@@ -1,0 +1,73 @@
+# AI-администратор: локальный dev-стек (фаза 0). См. docker/README.md
+# Запуск:  docker compose up -d      Стоп: docker compose down (данные БД остаются)
+name: ai-admin
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai-admin-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aiadmin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aiadmin_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-aiadmin}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aiadmin} -d ${POSTGRES_DB:-aiadmin}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  bot-service:
+    build: ./services/bot-service
+    container_name: ai-admin-bot
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-aiadmin}:${POSTGRES_PASSWORD:-aiadmin_dev}@postgres:5432/${POSTGRES_DB:-aiadmin}
+      SERVICE_NAME: bot-service
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "${BOT_HTTP_PORT:-8080}:8080"   # webhook-эндпоинт появится в фазе 2
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  call-service:
+    build: ./services/call-service
+    container_name: ai-admin-call
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-aiadmin}:${POSTGRES_PASSWORD:-aiadmin_dev}@postgres:5432/${POSTGRES_DB:-aiadmin}
+      SERVICE_NAME: call-service
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "${CALL_HTTP_PORT:-8081}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build: ./services/worker
+    container_name: ai-admin-worker
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-aiadmin}:${POSTGRES_PASSWORD:-aiadmin_dev}@postgres:5432/${POSTGRES_DB:-aiadmin}
+      SERVICE_NAME: worker
+    env_file:
+      - path: .env
+        required: false
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
