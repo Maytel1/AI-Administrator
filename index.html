@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>AI-администратор салонов — документы проекта</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f4f1ea;--paper:#fffefb;--ink:#1e2733;--muted:#63707f;--line:#e4dfd3;--accent:#0f766e;--accent-ink:#0b5d57;--accent-soft:#e3f1ee;--warn-ink:#93261b;--warn-soft:#fceeea;--ok:#1a7f37;--ok-soft:#e8f4ea;--radius:14px;--shadow:0 1px 2px rgba(30,39,51,.04),0 10px 28px rgba(30,39,51,.07)}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.72 "Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+::selection{background:var(--accent);color:#fff}
+h1,h2,h3{font-family:"Manrope","Inter",sans-serif;line-height:1.28;margin:0}
+a{color:var(--accent-ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+main{padding:40px 22px 80px}
+.doc{max-width:1000px;margin:0 auto}
+.doc-header{background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:32px 36px 26px;box-shadow:var(--shadow)}
+.kicker{font:700 11.5px "Inter",sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+.doc-header h1{font-size:31px;font-weight:800;letter-spacing:-.01em;margin:10px 0 10px}
+.lead{font-size:16.5px;color:var(--muted);margin:0;max-width:80ch}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.chip{display:inline-flex;align-items:center;gap:7px;font:600 12.5px "Inter",sans-serif;padding:5px 12px;border-radius:999px;background:var(--paper);border:1px solid var(--line)}
+.dot{flex:none;width:8px;height:8px;border-radius:50%;background:#9aa5b1}
+.dot.warn{background:#e07856}
+.dot.ok{background:#3fae5a}
+.rule{width:64px;height:3px;border-radius:3px;background:var(--accent);margin:20px 0 4px}
+.grp{display:flex;align-items:center;gap:12px;font:700 12px "Inter",sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:36px 0 14px}
+.grp::after{content:"";flex:1;height:1px;background:var(--line)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:18px 20px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:8px}
+.card h3{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:16.5px;margin:0}
+.card p{font-size:13.5px;color:var(--muted);margin:0;line-height:1.55}
+.acts{margin-top:auto;display:flex;gap:8px;flex-wrap:wrap;padding-top:8px}
+.btn{display:inline-block;font:600 13px "Inter",sans-serif;padding:7px 14px;border-radius:10px;background:var(--accent);color:#fff;text-decoration:none}
+.btn:hover{opacity:.92}
+.btn.ghost{background:transparent;color:var(--accent-ink);border:1px solid var(--line)}
+.btn.ghost:hover{background:var(--accent-soft)}
+.tag{display:inline-block;font:700 11px "Inter",sans-serif;padding:3px 9px;border-radius:999px;letter-spacing:.06em;text-transform:uppercase}
+.t-warn{background:#fbe3df;color:var(--warn-ink)}
+.t-ok{background:var(--ok-soft);color:var(--ok)}
+.t-mut{background:#ece9e1;color:var(--muted)}
+.howto{background:var(--accent-soft);border:1px solid #c3e0da;border-radius:12px;padding:14px 18px;font-size:14.5px}
+.howto p{margin:8px 0}
+code{font:500 .92em "JetBrains Mono",Consolas,monospace;background:#eef0f6;padding:2px 6px;border-radius:6px;color:#24304a}
+.src{margin-top:46px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--muted);font-style:italic}
+#top{position:fixed;right:22px;bottom:22px;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-size:17px;cursor:pointer;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .25s;z-index:55}
+#top.show{opacity:1;pointer-events:auto}
+#top:hover{background:var(--accent-soft)}
+@media print{body{background:#fff}main{padding:0}.doc-header{box-shadow:none;border-radius:0}#top{display:none}.card{box-shadow:none;page-break-inside:avoid}}
+</style>
+</head>
+<body>
+<main><article class="doc">
+<header class="doc-header">
+<div class="kicker">Документы проекта</div>
+<h1>AI-администратор для салонов красоты</h1>
+<p class="lead">Голосовой и текстовый AI-администратор (звонки 24/7 + WhatsApp/Telegram/VK, запись в YCLIENTS/Altegio) для салонов и барбершопов Тюмени. Индекс всех рабочих документов: стратегия и исследование, план разработки, решения на согласование, право и надёжность.</p>
+<div class="chips">
+<span class="chip"><span class="dot ok"></span>План разработки v1.2</span>
+<span class="chip">Тюмень · старт: салоны и барбершопы</span>
+<span class="chip">обновлено 20.09.2026</span>
+<span class="chip">11 документов + 2 материала</span>
+</div>
+<div class="rule"></div>
+</header>
+<div class="grp">Стратегия и исследование</div>
+<div class="grid">
+<div class="card">
+<h3><span class="tag t-ok">принято</span>Идеи и концепция</h3>
+<p>Спецификация голосового AI-администратора, регистрация скиллов, исследование ниши администраторов Тюмени (Роструд), принятые решения, включая решения от 20.09.2026.</p>
+<div class="acts"><a class="btn" href="IDEAS.html">Открыть документ</a><a class="btn ghost" href="IDEAS.md">MD</a></div>
+</div>
+<div class="card">
+<h3><span class="tag t-ok">рабочий план</span>План проекта</h3>
+<p>Приоритетная сфера (салоны/барбершопы Тюмени), формат продукта, источники данных и custdev по Mom Test; дополнения после ответов на 28 вопросов.</p>
+<div class="acts"><a class="btn" href="PLAN.html">Открыть документ</a><a class="btn ghost" href="PLAN.md">MD</a></div>
+</div>
+<div class="card">
+<h3><span class="tag t-mut">отчёт 19.09</span>Конкуренты Тюмени</h3>
+<p>Прямые и косвенные конкуренты (Likesoft, ZvonIII, ipt-ai, Daria AI, SEOmi), ценовые эшелоны, обязательные элементы оффера и рекомендации по позиционированию.</p>
+<div class="acts"><a class="btn" href="COMPETITORS_TYUMEN.html">Открыть документ</a><a class="btn ghost" href="COMPETITORS_TYUMEN.md">MD</a></div>
+</div>
+</div>
+<div class="grp">Разработка</div>
+<div class="grid">
+<div class="card">
+<h3><span class="tag t-ok">v1.2</span>План разработки</h3>
+<p>Стек из 13 компонентов, архитектура «один мозг — два рта», фазы 0–5 (12–14 недель до платного пилота), экономика, риски и раздел 8 с решениями от 20.09.2026.</p>
+<div class="acts"><a class="btn" href="DEVELOPMENT_PLAN.html">Открыть документ</a><a class="btn ghost" href="DEVELOPMENT_PLAN.md">MD</a></div>
+</div>
+</div>
+<div class="grp">Ждут вашего решения</div>
+<div class="grid">
+<div class="card">
+<h3><span class="tag t-warn">ждёт выбора</span>Тарифы</h3>
+<p>Три варианта сетки (по мастерам / по каналам / один универсальный тариф) и общие условия: setup, триал 7 дней, смена тарифа, рефералка «месяц бесплатно».</p>
+<div class="acts"><a class="btn" href="TARIFFS.html">Открыть документ</a><a class="btn ghost" href="TARIFFS.md">MD</a></div>
+</div>
+<div class="card">
+<h3><span class="tag t-warn">ждёт выбора</span>Ответственность за ошибки</h3>
+<p>Четыре формулировки для договора: от «как есть» до компенсации подтверждённых инцидентов и гарантии эффекта для пилотов; SLA и журнал аудита.</p>
+<div class="acts"><a class="btn" href="LIABILITY_OPTIONS.html">Открыть документ</a><a class="btn ghost" href="LIABILITY_OPTIONS.md">MD</a></div>
+</div>
+<div class="card">
+<h3><span class="tag t-warn">ждёт выбора</span>Салон без CRM</h3>
+<p>Пять сценариев работы для микросалонов с тетрадкой и WhatsApp: внутренний календарь, Google, гибрид с подтверждением, онбординг в Altegio, только подтверждения.</p>
+<div class="acts"><a class="btn" href="SALON_WITHOUT_CRM.html">Открыть документ</a><a class="btn ghost" href="SALON_WITHOUT_CRM.md">MD</a></div>
+</div>
+<div class="card">
+<h3><span class="tag t-warn">ждёт выбора</span>ПДн и LLM (152-ФЗ)</h3>
+<p>Юридическая рамка трансграничной передачи и пять путей решения: обезличивание перед LLM, YandexGPT, DeepSeek, локальная модель, гибрид.</p>
+<div class="acts"><a class="btn" href="PDN_LLM_OPTIONS.html">Открыть документ</a><a class="btn ghost" href="PDN_LLM_OPTIONS.md">MD</a></div>
+</div>
+</div>
+<div class="grp">Право, надёжность и парк вопросов</div>
+<div class="grid">
+<div class="card">
+<h3><span class="tag t-warn">проверить у юриста</span>Договор ПДн — шаблон</h3>
+<p>14 разделов и приложение: роли сторон, состав данных, меры защиты, доступ салона к записям звонков, экспорт при расторжении.</p>
+<div class="acts"><a class="btn" href="CONTRACT_PDN_TEMPLATE.html">Открыть документ</a><a class="btn ghost" href="CONTRACT_PDN_TEMPLATE.md">MD</a></div>
+</div>
+<div class="card">
+<h3><span class="tag t-mut">перед фазой 3</span>Сбои и failover</h3>
+<p>Десять сценариев деградации: что видит клиент, как отвечает система, что делает человек, какие меры настроить заранее.</p>
+<div class="acts"><a class="btn" href="FAILOVER_SCENARIOS.html">Открыть документ</a><a class="btn ghost" href="FAILOVER_SCENARIOS.md">MD</a></div>
+</div>
+<div class="card">
+<h3><span class="tag t-mut">парк</span>Открытые вопросы</h3>
+<p>13 отложенных пунктов: бренд и домен, миграция WhatsApp, TAM Тюмени, применимость патента, срок хранения аудио и другие.</p>
+<div class="acts"><a class="btn" href="OPEN_QUESTIONS.html">Открыть документ</a><a class="btn ghost" href="OPEN_QUESTIONS.md">MD</a></div>
+</div>
+</div>
+<div class="grp">Справочные материалы</div>
+<div class="grid">
+<div class="card">
+<h3><span class="tag t-mut">материал</span>Гайд по ИП — Тюмень 2026</h3>
+<p>Регистрация ИП, налоги и взносы: исходный исследовательский документ по юридической форме (решение — ИП на УСН).</p>
+<div class="acts"><a class="btn" href="ip_guide_tyumen_2026.html">Открыть</a></div>
+</div>
+<div class="card">
+<h3><span class="tag t-mut">материал</span>Анализ ниши администраторов v2</h3>
+<p>Предшествующий анализ рынка администраторов Тюмени (версия 2) — основа исследования в IDEAS.md.</p>
+<div class="acts"><a class="btn" href="administrator_tyumen_ai_analysis_v2.html">Открыть</a></div>
+</div>
+</div>
+<div class="grp">Как смотреть на GitHub</div>
+<div class="howto">
+<p><b>GitHub Pages (1 минута, бесплатно):</b> в репозитории откройте <code>Settings → Pages</code>, в «Build and deployment» выберите Source: <code>Deploy from a branch</code>, Branch: <code>main</code>, папка <code>/ (root)</code>, нажмите <code>Save</code>. Через минуту этот индекс откроется по адресу <code>https://&lt;логин&gt;.github.io/&lt;имя-репозитория&gt;/</code> — все ссылки на документы относительные и заработают сразу. Файл <code>.nojekyll</code> уже в репозитории (отключает сборку Jekyll). Для приватного репозитория Pages доступен только на платных планах.</p>
+<p><b>Без настройки Pages:</b> на странице файла GitHub показывает HTML как код — это нормально. Быстрый предпросмотр: <code>https://htmlpreview.github.io/?https://github.com/&lt;логин&gt;/&lt;репозиторий&gt;/blob/main/index.html</code>. Полная инструкция — в <a href="README.md">README.md</a>.</p>
+</div>
+<footer class="src">Индекс собран 20.09.2026 · 11 документов (HTML + MD-источники) · перегенерация разделов: <code>python build_html_docs.py</code></footer>
+</article></main>
+<button id="top" title="Наверх">↑</button>
+<script>
+const top=document.getElementById('top');
+addEventListener('scroll',()=>top.classList.toggle('show',scrollY>400));
+top.addEventListener('click',()=>scrollTo({top:0,behavior:'smooth'}));
+</script>
+</body>
+</html>
+
+

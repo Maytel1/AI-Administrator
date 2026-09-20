@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>План разработки — единый AI-администратор (текст + голос) для салонов красоты</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f1ea; --paper:#fffefb; --ink:#1e2733; --muted:#63707f; --line:#e4dfd3;
+  --accent:#0f766e; --accent-ink:#0b5d57; --accent-soft:#e3f1ee;
+  --warn-ink:#93261b; --warn-soft:#fceeea;
+  --ok:#1a7f37; --ok-soft:#e8f4ea;
+  --radius:14px; --sbw:296px;
+  --shadow:0 1px 2px rgba(30,39,51,.04),0 10px 28px rgba(30,39,51,.07);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.72 "Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+::selection{background:var(--accent);color:#fff}
+h1,h2,h3{font-family:"Manrope","Inter",sans-serif;line-height:1.28;margin:0}
+a{color:var(--accent-ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ---------- sidebar ---------- */
+#sidebar{position:fixed;top:0;bottom:0;left:0;width:var(--sbw);background:var(--paper);border-right:1px solid var(--line);padding:22px 18px;overflow-y:auto;display:flex;flex-direction:column;gap:13px;z-index:50;transition:transform .28s ease}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-badge{flex:none;width:38px;height:38px;border-radius:11px;background:var(--accent);display:grid;place-items:center;font-size:19px;box-shadow:var(--shadow)}
+.brand-title{font:800 14.5px/1.2 "Manrope",sans-serif;color:var(--ink)}
+.brand-sub{font-size:11.5px;color:var(--muted);margin-top:2px}
+.search{position:relative}
+#q{width:100%;padding:9px 30px 9px 12px;border:1px solid var(--line);border-radius:10px;font:13.5px "Inter",sans-serif;background:#faf8f2;color:var(--ink)}
+#q::placeholder{color:#9aa5b1}
+#q:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(15,118,110,.14)}
+#clearBtn{position:absolute;right:5px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--muted);font-size:13px;cursor:pointer;padding:4px 6px;border-radius:6px}
+#clearBtn:hover{background:#efece4}
+.count{font-size:11.5px;color:var(--muted);min-height:15px;padding:0 4px}
+.toc-h{font:700 10.5px "Inter",sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:2px 8px 4px}
+#toc{display:flex;flex-direction:column;gap:1px}
+#toc a{display:block;padding:5px 10px;border-radius:8px;border-left:2px solid transparent;color:var(--muted);text-decoration:none;font-size:13.5px;line-height:1.35}
+#toc a:hover{background:#f1eee6;color:var(--ink)}
+#toc a.active{background:var(--accent-soft);border-left-color:var(--accent);color:var(--accent-ink);font-weight:600}
+#toc a.sub{margin-left:14px;font-size:12.5px;padding:4px 10px 4px 12px}
+.kbd-hint{font-size:11px;color:var(--muted);padding:0 4px}
+.kbd-hint kbd{font:11px "JetBrains Mono",monospace;background:#f1eee6;border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+.sb-meta{margin-top:auto;font-size:11.5px;color:var(--muted);border-top:1px dashed var(--line);padding-top:12px}
+
+/* ---------- layout ---------- */
+main{margin-left:var(--sbw);padding:42px 48px 90px}
+.doc{max-width:880px}
+
+/* ---------- header ---------- */
+.kicker{font:700 11.5px "Inter",sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+.doc-header h1{font-size:31px;font-weight:800;margin:10px 0 12px;letter-spacing:-.01em}
+.lead{font-size:17px;color:var(--muted);max-width:72ch;margin:0}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.chip{font:600 12.5px "Inter",sans-serif;padding:5px 12px;border-radius:999px;background:var(--paper);border:1px solid var(--line)}
+.rule{width:64px;height:3px;border-radius:3px;background:var(--accent);margin:20px 0 4px}
+
+/* ---------- sections ---------- */
+section{scroll-margin-top:16px}
+h2{display:flex;align-items:center;flex-wrap:wrap;gap:12px;font-size:22.5px;margin:48px 0 16px}
+h2 .num{flex:none;width:34px;height:34px;border-radius:10px;background:var(--accent);color:#fff;display:grid;place-items:center;font:800 16px "Manrope",sans-serif}
+.h2sub{font:600 13.5px "Inter",sans-serif;color:var(--muted)}
+.h3sub{font:600 12.5px "Inter",sans-serif;color:var(--muted)}
+.comp{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;margin:16px 0;box-shadow:var(--shadow);scroll-margin-top:20px}
+.comp>h3{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:16.5px;margin:0 0 10px}
+.comp p{margin:8px 0}
+ul,ol{margin:8px 0;padding-left:22px}
+li{margin:4.5px 0}
+li::marker{color:var(--accent);font-weight:700}
+.goal{font-weight:600;color:var(--accent-ink);margin:2px 0 10px}
+.dom{font:500 11.5px "JetBrains Mono",monospace;color:var(--muted);background:#f1eee6;border:1px solid var(--line);padding:2px 7px;border-radius:6px}
+.tag{display:inline-block;font:700 11px "Inter",sans-serif;padding:3px 9px;border-radius:999px;letter-spacing:.02em}
+.t-warn{background:#fbe3df;color:var(--warn-ink)}
+.t-ok{background:var(--ok-soft);color:var(--ok)}
+.t-mut{background:#ece9e1;color:var(--muted)}
+.mut{color:var(--muted)}
+.price{font-weight:700;color:var(--accent-ink);white-space:nowrap}
+.callout{border:1px solid;border-radius:12px;padding:13px 16px;margin:13px 0;font-size:15px}
+.c-warn{background:var(--warn-soft);border-color:#f0cdc6}
+.c-note{background:var(--accent-soft);border-color:#c3e0da}
+.c-rec{background:linear-gradient(135deg,var(--accent-soft),#f4fbf9);border-left:5px solid var(--accent);border-color:#b8dcd4}
+
+/* ---------- checklists ---------- */
+ul.check{list-style:none;padding-left:2px;margin:10px 0}
+ul.check li{margin:0}
+.chk{display:flex;gap:10px;align-items:flex-start;padding:5px 8px;border-radius:8px;cursor:pointer}
+.chk:hover{background:#f6f3ec}
+.chk input{flex:none;width:17px;height:17px;margin:4px 0 0;accent-color:var(--accent);cursor:pointer}
+.chk input:checked+span{color:var(--muted);text-decoration:line-through}
+
+/* ---------- architecture diagram ---------- */
+pre.arch{font:12.5px/1.52 "JetBrains Mono",monospace;background:#223140;color:#e8f1ef;padding:20px 22px;border-radius:12px;overflow-x:auto;margin:14px 0 16px;box-shadow:var(--shadow)}
+
+/* ---------- stats ---------- */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0 22px}
+.stat{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow)}
+.stat b{display:block;font:800 20px/1.25 "Manrope",sans-serif;color:var(--accent-ink);margin-bottom:4px}
+.stat span{font-size:12.5px;color:var(--muted);line-height:1.45;display:block}
+
+/* ---------- tables ---------- */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);background:var(--paper);margin:14px 0 8px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{background:#edf4f1;color:var(--accent-ink);font:600 12.5px "Inter",sans-serif;text-align:left;padding:9px 12px;border:1px solid var(--line);white-space:nowrap}
+td{padding:9px 12px;border:1px solid var(--line);vertical-align:top}
+tbody tr:nth-child(even) td{background:#faf8f2}
+tbody tr:hover td{background:#f3f7f5}
+table.wide{min-width:920px}
+.row-hl td{background:#fdf3f1!important}
+.row-mut td{color:var(--muted);font-style:italic}
+
+/* ---------- misc ---------- */
+.src{margin-top:46px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--muted);font-style:italic}
+#top{position:fixed;right:22px;bottom:22px;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-size:17px;cursor:pointer;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .25s;z-index:55}
+#top.show{opacity:1;pointer-events:auto}
+#top:hover{background:var(--accent-soft)}
+.dimmed{opacity:.25;filter:saturate(.3);transition:opacity .2s}
+#menuBtn{display:none;position:fixed;top:13px;left:13px;z-index:60;width:42px;height:42px;border-radius:11px;border:1px solid var(--line);background:var(--paper);box-shadow:var(--shadow);font-size:17px;cursor:pointer}
+#scrim{position:fixed;inset:0;background:rgba(20,28,40,.38);opacity:0;pointer-events:none;transition:opacity .25s;z-index:45}
+body.nav-open #scrim{opacity:1;pointer-events:auto}
+body.nav-open{overflow:hidden}
+
+@media(max-width:1080px){
+  #sidebar{transform:translateX(-104%);box-shadow:none}
+  body.nav-open #sidebar{transform:none;box-shadow:0 10px 44px rgba(0,0,0,.2)}
+  main{margin-left:0;padding:76px 20px 70px}
+  #menuBtn{display:block}
+}
+@media(max-width:700px){
+  .stats{grid-template-columns:1fr 1fr}
+  .doc-header h1{font-size:24px}
+  .comp{padding:16px}
+  h2{font-size:20px}
+}
+@media print{
+  #sidebar,#top,#menuBtn,#scrim,.kbd-hint{display:none!important}
+  main{margin:0;padding:0}
+  body{background:#fff}
+  .comp,.tbl-wrap,.stat,pre.arch{box-shadow:none;break-inside:avoid}
+}
+</style>
+</head>
+<body>
+<button id="menuBtn" aria-label="Открыть содержание">☰</button>
+<div id="scrim"></div>
+<aside id="sidebar">
+  <div class="brand">
+    <div class="brand-badge">🛠️</div>
+    <div>
+      <div class="brand-title">План разработки</div>
+      <div class="brand-sub">AI-администратор: текст + голос · v1.1</div>
+    </div>
+  </div>
+  <div class="search">
+    <input id="q" type="search" placeholder="Поиск по плану…" autocomplete="off" spellcheck="false">
+    <button id="clearBtn" hidden aria-label="Очистить поиск">✕</button>
+  </div>
+  <div id="count" class="count"></div>
+  <div class="toc-h">Содержание</div>
+  <nav id="toc">
+    <a class="l1" href="#s1">1. Резюме</a>
+    <a class="l1" href="#s2">2. Инструменты и стек</a>
+    <a class="sub" href="#s21">2.1 · Продуктовый стек (13)</a>
+    <a class="sub" href="#s22">2.2 · Инструменты разработки</a>
+    <a class="sub" href="#s23">2.3 · Yandex Cloud по этапам</a>
+    <a class="l1" href="#s3">3. Архитектура</a>
+    <a class="l1" href="#s4">4. Этапы (12–14 недель)</a>
+    <a class="sub" href="#f0">Фаза 0 · Подготовка</a>
+    <a class="sub" href="#f1">Фаза 1 · «Мозг» и CRM</a>
+    <a class="sub" href="#f2">Фаза 2 · Текстовые каналы</a>
+    <a class="sub" href="#f3">Фаза 3 · Голосовой контур</a>
+    <a class="sub" href="#f4">Фаза 4 · Продуктизация</a>
+    <a class="sub" href="#f5">Фаза 5 · Масштабирование</a>
+    <a class="l1" href="#s5">5. Стоимость</a>
+    <a class="sub" href="#s51">5.1 · Запуск (единовременно)</a>
+    <a class="sub" href="#s52">5.2 · Операционные расходы</a>
+    <a class="sub" href="#s53">5.3 · Себестоимость точки</a>
+    <a class="l1" href="#s6">6. Риски и меры</a>
+    <a class="l1" href="#s7">7. Критерии успеха</a>
+    <a class="l1" href="#s8">8. Партнёрства и доступы</a>
+  </nav>
+  <div class="kbd-hint"><kbd>Ctrl</kbd>+<kbd>K</kbd> — быстрый поиск</div>
+  <div class="sb-meta">План: 19.09.2026 (обн. 20.09.2026) · 8 разделов · 6 фаз<br>HTML-версия DEVELOPMENT_PLAN.md</div>
+</aside>
+<main>
+<div class="doc">
+<header class="doc-header">
+  <div class="kicker">Development Plan · Тюмень · 19.09.2026</div>
+  <h1>Единый AI-администратор: текст + голос для салонов красоты</h1>
+  <p class="lead">План создания продукта, который закрывает все каналы связи клиента — входящие звонки 24/7 и чаты в мессенджерах — с интеграцией YCLIENTS / DIKIDI (Altegio). Позиционирование и конкурентная рамка — в отчёте COMPETITORS_TYUMEN.html.</p>
+  <div class="chips">
+    <span class="chip">⏱ 12–14 недель до платного пилота</span>
+    <span class="chip">🧩 13 компонентов стека</span>
+    <span class="chip">💰 Запуск ~38–82 тыс ₽ (без ФОТ)</span>
+    <span class="chip">📈 Себестоимость точки 5,6–11 тыс ₽/мес</span>
+    <span class="chip">🧠 Один LLM-«мозг» на оба канала</span>
+    <span class="chip">☁️ Инфраструктура — Yandex Cloud по фазам</span>
+  </div>
+  <div class="rule"></div>
+</header>
+<section id="s1">
+<h2><span class="num">1</span>Резюме</h2>
+<div class="stats">
+  <div class="stat"><b>12–14 нед</b><span>до платного пилота (6 фаз)</span></div>
+  <div class="stat"><b>13</b><span>компонентов продуктового стека</span></div>
+  <div class="stat"><b>~40–110 тыс ₽</b><span>единовременный запуск без ФОТ разработчиков</span></div>
+  <div class="stat"><b>45–75%</b><span>маржа точки при цене 10–20 тыс ₽/мес</span></div>
+</div>
+<p><b>Продукт:</b> единый AI-администратор для салонов красоты / барбершопов, который закрывает все каналы связи клиента: входящие звонки (голос 24/7) + текстовые чаты (WhatsApp, Telegram, VK, Instagram Direct). Интеграция с YCLIENTS / DIKIDI (Altegio).</p>
+<p><b>Позиционирование</b> (рамка из COMPETITORS_TYUMEN.md):</p>
+<div class="tbl-wrap"><table>
+<thead><tr><th>Эшелон рынка</th><th>Каналы</th><th>Цена для клиента</th></tr></thead>
+<tbody>
+<tr><td>Текстовые боты (Daria AI, jAutomation)</td><td>мессенджеры</td><td><span class="price">0–5 000 ₽/мес</span></td></tr>
+<tr><td>Голосовые для салонов (Likesoft Voice)</td><td>звонки</td><td>от <span class="price">30 000 ₽/мес</span> + setup 30 000 ₽</td></tr>
+<tr class="row-hl"><td><b>НАШ ПРОДУКТ</b></td><td><b>звонки + мессенджеры</b></td><td><b><span class="price">10–20 тыс ₽/мес</span> + setup 15–30 тыс ₽</b></td></tr>
+</tbody></table></div>
+<div class="callout c-rec"><b>Архитектурный принцип: «один мозг — два рта».</b> Единое LLM-ядро с beauty-логикой (услуги, мастера, слоты, FAQ), к которому подключены два канальных адаптера: телефония (голос) и мессенджеры (текст). CRM-слой записи общий.</div>
+</section>
+
+<section id="s2">
+<h2><span class="num">2</span>Сколько и какие инструменты нужны</h2>
+
+<div class="comp" id="s21">
+  <h3>2.1 · Продуктовый стек — 13 компонентов</h3>
+  <div class="tbl-wrap"><table class="wide">
+  <thead><tr><th>#</th><th>Компонент</th><th>Выбор по умолчанию</th><th>Альтернатива</th><th>Зачем</th></tr></thead>
+  <tbody>
+  <tr><td>1</td><td><b>Язык / рантайм</b></td><td>Python 3.11+</td><td>Node.js 20</td><td>все ключевые SDK для голоса и ботов — Python; возможен гибрид (голос — Python, боты — Node)</td></tr>
+  <tr><td>2</td><td><b>LLM-ядро</b></td><td>OpenAI gpt-4o-mini (+ function calling)</td><td>DeepSeek, YandexGPT 5, локальная Llama (152-ФЗ)</td><td>понимание запроса, выбор услуги/мастера/слота, FAQ, подтверждение записи</td></tr>
+  <tr><td>3</td><td><b>STT (речь → текст)</b></td><td>Yandex SpeechKit v3 (русский)</td><td>Whisper API, Vosk (on-prem)</td><td>перевод входящего звонка в текст в реальном времени</td></tr>
+  <tr><td>4</td><td><b>TTS (текст → речь)</b></td><td>Yandex SpeechKit Premium v3 (кастомный голос, ~450 ₽/мес за голос)</td><td>ElevenLabs, Silero v5</td><td>голос администратора, близкий к живому</td></tr>
+  <tr><td>5</td><td><b>Оркестрация звонка</b></td><td>Pipecat (open-source)</td><td>LiveKit Agents, Vocode</td><td>VAD, бардж-ин, прерывание бота, дуплексный цикл диалога</td></tr>
+  <tr><td>6</td><td><b>Телефония</b></td><td>Виртуальная АТС: Mango Office / UIS / Zadarma + SIP-номер</td><td>МТС Exolve, Gravitel</td><td>приём входящих звонков, переадресация, до-звон (подтверждение записи)</td></tr>
+  <tr><td>7</td><td><b>Мессенджер-шлюз</b></td><td>Bot API Telegram (aiogram) + WhatsApp Business API через провайдера (Twilio / 360dialog / Wazzup)</td><td>TextBack, official WA BSP</td><td>WhatsApp и Telegram — 2 ключевых канала салона</td></tr>
+  <tr><td>8</td><td><b>CRM-интеграция</b></td><td>YCLIENTS API (партнёрский доступ) + Altegio (DIKIDI) API</td><td>ручной режим на старте</td><td>чтение услуг/мастеров/слотов, создание/перенос/отмена записи</td></tr>
+  <tr><td>9</td><td><b>БД</b></td><td>PostgreSQL 16</td><td>+ TimescaleDB для логов звонков</td><td>клиенты, записи, логи диалогов, биллинг по точкам</td></tr>
+  <tr><td>10</td><td><b>Хостинг</b></td><td>Yandex Cloud (VM/K8s)</td><td>VK Cloud, Selectel</td><td>вся инфраструктура в РФ (152-ФЗ)</td></tr>
+  <tr><td>11</td><td><b>Мониторинг</b></td><td>Grafana + Prometheus + Loki</td><td>Sentry (ошибки), Langfuse (трейсы LLM)</td><td>uptime, задержки диалога, стоимость разговора</td></tr>
+  <tr><td>12</td><td><b>Фреймворк текстовых ботов</b></td><td>aiogram 3 (Telegram) + pywa (WhatsApp)</td><td>python-telegram-bot</td><td>единые хендлеры поверх общего «мозга»</td></tr>
+  <tr><td>13</td><td><b>Тестирование звонков</b></td><td>Тестовый SIP-аккаунт + мобильный телефон</td><td>автозвонки через телефонный шлюз</td><td>проверка сценариев записи/переноса до прода</td></tr>
+  </tbody></table></div>
+</div>
+
+<div class="comp" id="s22">
+  <h3>2.2 · Инструменты разработки и эксплуатации</h3>
+  <div class="tbl-wrap"><table>
+  <thead><tr><th>Назначение</th><th>Инструменты</th></tr></thead>
+  <tbody>
+  <tr><td>Кодирование</td><td>VS Code + Cline (DeepSeek), Git + GitHub</td></tr>
+  <tr><td>Контейнеры</td><td>Docker + docker-compose (call-service, bot-service, worker, PostgreSQL)</td></tr>
+  <tr><td>Тесты</td><td>pytest (юнит + интеграция), ручные тестовые звонки по чек-листу</td></tr>
+  <tr><td>Развёртывание</td><td>docker-compose на VM (Yandex Cloud), позже Kubernetes при росте</td></tr>
+  <tr><td>CI/CD</td><td>GitHub Actions: lint → тесты → сборка → деплой</td></tr>
+  <tr><td>Мониторинг и логи</td><td>Grafana + Prometheus + Loki + Sentry</td></tr>
+  <tr><td>Секреты</td><td>Yandex Lockbox / .env вне репозитория</td></tr>
+  <tr><td>Документация</td><td>Markdown в репозитории (этот файл, ADR-заметки по решениям)</td></tr>
+  </tbody></table></div>
+</div>
+<div class="comp" id="s23">
+  <h3>2.3 · Сервисы Yandex Cloud по этапам <span class="tag t-ok">обновлено 20.09.2026</span></h3>
+  <p><b>Четыре роли YC в проекте.</b> Всё остальное — не Yandex: LLM — OpenAI, телефония — Mango / UIS / Zadarma, мессенджеры — Bot API / BSP, CRM — YCLIENTS / Altegio.</p>
+  <div class="tbl-wrap"><table>
+  <thead><tr><th>Роль</th><th>Сервисы YC</th><th>Зачем</th></tr></thead>
+  <tbody>
+  <tr><td><b>Голос (AI)</b></td><td>SpeechKit — стриминговый STT v3 + TTS v3 (Premium / Brand Voice)</td><td>компоненты №3–4 стека</td></tr>
+  <tr><td><b>Хостинг</b></td><td>Compute Cloud (VM) → Managed Kubernetes (фаза 5)</td><td>компонент №10, данные в РФ (152-ФЗ)</td></tr>
+  <tr><td><b>Данные</b></td><td>Managed PostgreSQL (+TimescaleDB, +pgvector) · Object Storage</td><td>компонент №9 + аудиозаписи звонков</td></tr>
+  <tr><td><b>Платформа</b></td><td>IAM · Lockbox · Cloud DNS + Certificate Manager · Billing · Managed Prometheus / Monitoring</td><td>секреты, HTTPS-вебхуки, алерты, контроль расходов</td></tr>
+  </tbody></table></div>
+  <p><b>Что и когда подключаем:</b></p>
+  <div class="tbl-wrap"><table>
+  <thead><tr><th>Фаза</th><th>Сервисы YC</th><th>Комментарий</th></tr></thead>
+  <tbody>
+  <tr><td><b>0 · Подготовка</b></td><td>Billing: бюджеты + алерты; IAM: каталоги <span class="dom">dev</span>/<span class="dom">prod</span>, сервисный аккаунт, API-ключи SpeechKit; Compute (dev-VM); тесты SpeechKit</td><td>секреты — .env; TLS — certbot на VM</td></tr>
+  <tr><td><b>1 · «Мозг» и CRM</b></td><td>Managed PostgreSQL (мин. класс; вариант — PG в docker на dev-VM, 0 ₽); Lockbox — ключи Altegio / YCLIENTS / OpenAI</td><td>расширения подтверждены: timescaledb (издание Apache 2), pgvector</td></tr>
+  <tr><td><b>2 · Текстовые каналы</b></td><td>Cloud DNS + TLS (Certificate Manager или certbot); Managed PG — прод-пилот; Lockbox — токены ботов</td><td>публичный HTTPS для вебхуков TG / WA</td></tr>
+  <tr><td><b>3 · Голосовой контур</b></td><td>SpeechKit STT v3 (стрим) + TTS v3; Object Storage — аудиозаписи с lifecycle-правилами; вторая VM под call-service</td><td>VM строго в ru-central1 — цель &lt; 1.2 c на реплику; бакет приватный, доступ через сервисный аккаунт</td></tr>
+  <tr><td><b>4 · Продуктизация</b></td><td>Container Registry (если CI пушит образы); Managed Prometheus / Monitoring — алерты; Certificate Manager — демо-номер и кабинет</td><td>мультиарендность — схема БД, не сервис YC</td></tr>
+  <tr><td><b>5 · Масштабирование</b></td><td>Managed Kubernetes; реплика Managed PG; Managed Valkey — очереди рободо-звона</td><td>опции: SpeechSense, DataLens, Data Transfer, Message Queue</td></tr>
+  </tbody></table></div>
+  <p><b>Не брать</b> на горизонте 12–14 недель: Kubernetes и ALB до фазы 5, DataSphere, Managed Kafka, Cloud CDN, BareMetal — лишние расходы.</p>
+  <div class="callout c-warn"><b>Новое в YC — может заменить самописный call-service.</b> 28.05.2026 в Yandex AI Studio запущен конструктор голосовых ИИ-агентов (модель Yandex Speech Realtime): существующая АТС подключается по SIP (RTP → платформа), статус — Preview, интеграция через поддержку YC. Плюс — резко меньше разработки, есть Brand Voice Lite (запись своего голоса). Минус — LLM-ядро YandexGPT (не gpt-4o-mini), beauty-логика ограничена их tools-интерфейсом. Действие: запрос в поддержку YC + сравнительный тест с Pipecat-стендом (снимает риск латентности).</div>
+  <p><b>Ориентир расходов YC</b> (тарифная страница SpeechKit закрыта анти-ботом — проверить в калькуляторе цен):</p>
+  <div class="tbl-wrap"><table>
+  <thead><tr><th>Этап</th><th>YC-инфраструктура, ~₽/мес</th></tr></thead>
+  <tbody>
+  <tr><td>Фазы 0–1 (дев)</td><td><span class="price">1 500–3 000</span> (VM) + SpeechKit-тесты ≈ 0</td></tr>
+  <tr><td>Фазы 2–4 (пилот)</td><td><span class="price">4 000–6 000</span> (VM 4 vCPU / 8 GB) + <span class="price">3 500–5 500</span> (Managed PG, мин. класс) + единицы ₽ (Object Storage) + SpeechKit по минутам</td></tr>
+  </tbody></table></div>
+  <p><b>Чек-лист подготовки YC-аккаунта</b> (фаза 0, детально):</p>
+  <ul class="check">
+    <li><label class="chk"><input type="checkbox"><span>Облако + каталоги dev/prod, сервисные аккаунты с минимальными ролями (IAM)</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Бюджеты и алерты в Billing на каждый каталог (лимит ~5–10 тыс ₽/мес на дев)</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>API-ключи SpeechKit от сервисного аккаунта (STT + TTS), тест 2–3 фраз</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Security Groups: входящие — 443 (вебхуки) и UDP/RTP от АТС-провайдера, остальное закрыто</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Домен в Cloud DNS (webhook-стенд), TLS: certbot на старте → Certificate Manager с фаз 2–4</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Секреты: .env вне репозитория на старте → Lockbox с фазы 2–3; ключи не в git</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Запрос в поддержку YC: голосовой агент AI Studio по SIP — тестовая витрина</span></label></li>
+  </ul>
+</div>
+</section>
+<section id="s3">
+<h2><span class="num">3</span>Архитектура</h2>
+<pre class="arch">
+                       КЛИЕНТЫ
+   Телефонный звонок          WhatsApp / Telegram / VK / IG Direct
+          │                            │
+          ▼                            ▼
+┌──────────────────┐        ┌──────────────────────┐
+│ Телефония (АТС)  │        │ Мессенджер-шлюз      │
+│ Mango/UIS/Zadarma│        │ WA BSP + Bot API TG  │
+└────────┬─────────┘        └──────────┬───────────┘
+         │ SIP/RTP                     │ webhook
+         ▼                             ▼
+┌──────────────────────────────────────────────────┐
+│        КАНАЛЬНЫЕ АДАПТЕРЫ                        │
+│  call-service (Pipecat: VAD→STT→TTS)             │
+│  bot-service (aiogram + pywa)                    │
+└────────────────────┬─────────────────────────────┘
+                     ▼
+┌──────────────────────────────────────────────────┐
+│        LLM-ЯДРО (общий «мозг»)                   │
+│  gpt-4o-mini + system prompt + beauty-тools      │
+│  tools: услуги, мастера, слоты, запись, FAQ      │
+└────────────────────┬─────────────────────────────┘
+                     ▼
+┌──────────────────────────────────────────────────┐
+│        CRM-СЛОЙ                                  │
+│  YCLIENTS API · Altegio API · PostgreSQL         │
+└──────────────────────────────────────────────────┘
+
+Эскалация сложных вопросов → Telegram-бот администратора салона
+Уведомления о каждой записи → владельцу в Telegram
+</pre>
+<div class="comp">
+  <h3>Ключевые решения</h3>
+  <ol>
+    <li><b>Один LLM-агент на оба канала</b> — экономия разработки и единая логика ответов.</li>
+    <li><b>Голосовой цикл отдельным сервисом</b> (call-service), т.к. там realtime-требования: отклик бота &lt; 1 сек, бардж-ин.</li>
+    <li><b>Текстовые боты могут работать даже без LLM</b> на FAQ+кнопках (fallback при недоступности API).</li>
+    <li><b>Все данные и логи — в Yandex Cloud (152-ФЗ)</b>, записи разговоров храним с уведомлением клиента в начале звонка.</li>
+  </ol>
+</div>
+</section>
+
+<section id="s4">
+<h2><span class="num">4</span>Этапы <span class="h2sub">12–14 недель до платного пилота</span></h2>
+
+<div class="comp" id="f0">
+  <h3>Фаза 0 — Подготовка <span class="tag t-mut">неделя 1</span></h3>
+  <p class="goal">Цель: все доступы, ключи и юр. база.</p>
+  <ul class="check">
+    <li><label class="chk"><input type="checkbox"><span>ИП/юрлицо, расчётный счёт, подпись для договоров</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Политика ПДн и согласия (152-ФЗ), хранение в РФ</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Аккаунт Yandex Cloud, платёжный аккаунт, бюджет-алерты</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>API-ключи: OpenAI (или DeepSeek), Yandex SpeechKit (STT+TTS)</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Телефония: тестовый SIP-аккаунт и номер (Mango/Zadarma)</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Telegram-бот через @BotFather, webhook-стенд</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Заявка на партнёрский доступ YCLIENTS API; альтернативно — договорённость с 1–2 «дружественными» салонами на доступ через их аккаунт</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Репозиторий, CI, docker-compose-скелет</span></label></li>
+  </ul>
+  <div class="callout c-warn"><b>Риск фазы:</b> доступ к партнёрскому API YCLIENTS — самый долгий внешний шаг (от 2 недель). Параллельно готовим Altegio API (доступ быстрее) как первый интегрируемый объект.</div>
+</div>
+
+<div class="comp" id="f1">
+  <h3>Фаза 1 — «Мозг» и CRM-слой <span class="tag t-mut">недели 2–4</span></h3>
+  <p class="goal">Цель: текстовый агент пишет в CRM, CLI-тесты проходят.</p>
+  <ul class="check">
+    <li><label class="chk"><input type="checkbox"><span>Схема БД: салоны, услуги, мастера, слоты, клиенты, записи, диалоги</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>CRM-адаптер: get_services, get_masters, get_slots, create_booking, cancel_booking (Altegio → YCLIENTS)</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>LLM-агент: system prompt администратора, function calling на tools выше</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>CLI-режим диалога для отладки сценариев (без мессенджеров)</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Сценарии: запись, перенос, отмена, «что дешевле/ближайшее время», FAQ (адрес, цены, парковка)</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Эскалация: что бот НЕ решает сам → рука человека</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Юнит/интеграционные тесты (pytest) на основные ветки</span></label></li>
+  </ul>
+  <div class="callout c-note"><b>Критерий готовности:</b> 90% тестовых диалогов (сценарный набор ~30 штук) завершается корректной записью в CRM в тестовом салоне.</div>
+</div>
+
+<div class="comp" id="f2">
+  <h3>Фаза 2 — Текстовые каналы <span class="tag t-mut">недели 5–7</span></h3>
+  <p class="goal">Цель: бот в Telegram и WhatsApp реально записывает клиентов.</p>
+  <ul class="check">
+    <li><label class="chk"><input type="checkbox"><span>bot-service: aiogram (TG) + pywa (WA), общий роутер к «мозгу»</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Быстрые ответы/кнопки (услуга → мастер → время) как дополнение к свободному тексту</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Уведомления владельцу о каждой записи, ежедневный дайджест</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Ограничения: анти-спам, лимиты на номер, логирование всех диалогов</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Пилот у 1 дружественного салона (текстовый канал)</span></label></li>
+  </ul>
+  <div class="callout c-note"><b>Критерий готовности:</b> ≥50 реальных диалогов у пилота, ≥30% диалогов завершаются записью без человека.</div>
+</div>
+
+<div class="comp" id="f3">
+  <h3>Фаза 3 — Голосовой контур <span class="tag t-mut">недели 7–10</span></h3>
+  <p class="goal">Цель: бот берёт трубку и записывает по телефону.</p>
+  <ul class="check">
+    <li><label class="chk"><input type="checkbox"><span>call-service на Pipecat: подключение SIP-телефонии</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Стрим-обработка: VAD → SpeechKit STT → LLM → SpeechKit TTS, латентность &lt; 1.2 сек на реплику</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Бардж-ин (клиент перебивает — бот слушает), вежливое завершение</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Очередь «звонки в нерабочее время» и переадресация на человека днём (настройка на салон)</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Голосовое уведомление «разговор записывается» (152-ФЗ)</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Запись разговора → файл в облако → транскрипт в БД</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Тестовые звонки по чек-листу (тишина, шум, акцент, перебивание, злой клиент)</span></label></li>
+  </ul>
+  <div class="callout c-note"><b>Критерий готовности:</b> 80% тестовых звонков завершаются корректной записью; средняя латентность ответа &lt; 1.2 сек.</div>
+</div>
+
+<div class="comp" id="f4">
+  <h3>Фаза 4 — Продуктизация и пилот <span class="tag t-mut">недели 10–12</span></h3>
+  <p class="goal">Цель: продукт можно продать и подключить за 1 день.</p>
+  <ul class="check">
+    <li><label class="chk"><input type="checkbox"><span>Мультиарендность: салон = tenant, тарификация по числу мастеров</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Онбординг салона: анкета (услуги/цены/FAQ), импорт из YCLIENTS, настройка переадресации</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Демо-номер «позвони и попробуй записаться» (приём Likesoft — обязателен к повторению)</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Личный кабинет владельца (минимум: статистика звонков/чатов, записи, транскрипты) — можно начать с TG-бота отчётов</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Биллинг: учёт минут/диалогов, лимиты тарифа, доплата сверх пакета</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Мониторинг: алерты на падение канала, стоимость диалога в Grafana</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Юр. документы для клиента: оферта, согласие на обработку ПДн</span></label></li>
+  </ul>
+  <div class="callout c-note"><b>Критерий готовности:</b> подключение нового салона ≤ 1 рабочий день, 2–3 платных пилота запущены.</div>
+</div>
+
+<div class="comp" id="f5">
+  <h3>Фаза 5 — Масштабирование <span class="tag t-mut">недели 12+, после первых продаж</span></h3>
+  <ul class="check">
+    <li><label class="chk"><input type="checkbox"><span>VK и Instagram Direct (через провайдера)</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Исходящий контур: подтверждение записи накануне (рободо-звон) — отдельный источник выручки</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Тарифная сетка как у рынка: Base / Pro / Сеть</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>Автотесты звонков (регрессия голосового сценария)</span></label></li>
+    <li><label class="chk"><input type="checkbox"><span>K8s при росте нагрузки, репликация БД</span></label></li>
+  </ul>
+</div>
+</section>
+<section id="s5">
+<h2><span class="num">5</span>Бюджет запуска <span class="h2sub">до первого платного пилота</span></h2>
+
+<div class="comp" id="s51">
+  <h3>5.1 · Единоразовые затраты</h3>
+  <div class="tbl-wrap"><table>
+  <thead><tr><th>Статья</th><th>Мин</th><th>Макс</th></tr></thead>
+  <tbody>
+  <tr><td>Yandex Cloud, 3 мес (VM, БД, диск)</td><td><span class="price">12 000 ₽</span></td><td><span class="price">25 000 ₽</span></td></tr>
+  <tr><td>OpenAI API, разработка и пилоты</td><td><span class="price">4 000 ₽</span></td><td><span class="price">8 000 ₽</span></td></tr>
+  <tr><td>Yandex SpeechKit STT+TTS, 3 мес</td><td><span class="price">6 000 ₽</span></td><td><span class="price">10 000 ₽</span></td></tr>
+  <tr><td>Телефония: 2 SIP-номера × 3 мес</td><td><span class="price">4 500 ₽</span></td><td><span class="price">9 000 ₽</span></td></tr>
+  <tr><td>WhatsApp BSP: подключение + 3 мес</td><td><span class="price">4 500 ₽</span></td><td><span class="price">12 000 ₽</span></td></tr>
+  <tr><td>Домен, TLS-сертификат</td><td><span class="price">1 500 ₽</span></td><td><span class="price">3 000 ₽</span></td></tr>
+  <tr><td>Регистрация ИП + электронная подпись</td><td><span class="price">2 000 ₽</span></td><td><span class="price">8 000 ₽</span></td></tr>
+  <tr><td>Резерв ~10%</td><td><span class="price">3 500 ₽</span></td><td><span class="price">7 500 ₽</span></td></tr>
+  <tr class="row-hl"><td><b>ИТОГО единоразово</b></td><td><span class="price">~38 000 ₽</span></td><td><span class="price">~82 500 ₽</span></td></tr>
+  </tbody></table></div>
+  <p class="mut">Не входит: ФОТ разработчиков (считается отдельно, зависит от команды). Если разработку ведёт сам основатель с Cline/DeepSeek — бюджет сводится к строкам выше.</p>
+</div>
+
+<div class="comp" id="s52">
+  <h3>5.2 · Ежемесячные затраты на этапе разработки и пилотов</h3>
+  <div class="tbl-wrap"><table>
+  <thead><tr><th>Статья</th><th>Мин</th><th>Макс</th></tr></thead>
+  <tbody>
+  <tr><td>Yandex Cloud: VM + PostgreSQL + мониторинг</td><td><span class="price">4 000 ₽</span></td><td><span class="price">8 000 ₽</span></td></tr>
+  <tr><td>OpenAI API: ~1 000 диалогов/мес</td><td><span class="price">2 000 ₽</span></td><td><span class="price">4 000 ₽</span></td></tr>
+  <tr><td>SpeechKit STT+TTS: пилотные звонки</td><td><span class="price">2 000 ₽</span></td><td><span class="price">4 000 ₽</span></td></tr>
+  <tr><td>Телефония: 2 номера + минуты</td><td><span class="price">2 000 ₽</span></td><td><span class="price">4 000 ₽</span></td></tr>
+  <tr><td>WhatsApp BSP (Wazzup, 2 номера)</td><td><span class="price">2 000 ₽</span></td><td><span class="price">3 000 ₽</span></td></tr>
+  <tr class="row-hl"><td><b>ИТОГО в месяц</b></td><td><span class="price">~12 000 ₽</span></td><td><span class="price">~23 000 ₽</span></td></tr>
+  </tbody></table></div>
+</div>
+<div class="comp" id="s53">
+  <h3>5.3 · Себестоимость одного салона в месяц</h3>
+  <div class="tbl-wrap"><table>
+  <thead><tr><th>Статья</th><th>Мин</th><th>Макс</th><th>Комментарий</th></tr></thead>
+  <tbody>
+  <tr><td>Инфраструктура (доля VM + БД)</td><td><span class="price">600 ₽</span></td><td><span class="price">1 000 ₽</span></td><td>при 10–20 точках</td></tr>
+  <tr><td>LLM + STT/TTS (норма ~300 звонков+чатов)</td><td><span class="price">3 000 ₽</span></td><td><span class="price">6 000 ₽</span></td><td>зависит от нагрузки</td></tr>
+  <tr><td>Телефония: номер + ~500 мин</td><td><span class="price">1 000 ₽</span></td><td><span class="price">2 000 ₽</span></td><td>входящие дешевле исходящих</td></tr>
+  <tr><td>WhatsApp-канал</td><td><span class="price">1 000 ₽</span></td><td><span class="price">2 000 ₽</span></td><td>через BSP</td></tr>
+  <tr class="row-hl"><td><b>Себестоимость точки</b></td><td><span class="price">~5 600 ₽</span></td><td><span class="price">~11 000 ₽</span></td><td>без ФОТ и продаж</td></tr>
+  <tr><td>Цена подписки (наша)</td><td colspan="2"><span class="price">10 000–20 000 ₽/мес</span></td><td>плюс setup 15–30 тыс ₽ разово</td></tr>
+  <tr><td><b>Маржа точки</b></td><td colspan="2"><b><span class="price">~45–75%</span></b></td><td>растёт с масштабом</td></tr>
+  </tbody></table></div>
+  <div class="callout c-rec"><b>Юнит-экономика:</b> 10 точек → выручка 100–200 тыс ₽/мес при прямых затратах 56–110 тыс ₽/мес (маржа 45–75%). 30 точек → маржа 60–80%. Setup-платёж 15–30 тыс ₽ окупает онбординг точки.</div>
+</div>
+</section>
+
+<section id="s6">
+<h2><span class="num">6</span>Риски и как их снижать</h2>
+<div class="tbl-wrap"><table>
+<thead><tr><th>Риск</th><th>Вероятность</th><th>Митигация</th></tr></thead>
+<tbody>
+<tr><td>Партнёрский доступ к API YCLIENTS задержится</td><td>высокая</td><td>старт на Altegio API (быстрее), ручной режим записи для первых салонов, параллельная подача в YCLIENTS</td></tr>
+<tr><td>Латентность голосового цикла &gt; 2 сек (клиент вешает трубку)</td><td>средняя</td><td>Pipecat со стримингом, SpeechKit streaming-режим, замер p95 с первой недели фазы 3</td></tr>
+<tr><td>LLM «галлюцинирует» услуги или цены</td><td>средняя</td><td>function calling только по данным CRM, запрет свободной генерации цен, валидация перед записью</td></tr>
+<tr><td>Выход Likesoft в Тюмень</td><td>средняя</td><td>скорость входа (их цена от 30 тыс ₽/мес — мы позиционируемся в 2–3 раза дешевле), локальный сервис, живые демо</td></tr>
+<tr><td>Ошибки распознавания русской речи (шум салона)</td><td>средняя</td><td>тест SpeechKit vs Whisper на реальных записях, переспрашивание, fallback «перезвоню вам в WhatsApp»</td></tr>
+<tr><td>Демпинг текстовых ботов (Daria AI промо 0 ₽)</td><td>низкая</td><td>наша ставка на звонки — канал, который текстовые боты не закрывают</td></tr>
+<tr><td>152-ФЗ: запись разговоров, хранение ПДн</td><td>обязательно</td><td>Yandex Cloud в РФ, уведомление в начале звонка, согласия в оферте, логи доступа</td></tr>
+<tr><td>WhatsApp-политики (блокировка номера за спам)</td><td>средняя</td><td>официальный BSP, opt-in клиентов, лимиты шаблонов, warm-up номера</td></tr>
+</tbody></table></div>
+</section>
+<section id="s7">
+<h2><span class="num">7</span>Критерии успеха MVP</h2>
+<div class="tbl-wrap"><table>
+<thead><tr><th>Метрика</th><th>Цель к концу пилота</th></tr></thead>
+<tbody>
+<tr><td>Диалогов в месяц (все каналы)</td><td>≥ 300</td></tr>
+<tr><td>Доля диалогов, завершившихся записью без человека</td><td>≥ 30%</td></tr>
+<tr><td>Голосовых звонков, доведённых до записи</td><td>≥ 40%</td></tr>
+<tr><td>Средняя латентность ответа голоса</td><td>&lt; 1.2 сек (p95 &lt; 2 сек)</td></tr>
+<tr><td>Пропущенных звонков после подключения</td><td>снижение ≥ 70% против базовой линии салона</td></tr>
+<tr><td>Платных пилотных точек</td><td>≥ 3</td></tr>
+<tr><td>NPS владельцев пилота</td><td>≥ 8/10</td></tr>
+<tr><td>Стоимость себестоимости диалога</td><td>≤ 20 ₽</td></tr>
+</tbody></table></div>
+</section>
+
+<section id="s8">
+<h2><span class="num">8</span>Партнёрства и доступы — критический путь</h2>
+<ol class="resume">
+  <li><b>Altegio (DIKIDI) API</b> — fastest path: запрос доступа через сайт партнёров, обычно быстрее, чем YCLIENTS. Первый интегрируемый CRM.</li>
+  <li><b>YCLIENTS партнёрская программа</b> — заявка на api.yclients.ru; рассматривают интеграционные решения для салонов. Готовим демо текстового бота для ускорения одобрения.</li>
+  <li><b>Телефония</b> — договор с Mango Office / UIS / Zadarma (у всех есть API + тестовые номера). Мгновенно, без «партнёрских программ».</li>
+  <li><b>WhatsApp BSP</b> — Wazzup (простой старт, RU-поддержка) или 360dialog (официальный BSP). Opt-in клиентов обязателен.</li>
+  <li><b>LLM-провайдер</b> — OpenAI платный сразу; на этапе разработки можно тестировать DeepSeek (дешевле), но прод — с SLA.</li>
+  <li><b>Дружественные салоны</b> — 2–3 точки Тюмени с договором пилота: доступ к их YCLIENTS/Altegio + телефония в обмен на бесплатный период. Это обходной путь, пока нет партнёрского API.</li>
+</ol>
+<div class="callout c-warn"><b>Самое долгое звено — YCLIENTS.</b> Начинать заявку в фазе 0, не откладывая. Все остальные доступы оформляются за 1–3 дня.</div>
+</section>
+
+<footer class="src">Основа: COMPETITORS_TYUMEN.md (анализ рынка и конкурентов, 19.09.2026) · Цены компонентов: Yandex Cloud, SpeechKit, OpenAI, Wazzup/360dialog, Mango Office, Zadarma (проверены на тарифных страницах).<br>HTML-версия DEVELOPMENT_PLAN.md от 19.09.2026. Чек-боксы в разделе «Этапы» кликабельны — прогресс сохраняется в браузере (localStorage).<br>Обновление 20.09.2026: добавлен раздел 2.3 «Yandex Cloud по этапам» — сервисы сверены с каталогом и документацией YC (TimescaleDB в Managed PostgreSQL — издание Apache 2, pgvector поддерживается; голосовые агенты Yandex AI Studio по SIP — Preview с 28.05.2026; тарифы SpeechKit автоматикой не читаются — проверить в калькуляторе цен).</footer>
+</div>
+</main>
+<button id="top" aria-label="Наверх">↑</button>
+<script>
+(function(){
+"use strict";
+var $=function(s){return document.querySelector(s)},
+    $$=function(s){return Array.prototype.slice.call(document.querySelectorAll(s))};
+var tocLinks=$$('#toc a'),
+    topBtn=$('#top'),menuBtn=$('#menuBtn'),scrim=$('#scrim'),
+    q=$('#q'),clearBtn=$('#clearBtn'),count=$('#count'),
+    l1=tocLinks.filter(function(a){return a.classList.contains('l1')}),
+    secs=l1.map(function(a){return document.querySelector(a.getAttribute('href'))});
+
+if('IntersectionObserver' in window){
+  var spy=new IntersectionObserver(function(es){
+    es.forEach(function(e){
+      if(e.isIntersecting){
+        l1.forEach(function(a){a.classList.toggle('active',a.getAttribute('href')==='#'+e.target.id)});
+      }
+    });
+  },{rootMargin:'-12% 0px -62% 0px'});
+  secs.forEach(function(s){if(s)spy.observe(s)});
+}
+window.addEventListener('scroll',function(){topBtn.classList.toggle('show',window.scrollY>640)},{passive:true});
+topBtn.addEventListener('click',function(){window.scrollTo({top:0,behavior:'smooth'})});
+menuBtn.addEventListener('click',function(){document.body.classList.toggle('nav-open')});
+scrim.addEventListener('click',function(){document.body.classList.remove('nav-open')});
+tocLinks.forEach(function(a){a.addEventListener('click',function(){document.body.classList.remove('nav-open')})});
+
+function runSearch(){
+  var v=q.value.trim().toLowerCase(),hits=0;
+  clearBtn.hidden=!v;
+  tocLinks.forEach(function(a){
+    var ok=!v||a.textContent.toLowerCase().indexOf(v)>-1;
+    a.style.display=ok?'':'none';
+    if(ok)hits++;
+  });
+  secs.forEach(function(s){
+    if(!s)return;
+    s.classList.toggle('dimmed',!!v&&s.textContent.toLowerCase().indexOf(v)===-1);
+  });
+  count.textContent=v?(hits?'совпадений: '+hits:'ничего не найдено'):'';
+}
+q.addEventListener('input',runSearch);
+clearBtn.addEventListener('click',function(){q.value='';runSearch();q.focus()});
+document.addEventListener('keydown',function(e){
+  if((e.ctrlKey||e.metaKey)&&(e.key==='k'||e.key==='K'||e.key==='л')){e.preventDefault();q.focus()}
+});
+
+/* чек-боксы фаз: прогресс сохраняется в браузере */
+$$('.comp[id]').forEach(function(c){
+  Array.prototype.slice.call(c.querySelectorAll('.chk input')).forEach(function(b,i){
+    var k='ai-admin-plan:'+c.id+':'+i;
+    try{if(localStorage.getItem(k)==='1')b.checked=true}catch(e){}
+    b.addEventListener('change',function(){try{localStorage.setItem(k,b.checked?'1':'0')}catch(e){}});
+  });
+});
+})();
+</script>
+</body>
+</html>

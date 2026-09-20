@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Идеи и концепция продукта</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f4f1ea;--paper:#fffefb;--ink:#1e2733;--muted:#63707f;--line:#e4dfd3;--accent:#0f766e;--accent-ink:#0b5d57;--accent-soft:#e3f1ee;--warn-ink:#93261b;--warn-soft:#fceeea;--ok:#1a7f37;--ok-soft:#e8f4ea;--radius:14px;--shadow:0 1px 2px rgba(30,39,51,.04),0 10px 28px rgba(30,39,51,.07)}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.72 "Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+::selection{background:var(--accent);color:#fff}
+h1,h2,h3{font-family:"Manrope","Inter",sans-serif;line-height:1.28;margin:0}
+a{color:var(--accent-ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+main{padding:40px 22px 80px}
+.doc{max-width:920px;margin:0 auto}
+.doc-header{background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:30px 34px 24px;box-shadow:var(--shadow)}
+.kicker{font:700 11.5px "Inter",sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+.doc-header h1{font-size:30px;font-weight:800;letter-spacing:-.01em;margin:10px 0 10px}
+.lead{font-size:16.5px;color:var(--muted);margin:0;max-width:75ch}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.chip{display:inline-flex;align-items:center;gap:7px;font:600 12.5px "Inter",sans-serif;padding:5px 12px;border-radius:999px;background:var(--paper);border:1px solid var(--line)}
+.chip code{font-size:11.5px;padding:1px 6px}
+.dot{flex:none;width:8px;height:8px;border-radius:50%;background:#9aa5b1}
+.dot.warn{background:#e07856}
+.dot.mut{background:#9aa5b1}
+.dot.ok{background:#3fae5a}
+.rule{width:64px;height:3px;border-radius:3px;background:var(--accent);margin:20px 0 14px}
+.toc-chips{display:flex;flex-wrap:wrap;gap:8px}
+.toc-chips a{font:600 12.5px "Inter",sans-serif;padding:5px 12px;border-radius:999px;background:var(--accent-soft);color:var(--accent-ink);text-decoration:none}
+.toc-chips a:hover{background:#d3e8e2}
+h2{display:flex;align-items:center;flex-wrap:wrap;gap:12px;font-size:22.5px;margin:46px 0 14px;scroll-margin-top:14px}
+h2 .num{flex:none;width:34px;height:34px;border-radius:10px;background:var(--accent);color:#fff;display:grid;place-items:center;font:800 16px "Manrope",sans-serif}
+h3{font-size:16.5px;margin:22px 0 8px}
+p{margin:10px 0}
+p.lead-block{background:var(--accent-soft);border:1px solid #c3e0da;border-radius:12px;padding:12px 16px;font-size:15px}
+.tag{display:inline-block;font:700 11px "Inter",sans-serif;padding:3px 9px;border-radius:999px;letter-spacing:.06em;text-transform:uppercase}
+.t-warn{background:#fbe3df;color:var(--warn-ink)}
+.t-ok{background:var(--ok-soft);color:var(--ok)}
+.t-mut{background:#ece9e1;color:var(--muted)}
+blockquote.callout{border:1px solid #f0cdc6;background:var(--warn-soft);border-radius:12px;padding:13px 16px;margin:14px 0;font-size:15px}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);background:var(--paper);margin:14px 0 8px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+table.wide{min-width:900px}
+th{background:#edf4f1;color:var(--accent-ink);font:600 12.5px "Inter",sans-serif;text-align:left;padding:9px 12px;border:1px solid var(--line);white-space:nowrap}
+td{padding:9px 12px;border:1px solid var(--line);vertical-align:top}
+tbody tr:nth-child(even) td{background:#faf8f2}
+tbody tr:hover td{background:#f3f7f5}
+ul,ol{margin:10px 0;padding-left:24px}
+li{margin:6px 0}
+li::marker{color:var(--accent)}
+li .cb{color:var(--accent-ink);font-weight:700}
+code{font:500 .92em "JetBrains Mono",Consolas,monospace;background:#eef0f6;padding:2px 6px;border-radius:6px;color:#24304a}
+strong{color:#101828}
+hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+.src{margin-top:46px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--muted);font-style:italic}
+.src code{font-style:normal;background:#efece4}
+#top{position:fixed;right:22px;bottom:22px;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-size:17px;cursor:pointer;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .25s;z-index:55}
+#top.show{opacity:1;pointer-events:auto}
+#top:hover{background:var(--accent-soft)}
+@media print{body{background:#fff}main{padding:0}.doc-header{box-shadow:none;border-radius:0}#top{display:none}h2{break-after:avoid}.tbl-wrap{box-shadow:none;overflow:visible}table{font-size:12px}}
+</style>
+</head>
+<body>
+<main><article class="doc">
+<header class="doc-header">
+<div class="kicker">Концепция и исследование</div>
+<h1>Идеи и концепция продукта</h1>
+<p class="lead">Спецификация голосового AI-администратора, регистрация скиллов, исследование ниши администраторов (Роструд, Тюмень) и принятые решения, включая 20.09.2026.</p>
+<div class="chips">
+<span class="chip"><span class="dot ok"></span>Концепция принята</span>
+<span class="chip">обновлено 20.09.2026</span>
+<span class="chip">источник: <code>IDEAS.md</code></span>
+</div>
+<div class="rule"></div>
+<nav class="toc-chips"><a href="#s1">Спецификация продукта (уточнено)</a><a href="#s2">Рантайм</a><a href="#s3">Регистрация скиллов</a><a href="#s4">Обслуживание скиллов</a><a href="#s5">Установленные скиллы (Agent Skills)</a><a href="#s6">Исследование ниши: администраторы (Тюмень, сентябрь 2026)</a><a href="#s7">Идеи</a><a href="#s8">Заметки</a><a href="#s9">Принятые решения</a><a href="#s10">Вопросы</a></nav>
+</header>
+<h1>Идеи для проекта</h1>
+<p>Здесь мы будем сохранять все идеи, касающиеся проекта. Продукт — собственный, цель — продажа.</p>
+<h2 id="s1"><span class="num">1</span><span>Спецификация продукта (уточнено)</span></h2>
+<p><strong>Суть:</strong> голосовой AI-администратор для МСБ услуг (старт — салоны красоты и барбершопы Тюмени). Перехватывает звонок и ведёт диалог с клиентом вместо живого администратора.</p>
+<p><strong>Функции:</strong></p>
+<ol><li><strong>Перехват звонка</strong> — приём входящего звонка (в т.ч. когда салон занят или закрыт).</li><li><strong>Общение с клиентом</strong> — естественный диалог, ответы на вопросы.</li><li><strong>Объяснение услуг</strong> — рассказ об услугах, ценах, мастерах, акциях.</li><li><strong>Обработка запроса</strong> — выявление потребности клиента.</li><li><strong>Запись посещения</strong> — бронирование даты, времени, услуги, мастера.</li><li><strong>Создание записей в календаре работника</strong> — запись в календарь; провайдер календаря подключается позже и может быть любым (нужна абстракция/адаптер).</li><li><strong>Контроль записей</strong> — учёт, изменение, отмена, напоминания, недопущение накладок.</li></ol>
+<h2 id="s2"><span class="num">2</span><span>Рантайм</span></h2>
+<ul><li>Агент: <strong>Cline</strong> (VS Code)</li><li>Модель: <strong>DeepSeek</strong></li><li>Важно: Agent Skills — нативный формат Anthropic и <strong>не загружается моделью автоматически</strong>. Поэтому скиллы зарегистрированы через <code>.clinerules</code> (эмуляция поведения Agent Skills для Cline + DeepSeek).</li></ul>
+<h2 id="s3"><span class="num">3</span><span>Регистрация скиллов</span></h2>
+<ul><li><strong>Правило Cline:</strong> <code>C:\Users\1\Desktop\.clinerules\skills.md</code> — инструкции по загрузке и полный индекс всех 495 скиллов с путями и триггерами. Cline подгружает это правило автоматически в начале каждой задачи.</li><li><strong>Индекс (Markdown):</strong> <code>project/skills/INDEX.md</code> — человекочитаемый индекс.</li><li><strong>Индекс (JSON):</strong> <code>project/skills/skills.json</code> — машинный список (name, set, path, description).</li><li><strong>Генераторы:</strong> <code>project/build_skill_index.py</code> и <code>project/build_clinerules.py</code> — пересборка индекса и правила (запуск: <code>python project\build_skill_index.py</code>, затем <code>python project\build_clinerules.py</code>).</li></ul>
+<h2 id="s4"><span class="num">4</span><span>Обслуживание скиллов</span></h2>
+<ul><li><strong>Очистка дублей:</strong> <code>python project\cleanup_duplicates.py</code> (сначала <code>--dry-run</code>). Удалено 617 дублирующих директорий (~1488 файлов, 12.7 МБ) — агент-специфичные копии <code>.gemini</code>, <code>.claude</code>, <code>.codex</code>, <code>.cursor</code>, <code>.windsurf</code> и плагинные дубли.</li><li><strong>Проверка работоспособности:</strong> <code>python project\validate_skills.py</code> — проверяет наличие файла, frontmatter (name/description), непустоту. Результат последнего прогона: <strong>495/495 OK, проблем 0</strong>.</li></ul>
+<h2 id="s5"><span class="num">5</span><span>Установленные скиллы (Agent Skills)</span></h2>
+<p>Скиллы установлены в <code>project/skills/</code>:</p>
+<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Набор</th><th>Путь</th><th>Кол-во скиллов</th><th>Назначение</th></tr></thead><tbody><tr><td>Marketing Skills (coreyhaines31)</td><td><code>skills/marketingskills/skills/</code></td><td>50</td><td>Маркетинг, продажи, CRO, SEO, аналитика</td></tr><tr><td>Wondel.ai Skills</td><td><code>skills/wondelai-skills/</code></td><td>75</td><td>Стартап, бизнес, анализ рынка, продуктовые фреймворки</td></tr><tr><td>Anthropic Skills (официальные)</td><td><code>skills/anthropic-skills/skills/</code></td><td>19</td><td>Документы (pptx, xlsx, docx, pdf), skill-creator</td></tr><tr><td>Claude Skills (alirezarezvani)</td><td><code>skills/alirezarezvani-claude-skills/</code></td><td>380+</td><td>Маркетинг, продукт, бизнес-операции, research, C-level, финансы</td></tr></tbody></table></div>
+<h3>Ключевые скиллы под наши задачи</h3>
+<p><strong>Маркетинг и продажи:</strong></p>
+<ul><li><code>product-marketing</code> — базовый контекст продукта (читается всеми остальными)</li><li><code>copywriting</code>, <code>copy-editing</code>, <code>cold-email</code>, <code>emails</code>, <code>social</code> — тексты и рассылки</li><li><code>offers</code>, <code>pricing</code>, <code>launch</code> — оффер, цены, запуск</li><li><code>sales-enablement</code>, <code>revops</code>, <code>prospecting</code> — продажи</li><li><code>ads</code>, <code>ad-creative</code> — реклама</li></ul>
+<p><strong>Стартап и бизнес:</strong></p>
+<ul><li><code>create-business</code>, <code>grow-business</code>, <code>improve-business</code></li><li><code>lean-startup</code>, <code>crossing-the-chasm</code>, <code>blue-ocean-strategy</code>, <code>traction-eos</code></li><li><code>obviously-awesome</code>, <code>hundred-million-offers</code>, <code>predictable-revenue</code></li></ul>
+<p><strong>Анализ рынка и клиентов:</strong></p>
+<ul><li><code>customer-research</code>, <code>competitor-profiling</code>, <code>competitors</code>, <code>marketing-plan</code></li><li><code>mom-test</code>, <code>jobs-to-be-done</code>, <code>continuous-discovery</code>, <code>design-sprint</code></li><li><code>lean-analytics</code>, <code>inspired-product</code></li></ul>
+<p><strong>Инструменты (официальные):</strong></p>
+<ul><li><code>pptx</code> — питч-деки, <code>xlsx</code> — финмодели, <code>docx</code> — КП, <code>pdf</code> — отчёты</li><li><code>skill-creator</code> — создание собственных скиллов</li></ul>
+<h2 id="s6"><span class="num">6</span><span>Исследование ниши: администраторы (Тюмень, сентябрь 2026)</span></h2>
+<p><strong>Источник:</strong> открытые данные Роструда (Trudvsem API, регион 7200000000000). hh.ru API из сети недоступен (403 / код 000). Скрипты: <code>research_trud.py</code>, <code>analyze_trud.py</code>. Данные: <code>trud_admin_tyumen.json</code>, отчёты: <code>trud_report.txt</code>, <code>trud_analysis.txt</code>.</p>
+<h3>Цифры (актуальные, обновлены за 30 дней)</h3>
+<ul><li>Ниша по области (администратор / ресепшн / секретарь / оператор / диспетчер / регистратор / офис-менеджер): <strong>303</strong> вакансии.</li><li>Город Тюмень: <strong>148</strong>.</li><li>Без крупных сетей (МСБ): <strong>64</strong>.</li><li>Сфера услуг (салон / клиника / отель / автосервис / фитнес / образование / недвижимость): <strong>47</strong>.</li><li>С привязкой к звонкам/записи клиентов: <strong>31</strong>.</li></ul>
+<h3>Требования нанимателей</h3>
+<ul><li>Опыт: ~70% — опыт НЕ требуется (0 лет) либо достаточно 1 года. Образование: среднее / среднее специальное.</li><li>График: сменная работа (~50%), полный день (~35%).</li><li>Частые требования: работа с клиентами, приём и распределение звонков, ведение записей, работа с ПК/программами, консультирование, контроль порядка.</li><li>Зарплата (город, МСБ): от 29 880 руб., медиана <strong>38 000 руб.</strong></li></ul>
+<h3>Проблема с данными</h3>
+<p>Trudvsem переполнен бюджетниками (больницы, МФЦ, суды) и крупной розницей (Fix Price, Пятёрочка) — малый/средний бизнес услуг (салоны, частные клиники, отели, автосервисы) там представлен слабо. Основной пул МСБ — на hh.ru, Avito, Работа.ру; нужен дополнительный источник.</p>
+<h3>Выводы</h3>
+<ul><li>Ниша реальна и объёмна: только в Тюмени десятки актуальных вакансий администратора в МСБ услуг.</li><li>Типовой портрет: без опыта, сменный график, приём звонков + запись клиентов + работа с программами, зарплата ~38 000 руб.</li><li>Задачи повторяемы (звонки, запись, консультирование) -&gt; поддаются систематизации.</li></ul>
+<h2 id="s7"><span class="num">7</span><span>Идеи</span></h2>
+<ul><li>Продукт для МСБ услуг Тюмени: закрыть повторяющиеся задачи администратора (приём/распределение звонков, запись клиентов, напоминания, ответы на типовые вопросы).</li></ul>
+<h2 id="s8"><span class="num">8</span><span>Заметки</span></h2>
+<h2 id="s9"><span class="num">9</span><span>Принятые решения</span></h2>
+<ul><li><strong>Источники данных:</strong> hh.ru из этой сети недоступен (API 403, web 302). База — Trudvsem; качественные данные собирать вручную с hh.ru/Avito/Работа.ру.</li><li><strong>Приоритетная сфера (клин):</strong> салоны красоты и барбершопы Тюмени.</li><li><strong>Формат продукта:</strong> голосовой <strong>AI-администратор</strong> (не человек+софт): перехват звонка, диалог с клиентом, объяснение услуг, обработка запроса, запись посещения, создание записей в календаре работника (провайдер календаря — позже, через адаптер), контроль записей. Полная спецификация — в начале файла.</li><li><strong>Модель оплаты:</strong> подписка за салон (фикс в месяц), ценность = спасённые звонки и предотвращённые неявки.</li><li><strong>Custdev:</strong> 10–15 интервью по Mom Test с владельцами салонов.</li></ul>
+<h3>Решения от 20.09.2026 (после ответов на 28 вопросов)</h3>
+<ul><li><strong>Голос и образ:</strong> женский голос, один на всех, максимально «очеловеченный»; бот представляется живым администратором (уведомление о записи разговора сохраняется; честный ответ на прямой вопрос «вы робот?» — риск в DEVELOPMENT_PLAN.md, раздел 5).</li><li><strong>Клиенты:</strong> бот узнаёт своих клиентов по номеру телефона (история визитов, скидки, любимый мастер — из CRM).</li><li><strong>Предоплата:</strong> опциональная функция на уровне клиента — флаг «требует предоплату» в ЛК, бот предлагает внести предоплату (платёжная ссылка) или отказаться; включается владельцем салона на каждого клиента отдельно.</li><li><strong>Условия покупки:</strong> setup платный; 7 дней тарифа бесплатно; далее подписка; тариф можно менять в любой момент с перерасчётом. Сетка — на согласовании: <code>project/TARIFFS.md</code>.</li><li><strong>Личный кабинет:</strong> обязателен для каждого подключённого салона; плюс веб-админка для нашей команды; требования безопасности — DEVELOPMENT_PLAN.md, раздел 8.2.</li><li><strong>Подтверждение клиенту:</strong> SMS + уведомление в мессенджере (VK/WhatsApp/Telegram по доступному каналу).</li><li><strong>Юрлицо и ПДн:</strong> ИП, УСН 6% (патент — проверить); договор поручения на обработку ПДн — шаблон <code>project/CONTRACT_PDN_TEMPLATE.md</code>; салон имеет доступ к записям звонков.</li><li><strong>Продажи и рост:</strong> продаёт лично владелец проекта (включая встречи на точках по следам вакансий); базовая линия «до» — отчёты YCLIENTS или статистика АТС; рефералка — месяц тарифа бесплатно за приведённого и подключившегося.</li><li><strong>Поддержка:</strong> ночные алерты на владельца проекта, обрабатывает он же; днём — эскалация человеку.</li><li><strong>Отложено:</strong> ров за пределами Тюмени и экспансия (соседние города) — не сейчас; сбои — <code>project/FAILOVER_SCENARIOS.md</code>; ПДн/LLM — <code>project/PDN_LLM_OPTIONS.md</code>; WhatsApp-миграция, бренд, TAM — <code>project/OPEN_QUESTIONS.md</code>.</li><li><strong>Рободо-звон:</strong> подробное объяснение отправлено в чате; решение — за владельцем (см. PLAN.md).</li></ul>
+<p>Подробности — в <code>project/PLAN.md</code>.</p>
+<h2 id="s10"><span class="num">10</span><span>Вопросы</span></h2>
+<ul><li>Точная цена подписки для пилота?</li></ul>
+<footer class="src">Сгенерировано из <code>IDEAS.md</code> · перегенерация: <code>python build_html_docs.py</code> · не редактируйте HTML вручную</footer>
+</article></main>
+<button id="top" title="Наверх">↑</button>
+<script>
+const top=document.getElementById('top');
+addEventListener('scroll',()=>top.classList.toggle('show',scrollY>400));
+top.addEventListener('click',()=>scrollTo({top:0,behavior:'smooth'}));
+</script>
+</body>
+</html>

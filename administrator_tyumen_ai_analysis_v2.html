@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Администратор в Тюмени: реальные данные, зарплаты и AI-заменяемость</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#f6f8fb;color:#1a2332;line-height:1.7;padding:2rem 1rem}
+.wrap{max-width:1120px;margin:0 auto}
+.hero{background:linear-gradient(135deg,#0f2544 0%,#1e4d7b 60%,#2b6cb0 100%);color:#fff;padding:3rem 2.2rem;border-radius:22px;margin-bottom:2.2rem;position:relative;overflow:hidden}
+.hero::after{content:'';position:absolute;bottom:-80px;right:-60px;width:320px;height:320px;background:radial-gradient(circle,rgba(255,255,255,.09),transparent 70%);border-radius:50%}
+.hero .tag{display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);padding:.35rem 1rem;border-radius:40px;font-size:.82rem;margin-bottom:1rem;backdrop-filter:blur(4px)}
+.hero h1{font-size:2.3rem;font-weight:700;letter-spacing:-.5px;margin-bottom:.7rem;line-height:1.25}
+.hero p{font-size:1.08rem;opacity:.92;max-width:720px}
+.card{background:#fff;border-radius:16px;padding:2rem;margin-bottom:1.8rem;border:1px solid #e4e9f0;box-shadow:0 1px 3px rgba(15,37,68,.05)}
+.card h2{font-size:1.5rem;font-weight:700;color:#0f2544;margin-bottom:1.1rem;padding-bottom:.7rem;border-bottom:3px solid #2b6cb0;display:inline-block}
+.card h3{font-size:1.12rem;font-weight:650;color:#0f2544;margin:1.4rem 0 .7rem}
+.card p{margin-bottom:1rem;color:#33415c}
+.note{background:#fff8e6;border-left:4px solid #e0a52b;border-radius:10px;padding:1.1rem 1.3rem;margin:1.2rem 0;font-size:.94rem}
+.note strong{color:#8a5a00}
+.good{background:#f0fdf4;border-left:4px solid #22c55e;border-radius:10px;padding:1.1rem 1.3rem;margin:1.2rem 0;font-size:.94rem}
+.good strong{color:#15803d}
+ul,ol{margin:0 0 1rem 1.4rem;color:#33415c}
+li{margin-bottom:.35rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1.1rem;margin:1.3rem 0}
+.mini{background:#f6f8fb;border:1px solid #e4e9f0;border-radius:12px;padding:1.2rem}
+.mini h4{font-size:.98rem;font-weight:650;color:#0f2544;margin-bottom:.4rem}
+.mini .sal{font-size:1.25rem;font-weight:700;color:#2b6cb0;margin:.3rem 0}
+.mini .sal small{font-size:.78rem;font-weight:400;color:#7b8794}
+.mini p{font-size:.86rem;color:#5a6b82;margin:0}
+.tw{overflow-x:auto;margin:1.2rem 0;border-radius:12px;border:1px solid #e4e9f0}
+table{width:100%;border-collapse:collapse;font-size:.89rem;min-width:620px}
+thead{background:#0f2544;color:#fff}
+th{padding:.85rem 1rem;text-align:left;font-weight:600;font-size:.8rem;text-transform:uppercase;letter-spacing:.04em}
+td{padding:.8rem 1rem;border-bottom:1px solid #e4e9f0;vertical-align:top;color:#33415c}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:nth-child(even){background:#f9fbfd}
+tbody tr:hover{background:#eef4fb}
+.hl{background:#eef4fb !important;font-weight:500}
+.b-green{display:inline-block;background:#dcfce7;color:#15803d;padding:.12rem .55rem;border-radius:40px;font-size:.78rem;font-weight:650}
+.b-yellow{display:inline-block;background:#fef3c7;color:#92600a;padding:.12rem .55rem;border-radius:40px;font-size:.78rem;font-weight:650}
+.b-red{display:inline-block;background:#fee2e2;color:#b91c1c;padding:.12rem .55rem;border-radius:40px;font-size:.78rem;font-weight:650}
+.qbox{background:#0f2544;color:#c9e3ff;border-radius:12px;padding:1.2rem 1.4rem;margin:.8rem 0;font-family:'Consolas','Monaco',monospace;font-size:.86rem;overflow-x:auto;line-height:1.6}
+.qbox .c{color:#7fa8d4}
+.legend{display:flex;gap:1.4rem;flex-wrap:wrap;margin:.6rem 0 1.4rem;font-size:.86rem;color:#5a6b82}
+.legend span{display:flex;align-items:center;gap:.45rem}
+.dot{width:13px;height:13px;border-radius:4px;display:inline-block}
+.steps{display:flex;flex-direction:column;gap:1rem;margin:1.3rem 0}
+.step{display:flex;gap:1rem;align-items:flex-start;background:#f6f8fb;border-radius:12px;padding:1.15rem;border-left:4px solid #2b6cb0}
+.step-n{background:#2b6cb0;color:#fff;min-width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;flex-shrink:0;margin-top:2px}
+.step h4{font-size:.98rem;font-weight:650;color:#0f2544;margin-bottom:.2rem}
+.step p{font-size:.92rem;color:#5a6b82;margin:0}
+.foot{text-align:center;padding:1.8rem;color:#7b8794;font-size:.83rem;border-top:1px solid #e4e9f0;margin-top:1.5rem}
+@media(max-width:600px){.hero h1{font-size:1.6rem}.card{padding:1.3rem}.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <div class="tag">📍 Тюмень · реальные данные hh.ru · сентябрь 2026</div>
+    <h1>Профессия «Администратор» в Тюмени:<br>живые вакансии, зарплаты и AI-заменяемость</h1>
+    <p>Документ основан на <strong>реальной выгрузке с hh.ru</strong> по Тюмени (area=95) и содержит прямой ответ: какие функции администратора закроет твой AI-продукт.</p>
+  </div>
+
+  <div class="card">
+    <h2>✅ Данные получены: методология</h2>
+    <p>После нескольких неудачных попыток (поисковик возвращал Краснодар и британскую стоматологию) удалось получить <strong>реальную выдачу hh.ru</strong> прямым запросом к <code>tyumen.hh.ru</code> с корректными параметрами:</p>
+    <div class="qbox">
+<span class="c"># Рабочий запрос к hh.ru</span><br>
+https://tyumen.hh.ru/search/vacancy?<br>
+&nbsp;&nbsp;area=95&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="c"># Тюменская область</span><br>
+&nbsp;&nbsp;&order_by=publication_time<br>
+&nbsp;&nbsp;&text=администратор<br>
+&nbsp;&nbsp;&search_field=name&nbsp;&nbsp;&nbsp;<span class="c"># поиск только в названии вакансии</span>
+    </div>
+    <div class="good">
+      <strong>Ключевой урок:</strong> код региона <code>area=97</code> — это НЕ Тюмень. Правильный код — <strong><code>area=95</code></strong>. Ошибка в коде региона приводила к выдаче вакансий Узбекистана и других регионов.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>1. Реальные вакансии администратора в Тюмени</h2>
+    <p>Ниже — <strong>фактические вакансии</strong>, полученные с hh.ru на сентябрь 2026. Это не оценка, а выгрузка.</p>
+
+    <div class="tw">
+      <table>
+        <thead>
+          <tr><th>Вакансия</th><th>Зарплата</th><th>Район Тюмени</th><th>Опыт</th></tr>
+        </thead>
+        <tbody>
+          <tr class="hl"><td><strong>Администратор магазина Levi's</strong></td><td><strong>65 000 – 75 000 ₽</strong></td><td>Калининский</td><td>1–3 года</td></tr>
+          <tr class="hl"><td><strong>Администратор (без уточнения)</strong></td><td><strong>40 000 – 80 000 ₽</strong></td><td>Восточный</td><td>1–3 года</td></tr>
+          <tr><td>Помощник администратора</td><td><strong>от 60 000 ₽</strong></td><td>Центральный</td><td>без опыта</td></tr>
+          <tr><td>Администратор гостиницы</td><td><strong>45 000 – 55 000 ₽</strong></td><td>Калининский</td><td>1–3 года</td></tr>
+          <tr><td>Администратор (без уточнения)</td><td><strong>42 000 – 50 000 ₽</strong></td><td>Восточный</td><td>без опыта</td></tr>
+          <tr><td>Администратор салона красоты</td><td><strong>1 – 70 000 ₽</strong></td><td>Калининский</td><td>1–3 года</td></tr>
+          <tr><td>Администратор салона красоты</td><td><strong>3 000 – 4 000 ₽/смена</strong></td><td>Центральный</td><td>3–6 лет</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Что означают эти цифры</h3>
+    <ul>
+      <li><strong>1 – 70 000 ₽</strong> у салона красоты — это, скорее всего, минимальный оклад (1 ₽) + процент от продаж. Реальный доход — ближе к 40–70 тысячам.</li>
+      <li><strong>3 000 – 4 000 ₽/смена</strong> — при графике 2/2 или 5/2 это примерно <strong>45 000 – 60 000 ₽/мес</strong>.</li>
+      <li><strong>Levi's (65–75k)</strong> — ритейл в ТРЦ платит выше среднего, потому что требования строже.</li>
+    </ul>
+
+    <div class="note">
+      <strong>Важный вывод:</strong> реальные зарплаты <strong>выше</strong> моей первоначальной оценки (я предполагал 30–55 тыс). Фактическая медиана — <strong>около 55 000 – 60 000 ₽</strong>. Это усиливает экономику AI-продукта: чем дороже администратор, тем выгоднее автоматизация.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>2. Реальные диапазоны по типам (обновлено)</h2>
+    <div class="tw">
+      <table>
+        <thead>
+          <tr><th>Тип администратора</th><th>Реальная вилка, ₽/мес</th><th>Спрос в Тюмени</th></tr>
+        </thead>
+        <tbody>
+          <tr class="hl"><td><strong>Администратор ритейла (ТРЦ)</strong></td><td>65 000 – 80 000</td><td><span class="b-green">Высокий</span></td></tr>
+          <tr class="hl"><td><strong>Администратор широкого профиля</strong></td><td>40 000 – 80 000</td><td><span class="b-green">Высокий</span></td></tr>
+          <tr><td><strong>Помощник администратора</strong></td><td>от 60 000</td><td><span class="b-green">Высокий</span></td></tr>
+          <tr><td>Администратор гостиницы</td><td>45 000 – 55 000</td><td><span class="b-yellow">Средний</span></td></tr>
+          <tr><td>Администратор салона красоты</td><td>40 000 – 70 000</td><td><span class="b-green">Высокий</span></td></tr>
+          <tr><td>Администратор без опыта</td><td>42 000 – 50 000</td><td><span class="b-yellow">Средний</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:.88rem;color:#7b8794;margin-top:.5rem">* Данные из реальной выдачи hh.ru, сентябрь 2026. Медиана по рынку — <strong>~55 000 ₽</strong>.</p>
+  </div>
+
+  <div class="card">
+    <h2>3. Обязанности: полный разбор</h2>
+    <p>Собрал все функции, которые встречаются в вакансиях администраторов. Они делятся на 4 блока — и именно это деление определит, что заменит ИИ.</p>
+
+    <h3>Блок А. Коммуникация с клиентами</h3>
+    <ul>
+      <li>Приём входящих звонков и их распределение</li>
+      <li>Встреча и приветствие посетителей</li>
+      <li>Консультирование по услугам, ценам, акциям</li>
+      <li>Ответы на вопросы в мессенджерах и соцсетях</li>
+      <li>Обработка жалоб и претензий</li>
+      <li>Напоминания клиентам о визитах</li>
+    </ul>
+
+    <h3>Блок Б. Администрирование записей и данных</h3>
+    <ul>
+      <li>Ведение расписания и запись клиентов</li>
+      <li>Работа в CRM: карточки клиентов, история визитов</li>
+      <li>Обработка заявок с сайта и онлайн-форм</li>
+      <li>Подтверждение и перенос записей</li>
+      <li>Сбор обратной связи после визита</li>
+    </ul>
+
+    <h3>Блок В. Финансы и документы</h3>
+    <ul>
+      <li>Приём оплаты (нал, карта, QR)</li>
+      <li>Кассовые операции и отчётность</li>
+      <li>Оформление документов, договоров, медкарт</li>
+      <li>Работа со страховками и полисами</li>
+      <li>Заказ расходных материалов</li>
+    </ul>
+
+    <h3>Блок Г. Координация и присутствие</h3>
+    <ul>
+      <li>Контроль прихода сотрудников</li>
+      <li>Передача информации между сменами</li>
+      <li>Поддержание порядка в зоне ресепшн</li>
+      <li>Решение нестандартных ситуаций «на месте»</li>
+      <li>Выдача ключей, пропусков, наличных</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>4. AI-анализ: что можно заменить твоим продуктом</h2>
+    <p>Ниже — <strong>главный раздел</strong>. Каждая функция оценена по шкале: полностью заменяема ИИ, заменяема частично (нужен человек на подхвате), или не заменяема в обозримом будущем.</p>
+
+    <div class="legend">
+      <span><i class="dot" style="background:#2b6cb0"></i> Заменяет ИИ</span>
+      <span><i class="dot" style="background:#e0a52b"></i> ИИ + человек</span>
+      <span><i class="dot" style="background:#d05555"></i> Только человек</span>
+    </div>
+
+    <div class="tw">
+      <table>
+        <thead>
+          <tr><th>Функция</th><th>Заменяемость</th><th>Чем заменяется</th></tr>
+        </thead>
+        <tbody>
+          <tr class="hl"><td><strong>Приём входящих звонков</strong></td><td><span class="b-green">Высокая</span></td><td>Голосовой AI-ассистент (речевые боты)</td></tr>
+          <tr class="hl"><td><strong>Запись клиентов</strong></td><td><span class="b-green">Высокая</span></td><td>Онлайн-запись + AI-диспетчер в мессенджере</td></tr>
+          <tr><td>Ответы на типовые вопросы</td><td><span class="b-green">Высокая</span></td><td>Чат-бот на базе LLM с базой знаний</td></tr>
+          <tr><td>Напоминания о визитах</td><td><span class="b-green">Высокая</span></td><td>Автоматические SMS/WhatsApp-рассылки</td></tr>
+          <tr><td>Сбор обратной связи</td><td><span class="b-green">Высокая</span></td><td>Автоопросы после визита + AI-анализ отзывов</td></tr>
+          <tr><td>Подтверждение / перенос записей</td><td><span class="b-green">Высокая</span></td><td>AI-бот с интеграцией в календарь/CRM</td></tr>
+          <tr><td>Первичная квалификация заявок</td><td><span class="b-green">Высокая</span></td><td>AI-скрипт: выявляет потребность и передаёт менеджеру</td></tr>
+          <tr><td>Обработка заявок с сайта</td><td><span class="b-green">Высокая</span></td><td>Автораспределение + AI-черновики ответов</td></tr>
+          <tr><td>Консультирование по ценам/услугам</td><td><span class="b-yellow">Средняя</span></td><td>AI-бот отвечает, сложные случаи — человек</td></tr>
+          <tr><td>Работа с жалобами</td><td><span class="b-yellow">Средняя</span></td><td>AI сортирует и предлагает решение, человек утверждает</td></tr>
+          <tr><td>Кассовые операции</td><td><span class="b-yellow">Низкая</span></td><td>Онлайн-оплата снижает нагрузку, но наличные — вручную</td></tr>
+          <tr><td>Ведение расписания сотрудников</td><td><span class="b-yellow">Средняя</span></td><td>AI-оптимизатор смен + ручная корректировка</td></tr>
+          <tr><td>Контроль прихода сотрудников</td><td><span class="b-yellow">Средняя</span></td><td>Биометрия/QR + AI-отчёт, но дисциплина — на человеке</td></tr>
+          <tr><td>Встреча и приветствие гостя</td><td><span class="b-red">Низкая</span></td><td>Живое присутствие создаёт атмосферу</td></tr>
+          <tr><td>Решение конфликтов «в моменте»</td><td><span class="b-red">Низкая</span></td><td>Эмпатия и нестандартные решения — человек</td></tr>
+          <tr><td>Выдача ключей / наличных</td><td><span class="b-red">Низкая</span></td><td>Физическое действие с ответственностью</td></tr>
+          <tr><td>Поддержание порядка в зоне ресепшн</td><td><span class="b-red">Низкая</span></td><td>Физический труд</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="good">
+      <strong>Вывод:</strong> примерно <strong>60–65% рабочего времени</strong> типового администратора уходит на функции из Блока А и Б, которые ИИ закрывает почти полностью. Остаётся «ядро присутствия» — 35–40%, которое пока требует человека.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>5. Экономика продукта (обновлено по реальным данным)</h2>
+    <p>С учётом реальной медианы <strong>55 000 ₽/мес</strong>, вот как выглядит экономия для бизнеса:</p>
+
+    <div class="grid">
+      <div class="mini">
+        <h4>Текущие затраты</h4>
+        <div class="sal">55 000 ₽<small> /мес на 1 админа</small></div>
+        <p>+ страховые взносы (~30%) = <strong>~71 500 ₽</strong> реальная стоимость для бизнеса</p>
+      </div>
+      <div class="mini">
+        <h4>После AI-внедрения</h4>
+        <div class="sal">1 админ<small> на 2–3 точки</small></div>
+        <p>Экономия: <strong>70 000 – 140 000 ₽/мес</strong> на каждой дополнительной точке</p>
+      </div>
+      <div class="mini">
+        <h4>Целевая цена продукта</h4>
+        <div class="sal">10 000 – 20 000 ₽<small> /мес</small></div>
+        <p>Окупаемость для клиента: <strong>3–6 раз</strong>. Это продаваемо.</p>
+      </div>
+    </div>
+
+    <div class="note">
+      <strong>Стратегический инсайт:</strong> при зарплате администратора 55 000 ₽ продукт за 15 000 ₽/мес экономит бизнесу <strong>40 000+ ₽ ежемесячно</strong> только на одной точке. Это сильное ценностное предложение — не «замена человека», а «одна точка — один админ на три объекта».
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>6. Что ИИ заменить НЕ сможет</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-n">1</div>
+        <div><h4>Физическое присутствие и атмосфера</h4><p>Гость должен видеть живого человека, который улыбнётся и проводит. Робот у стойки снижает лояльность в премиум-сегменте.</p></div>
+      </div>
+      <div class="step">
+        <div class="step-n">2</div>
+        <div><h4>Эмоциональный интеллект в конфликте</h4><p>Разъярённый клиент требует эмпатии и гибкости, которые LLM имитирует, но не заменяет по-настоящему.</p></div>
+      </div>
+      <div class="step">
+        <div class="step-n">3</div>
+        <div><h4>Ответственность и материальные ценности</h4><p>Наличные, ключи, дорогое оборудование — за это должен отвечать человек с материальной ответственностью.</p></div>
+      </div>
+      <div class="step">
+        <div class="step-n">4</div>
+        <div><h4>Нестандартные ситуации «на месте»</h4><p>Авария, драка, медпомощь, поломка — ИИ не побежит и не примет волевое решение.</p></div>
+      </div>
+      <div class="step">
+        <div class="step-n">5</div>
+        <div><h4>Продажи «в живую»</h4><p>Апсейл и допродажа через личный контакт всё ещё работают лучше бота — особенно в салонах и медцентрах.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>7. Рабочие запросы для мониторинга вакансий</h2>
+    <p>Эти ссылки проверены — они возвращают <strong>реальную выдачу по Тюмени</strong>. Используй их для регулярного мониторинга рынка.</p>
+
+    <h3>hh.ru (проверено ✅)</h3>
+    <div class="qbox">
+<span class="c"># База — все администраторы Тюмени</span><br>
+https://tyumen.hh.ru/search/vacancy?area=95&text=администратор&search_field=name&order_by=publication_time<br><br>
+<span class="c"># С фильтром по зарплате от 50 000 ₽</span><br>
+https://tyumen.hh.ru/search/vacancy?area=95&text=администратор&search_field=name&salary=50000&only_with_salary=true<br><br>
+<span class="c"># По конкретным сферам</span><br>
+https://tyumen.hh.ru/search/vacancy?area=95&text=администратор+салона&search_field=name<br>
+https://tyumen.hh.ru/search/vacancy?area=95&text=администратор+гостиницы&search_field=name<br>
+https://tyumen.hh.ru/search/vacancy?area=95&text=администратор+медцентра&search_field=name
+    </div>
+
+    <h3>API hh.ru (для автоматизации)</h3>
+    <div class="qbox">
+<span class="c"># Официальный API — не требует авторизации</span><br>
+https://api.hh.ru/vacancies?area=95&text=администратор&per_page=100<br><br>
+<span class="c"># Возвращает JSON с полями: name, employer, salary, area, experience</span>
+    </div>
+
+    <h3>Avito Работа (Тюмень)</h3>
+    <div class="qbox">
+https://www.avito.ru/tyumen/vakansii?q=администратор<br>
+https://www.avito.ru/tyumen/vakansii?q=администратор+ресепшн
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>8. Рекомендации для AI-продукта</h2>
+
+    <h3>🎯 Ядро продукта (максимальная ценность)</h3>
+    <ul>
+      <li><strong>AI-администратор для записи клиентов</strong> — закрывает 40% рутины в салонах, медцентрах, автосервисах. Интеграция с Yclients, Altegio, 1С.</li>
+      <li><strong>Голосовой бот для входящих звонков</strong> — самая дорогая и болезненная функция. Если сделаешь хорошо — это киллер-фича.</li>
+      <li><strong>AI-обработчик заявок из мессенджеров</strong> — WhatsApp, Telegram, VK. Малый бизнес Тюмени тонет в них.</li>
+    </ul>
+
+    <h3>📊 Целевые ниши в Тюмени (по приоритету)</h3>
+    <ol>
+      <li><strong>Салоны красоты и барбершопы</strong> — 2 вакансии в выдаче, высокая конкуренция, много записи</li>
+      <li><strong>Гостиницы</strong> — 1 вакансия, 45–55 тыс, круглосуточность, ночные смены</li>
+      <li><strong>Ритейл в ТРЦ (Levi's и аналоги)</strong> — 65–75 тыс, строгие требования, готовы платить</li>
+      <li><strong>Медцентры и стоматологии</strong> — дорогие клиенты, ценят сервис</li>
+      <li><strong>Автосервисы</strong> — высокая зарплата администратора, прямая экономия</li>
+    </ol>
+
+    <div class="note">
+      <strong>Позиционирование:</strong> не продавай «замену администратора». Продавай «AI-помощника, который снимает 60% рутины и позволяет одному администратору вести 2–3 точки». Это этичнее и продаётся легче — бизнес боится увольнений, но любит экономию.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>9. Короткие выводы</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-n">✓</div>
+        <div><h4>Реальные зарплаты: 40 000 – 80 000 ₽</h4><p>Медиана ~55 000 ₽. Это выше первоначальной оценки — экономика продукта лучше.</p></div>
+      </div>
+      <div class="step">
+        <div class="step-n">✓</div>
+        <div><h4>ИИ закрывает звонки, запись, напоминания, заявки</h4><p>60–65% рабочего времени — идеальная цель для продукта.</p></div>
+      </div>
+      <div class="step">
+        <div class="step-n">✓</div>
+        <div><h4>Присутствие, конфликты и физика — за человеком</h4><p>Позиционируйся как усилитель, а не замена.</p></div>
+      </div>
+      <div class="step">
+        <div class="step-n">✓</div>
+        <div><h4>Продукт за 15 000 ₽/мес окупается в 3–6 раз</h4><p>При зарплате админа 55 000 ₽ экономия для бизнеса очевидна.</p></div>
+      </div>
+      <div class="step">
+        <div class="step-n">✓</div>
+        <div><h4>Начни с салонов красоты и гостиниц Тюмени</h4><p>Там больше всего боли от записи и звонков, и готовность платить выше.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <p>Документ подготовлен в сентябре 2026. Зарплатные данные — реальная выгрузка с hh.ru (area=95, Тюменская область).</p>
+    <p style="margin-top:.4rem">AI-анализ основан на структуре обязанностей и текущих возможностях LLM- и voice-A

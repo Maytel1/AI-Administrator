@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>План проекта: «Виртуальный администратор»</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f4f1ea;--paper:#fffefb;--ink:#1e2733;--muted:#63707f;--line:#e4dfd3;--accent:#0f766e;--accent-ink:#0b5d57;--accent-soft:#e3f1ee;--warn-ink:#93261b;--warn-soft:#fceeea;--ok:#1a7f37;--ok-soft:#e8f4ea;--radius:14px;--shadow:0 1px 2px rgba(30,39,51,.04),0 10px 28px rgba(30,39,51,.07)}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.72 "Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+::selection{background:var(--accent);color:#fff}
+h1,h2,h3{font-family:"Manrope","Inter",sans-serif;line-height:1.28;margin:0}
+a{color:var(--accent-ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+main{padding:40px 22px 80px}
+.doc{max-width:920px;margin:0 auto}
+.doc-header{background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:30px 34px 24px;box-shadow:var(--shadow)}
+.kicker{font:700 11.5px "Inter",sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+.doc-header h1{font-size:30px;font-weight:800;letter-spacing:-.01em;margin:10px 0 10px}
+.lead{font-size:16.5px;color:var(--muted);margin:0;max-width:75ch}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.chip{display:inline-flex;align-items:center;gap:7px;font:600 12.5px "Inter",sans-serif;padding:5px 12px;border-radius:999px;background:var(--paper);border:1px solid var(--line)}
+.chip code{font-size:11.5px;padding:1px 6px}
+.dot{flex:none;width:8px;height:8px;border-radius:50%;background:#9aa5b1}
+.dot.warn{background:#e07856}
+.dot.mut{background:#9aa5b1}
+.dot.ok{background:#3fae5a}
+.rule{width:64px;height:3px;border-radius:3px;background:var(--accent);margin:20px 0 14px}
+.toc-chips{display:flex;flex-wrap:wrap;gap:8px}
+.toc-chips a{font:600 12.5px "Inter",sans-serif;padding:5px 12px;border-radius:999px;background:var(--accent-soft);color:var(--accent-ink);text-decoration:none}
+.toc-chips a:hover{background:#d3e8e2}
+h2{display:flex;align-items:center;flex-wrap:wrap;gap:12px;font-size:22.5px;margin:46px 0 14px;scroll-margin-top:14px}
+h2 .num{flex:none;width:34px;height:34px;border-radius:10px;background:var(--accent);color:#fff;display:grid;place-items:center;font:800 16px "Manrope",sans-serif}
+h3{font-size:16.5px;margin:22px 0 8px}
+p{margin:10px 0}
+p.lead-block{background:var(--accent-soft);border:1px solid #c3e0da;border-radius:12px;padding:12px 16px;font-size:15px}
+.tag{display:inline-block;font:700 11px "Inter",sans-serif;padding:3px 9px;border-radius:999px;letter-spacing:.06em;text-transform:uppercase}
+.t-warn{background:#fbe3df;color:var(--warn-ink)}
+.t-ok{background:var(--ok-soft);color:var(--ok)}
+.t-mut{background:#ece9e1;color:var(--muted)}
+blockquote.callout{border:1px solid #f0cdc6;background:var(--warn-soft);border-radius:12px;padding:13px 16px;margin:14px 0;font-size:15px}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);background:var(--paper);margin:14px 0 8px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+table.wide{min-width:900px}
+th{background:#edf4f1;color:var(--accent-ink);font:600 12.5px "Inter",sans-serif;text-align:left;padding:9px 12px;border:1px solid var(--line);white-space:nowrap}
+td{padding:9px 12px;border:1px solid var(--line);vertical-align:top}
+tbody tr:nth-child(even) td{background:#faf8f2}
+tbody tr:hover td{background:#f3f7f5}
+ul,ol{margin:10px 0;padding-left:24px}
+li{margin:6px 0}
+li::marker{color:var(--accent)}
+li .cb{color:var(--accent-ink);font-weight:700}
+code{font:500 .92em "JetBrains Mono",Consolas,monospace;background:#eef0f6;padding:2px 6px;border-radius:6px;color:#24304a}
+strong{color:#101828}
+hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+.src{margin-top:46px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--muted);font-style:italic}
+.src code{font-style:normal;background:#efece4}
+#top{position:fixed;right:22px;bottom:22px;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-size:17px;cursor:pointer;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .25s;z-index:55}
+#top.show{opacity:1;pointer-events:auto}
+#top:hover{background:var(--accent-soft)}
+@media print{body{background:#fff}main{padding:0}.doc-header{box-shadow:none;border-radius:0}#top{display:none}h2{break-after:avoid}.tbl-wrap{box-shadow:none;overflow:visible}table{font-size:12px}}
+</style>
+</head>
+<body>
+<main><article class="doc">
+<header class="doc-header">
+<div class="kicker">Планирование</div>
+<h1>План проекта: «Виртуальный администратор»</h1>
+<p class="lead">Приоритетная сфера (салоны/барбершопы Тюмени), формат продукта, источники данных и custdev по Mom Test; дополнения от 20.09.2026.</p>
+<div class="chips">
+<span class="chip"><span class="dot ok"></span>Рабочий план</span>
+<span class="chip">обновлено 20.09.2026</span>
+<span class="chip">источник: <code>PLAN.md</code></span>
+</div>
+<div class="rule"></div>
+<nav class="toc-chips"><a href="#s1">Шаг 3. Источники данных (проверено)</a><a href="#s2">Шаг 1. Приоритетная сфера услуг</a><a href="#s3">Шаг 2. Формат продукта</a><a href="#s4">Шаг 4. Custdev (интервью с владельцами)</a><a href="#s5">Ближайшие шаги</a><a href="#s6">Дополнения 20.09.2026 (решения после 28 вопросов)</a></nav>
+</header>
+<h1>План проекта: «Виртуальный администратор» для МСБ услуг Тюмени</h1>
+<p>Дата: сентябрь 2026. Основано на исследовании ниши (<code>IDEAS.md</code>) и разборе 4 шагов планирования.</p>
+<hr>
+<h2 id="s1"><span class="num">1</span><span>Шаг 3. Источники данных (проверено)</span></h2>
+<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Источник</th><th>Статус из этой сети</th><th>Комментарий</th></tr></thead><tbody><tr><td>Trudvsem (Роструд, open data)</td><td>работает</td><td>303 активные вакансии ниши; много бюджетников и сетей</td></tr><tr><td>hh.ru API</td><td>403 (blacklisted UA)</td><td>Основной пул МСБ — недоступен</td></tr><tr><td>hh.ru web</td><td>302 (анти-бот редирект)</td><td>—</td></tr><tr><td>Avito / Работа.ру</td><td>требует ручной проверки</td><td>Данные собирать вручную в браузере</td></tr></tbody></table></div>
+<p><strong>Решение:</strong> количественную базу берём из Trudvsem, качественную (реальные вакансии МСБ услуг) — вручную с hh.ru/Avito. Ниша подтверждена: 47 вакансий в услугах только по одному источнику.</p>
+<hr>
+<h2 id="s2"><span class="num">2</span><span>Шаг 1. Приоритетная сфера услуг</span></h2>
+<p>Критерии выбора «клина»: высокая плотность бизнесов в Тюмени, частые звонки/записи, высокая цена простоя (пропущенный звонок = потерянный клиент), низкая ИТ-зрелость.</p>
+<div class="tbl-wrap"><table class="tbl wide"><thead><tr><th>Сфера</th><th>Плотность</th><th>Ценность записи</th><th>Боль</th><th>Приоритет</th></tr></thead><tbody><tr><td><strong>Салоны красоты / барбершопы</strong></td><td>Очень высокая</td><td>Средняя (чеки частые)</td><td>Пропущенные звонки, неявки, ручная запись</td><td><strong>1 (старт)</strong></td></tr><tr><td>Стоматологии / частные клиники</td><td>Высокая</td><td>Высокая</td><td>Дорогие пропущенные звонки</td><td>2 (расширение)</td></tr><tr><td>Автосервисы / шиномонтаж</td><td>Средняя</td><td>Высокая</td><td>Загрузка постов, подтверждения</td><td>3</td></tr><tr><td>Отели / апартаменты</td><td>Средняя</td><td>Высокая</td><td>Бронирования 24/7</td><td>4</td></tr></tbody></table></div>
+<p><strong>Решение:</strong> старт с <strong>салонов красоты и барбершопов</strong> в Тюмени. Причины: максимальная плотность, стандартный процесс (запись+напоминание), владелец = собственник (быстрое решение), боль с пропущенными звонками и неявками понятна и измерима.</p>
+<hr>
+<h2 id="s3"><span class="num">3</span><span>Шаг 2. Формат продукта</span></h2>
+<p><strong>Решение (уточнено):</strong> продукт — <strong>голосовой AI-администратор</strong>. Он перехватывает звонок и ведёт диалог с клиентом вместо живого администратора.</p>
+<p>Функции продукта:</p>
+<ol><li><strong>Перехват звонка</strong> — приём входящего звонка (в т.ч. когда салон занят или закрыт).</li><li><strong>Общение с клиентом</strong> — естественный диалог, ответы на вопросы.</li><li><strong>Объяснение услуг</strong> — услуги, цены, мастера, акции.</li><li><strong>Обработка запроса</strong> — выявление потребности клиента.</li><li><strong>Запись посещения</strong> — дата, время, услуга, мастер.</li><li><strong>Создание записей в календаре работника</strong> — провайдер календаря подключается позже и может быть любым → нужен слой-адаптер (абстракция календаря).</li><li><strong>Контроль записей</strong> — учёт, изменение, отмена, напоминания, недопущение накладок.</li></ol>
+<p>Архитектурные следствия:</p>
+<ul><li>Голосовой канал: телефония (SIP/номер) + распознавание речи (STT) + диалоговый движок (LLM) + синтез речи (TTS).</li><li>Календарь: интерфейс-адаптер, конкретные провайдеры (Google Calendar, Яндекс, внутренний) подключаются позже.</li><li>Хранение записей: база записей клиентов/визитов + правила контроля (пересечения, доступность мастера).</li></ul>
+<p>Модель оплаты: подписка за салон (фикс в месяц). Ценность = спасённые звонки и предотвращённые неявки.</p>
+<hr>
+<h2 id="s4"><span class="num">4</span><span>Шаг 4. Custdev (интервью с владельцами)</span></h2>
+<p>На основе Mom Test (скилл <code>mom-test</code>): спрашивать о прошлом и фактах, не питчить идею.</p>
+<p><strong>Кого интервьюировать:</strong> владельцы салонов/барбершопов Тюмени (10–15 интервью).</p>
+<p><strong>Ключевые вопросы:</strong></p>
+<ol><li>Как сейчас принимаете записи — телефон, WhatsApp, онлайн-запись? Что работает хуже всего?</li><li>Сколько звонков в день пропускаете? Что происходит с этими клиентами?</li><li>Сколько клиентов не приходит без предупреждения за неделю? Что делаете?</li><li>Кто сейчас отвечает на звонки и сколько это стоит (зарплата/время)?</li><li>Что случалось в последний раз, когда не успевали отвечать? (конкретный эпизод)</li><li>Пробовали ли что-то менять? Почему не сработало?</li><li>Если бы всё работало идеально, как выглядел бы ваш день с записями?</li></ol>
+<p><strong>Что фиксируем:</strong> частоту пропущенных звонков, долю неявок, текущие затраты (например, 38 000 руб/мес + налоги за администратора), готовность платить.</p>
+<p><strong>Метрика решения проблемы (гипотеза):</strong> пропущенные звонки → 0, неявки −30%, стоимость ниже зарплаты администратора.</p>
+<hr>
+<h2 id="s5"><span class="num">5</span><span>Ближайшие шаги</span></h2>
+<ol><li>Провести 10–15 custdev-интервью с салонами красоты/барбершопами Тюмени.</li><li>Ручной сбор 30–50 вакансий администратора салонов с hh.ru/Avito для уточнения требований и болей.</li><li>Сформировать оффер (скилл <code>offers</code>) и цену (скилл <code>pricing</code>) для пилота.</li><li>Найти 2–3 пилотных салона на бесплатный/льготный период.</li><li>Согласовать тарифную сетку (TARIFFS.md) и вариант ответственности (LIABILITY_OPTIONS.md).</li><li>Посчитать TAM Тюмени: сколько салонов/барбершопов, доля на YCLIENTS/Altegio (OPEN_QUESTIONS.md).</li></ol>
+<hr>
+<h2 id="s6"><span class="num">6</span><span>Дополнения 20.09.2026 (решения после 28 вопросов)</span></h2>
+<ul><li><strong>Продажи:</strong> лично владелец проекта, включая личные встречи на точках (в т.ч. по следам вакансий администраторов из исследования).</li><li><strong>Базовая линия «до»:</strong> салон на YCLIENTS — берём отчёты YCLIENTS; иначе — статистику пропущенных у АТС. Без неё нельзя доказать «спасённые звонки» и конвертировать пилот в платный.</li><li><strong>Рефералка:</strong> приведший и подключивший новый салон получает месяц своего тарифа бесплатно (за каждого оплатившего первый месяц).</li><li><strong>Условия:</strong> setup платный; 7 дней тарифа бесплатно; далее подписка; смена тарифа в любой момент с перерасчётом. Сетка — TARIFFS.md (на согласовании).</li><li><strong>Юрлицо:</strong> ИП, УСН 6%; патент — проверить у бухгалтера. Договор поручения ПДн — CONTRACT_PDN_TEMPLATE.md (шаблон, проверить у юриста); оператор ПДн — мы, салон получает доступ к записям.</li><li><strong>Рободо-звон (вопрос 28):</strong> подробное объяснение варианта отправлено в чате 20.09.2026; решение — следующим сообщением владельца. Пока остаётся в фазе 5.</li></ul>
+<footer class="src">Сгенерировано из <code>PLAN.md</code> · перегенерация: <code>python build_html_docs.py</code> · не редактируйте HTML вручную</footer>
+</article></main>
+<button id="top" title="Наверх">↑</button>
+<script>
+const top=document.getElementById('top');
+addEventListener('scroll',()=>top.classList.toggle('show',scrollY>400));
+top.addEventListener('click',()=>scrollTo({top:0,behavior:'smooth'}));
+</script>
+</body>
+</html>

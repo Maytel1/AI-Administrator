@@ -1,0 +1,12 @@
+﻿__pycache__/
+*.pyc
+.env
+
+# third-party skill sets (installed by scripts, see skills/INDEX.md)
+skills/marketingskills/
+skills/wondelai-skills/
+skills/anthropic-skills/
+skills/alirezarezvani-claude-skills/
+
+# hh.ru app client_secret - do not publish
+hh_app_auth.txt

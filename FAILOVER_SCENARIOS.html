@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Сбои и деградация — сценарии</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f4f1ea;--paper:#fffefb;--ink:#1e2733;--muted:#63707f;--line:#e4dfd3;--accent:#0f766e;--accent-ink:#0b5d57;--accent-soft:#e3f1ee;--warn-ink:#93261b;--warn-soft:#fceeea;--ok:#1a7f37;--ok-soft:#e8f4ea;--radius:14px;--shadow:0 1px 2px rgba(30,39,51,.04),0 10px 28px rgba(30,39,51,.07)}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.72 "Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+::selection{background:var(--accent);color:#fff}
+h1,h2,h3{font-family:"Manrope","Inter",sans-serif;line-height:1.28;margin:0}
+a{color:var(--accent-ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+main{padding:40px 22px 80px}
+.doc{max-width:920px;margin:0 auto}
+.doc-header{background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:30px 34px 24px;box-shadow:var(--shadow)}
+.kicker{font:700 11.5px "Inter",sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+.doc-header h1{font-size:30px;font-weight:800;letter-spacing:-.01em;margin:10px 0 10px}
+.lead{font-size:16.5px;color:var(--muted);margin:0;max-width:75ch}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.chip{display:inline-flex;align-items:center;gap:7px;font:600 12.5px "Inter",sans-serif;padding:5px 12px;border-radius:999px;background:var(--paper);border:1px solid var(--line)}
+.chip code{font-size:11.5px;padding:1px 6px}
+.dot{flex:none;width:8px;height:8px;border-radius:50%;background:#9aa5b1}
+.dot.warn{background:#e07856}
+.dot.mut{background:#9aa5b1}
+.dot.ok{background:#3fae5a}
+.rule{width:64px;height:3px;border-radius:3px;background:var(--accent);margin:20px 0 14px}
+.toc-chips{display:flex;flex-wrap:wrap;gap:8px}
+.toc-chips a{font:600 12.5px "Inter",sans-serif;padding:5px 12px;border-radius:999px;background:var(--accent-soft);color:var(--accent-ink);text-decoration:none}
+.toc-chips a:hover{background:#d3e8e2}
+h2{display:flex;align-items:center;flex-wrap:wrap;gap:12px;font-size:22.5px;margin:46px 0 14px;scroll-margin-top:14px}
+h2 .num{flex:none;width:34px;height:34px;border-radius:10px;background:var(--accent);color:#fff;display:grid;place-items:center;font:800 16px "Manrope",sans-serif}
+h3{font-size:16.5px;margin:22px 0 8px}
+p{margin:10px 0}
+p.lead-block{background:var(--accent-soft);border:1px solid #c3e0da;border-radius:12px;padding:12px 16px;font-size:15px}
+.tag{display:inline-block;font:700 11px "Inter",sans-serif;padding:3px 9px;border-radius:999px;letter-spacing:.06em;text-transform:uppercase}
+.t-warn{background:#fbe3df;color:var(--warn-ink)}
+.t-ok{background:var(--ok-soft);color:var(--ok)}
+.t-mut{background:#ece9e1;color:var(--muted)}
+blockquote.callout{border:1px solid #f0cdc6;background:var(--warn-soft);border-radius:12px;padding:13px 16px;margin:14px 0;font-size:15px}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);background:var(--paper);margin:14px 0 8px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+table.wide{min-width:900px}
+th{background:#edf4f1;color:var(--accent-ink);font:600 12.5px "Inter",sans-serif;text-align:left;padding:9px 12px;border:1px solid var(--line);white-space:nowrap}
+td{padding:9px 12px;border:1px solid var(--line);vertical-align:top}
+tbody tr:nth-child(even) td{background:#faf8f2}
+tbody tr:hover td{background:#f3f7f5}
+ul,ol{margin:10px 0;padding-left:24px}
+li{margin:6px 0}
+li::marker{color:var(--accent)}
+li .cb{color:var(--accent-ink);font-weight:700}
+code{font:500 .92em "JetBrains Mono",Consolas,monospace;background:#eef0f6;padding:2px 6px;border-radius:6px;color:#24304a}
+strong{color:#101828}
+hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+.src{margin-top:46px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--muted);font-style:italic}
+.src code{font-style:normal;background:#efece4}
+#top{position:fixed;right:22px;bottom:22px;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-size:17px;cursor:pointer;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .25s;z-index:55}
+#top.show{opacity:1;pointer-events:auto}
+#top:hover{background:var(--accent-soft)}
+@media print{body{background:#fff}main{padding:0}.doc-header{box-shadow:none;border-radius:0}#top{display:none}h2{break-after:avoid}.tbl-wrap{box-shadow:none;overflow:visible}table{font-size:12px}}
+</style>
+</head>
+<body>
+<main><article class="doc">
+<header class="doc-header">
+<div class="kicker">Надёжность</div>
+<h1>Сбои и деградация — сценарии</h1>
+<p class="lead">Десять сценариев: что видит клиент, как отвечает система, что делает человек и что настроить заранее. Принцип: наш сбой не должен увеличивать потери салона.</p>
+<div class="chips">
+<span class="chip"><span class="dot mut"></span>Вернуться перед фазой 3</span>
+<span class="chip">обновлено 20.09.2026</span>
+<span class="chip">источник: <code>FAILOVER_SCENARIOS.md</code></span>
+</div>
+<div class="rule"></div>
+<nav class="toc-chips"><a href="#s1">Что решаем позже (вернуться перед фазой 3)</a></nav>
+</header>
+<h1>Сбои и деградация — сценарии (20.09.2026, вернуться позже)</h1>
+<p>Контекст (вопрос 13). Принцип: <strong>падение нашего сервиса не должно увеличивать потери салона от пропущенных звонков</strong> — в любой деградации клиент должен дозваниваться хотя бы до живого человека/автоответчика. Файл — заготовка: реализацию и пороги обсуждаем позже (перед фазой 3).</p>
+<div class="tbl-wrap"><table class="tbl wide"><thead><tr><th>#</th><th>Сценарий</th><th>Что видит клиент</th><th>Автоответ системы</th><th>Действия человека</th><th>Превентивная мера</th></tr></thead><tbody><tr><td>1</td><td>Полное падение call-service / VM</td><td>Гудки → переадресация на живого админа/мобильный владельца (настраивается на стороне АТС, не нашего софта)</td><td>—</td><td>Алерт основателю (24/7), восстановление</td><td>Правило «no-answer/failure → на живого админа» обязательно настраивается при подключении каждого салона; healthcheck-мониторинг</td></tr><tr><td>2</td><td>SpeechKit (STT/TTS) недоступен или деградация</td><td>Бот молчит/отвечает медленно → «секунду, соединяю с администратором» + переадресация</td><td>Fallback-провайдер STT/TTS (Whisper API / Silero) через абстракцию</td><td>Алерт, переключение конфига</td><td>Провайдер за интерфейсом; e2e-таймер латентности с алертом</td></tr><tr><td>3</td><td>LLM-ядро недоступно (OpenAI/YandexGPT)</td><td>Голос: автоответчик «оставьте сообщение, перезвоним» + запись аудио. Текст: FAQ-режим без LLM + «заявка сохранена»</td><td>Fallback-модель в конфиге</td><td>Алерт, проверка лимитов/счёта API</td><td>Второй LLM-провайдер; тест fallback раз в неделю</td></tr><tr><td>4</td><td>CRM (YCLIENTS/Altegio) недоступна/таймаут</td><td>Диалог продолжается; бот подтверждает слот голосом</td><td>Запись кладётся в очередь (outbox) и создаётся при восстановлении; идемпотентность create_booking</td><td>Алерт, контроль очереди</td><td>Ретраи; подтверждение слота до create (уже в плане)</td></tr><tr><td>5</td><td>Телефонный провайдер упал</td><td>Клиент не дозванивается вообще</td><td>—</td><td>Алерт основателю, тикет провайдеру, SLA-претензия</td><td>SLA в договоре с провайдером; для критичных салонов позже — второй номер</td></tr><tr><td>6</td><td>«Зависший» звонок (тишина, шум, цикл)</td><td>Бот вежливо завершает: «перезвоним вам»</td><td>Таймауты: макс. длина звонка, N сек тишины, M неудачных реплик подряд; задача на перезвон</td><td>Разбор лога</td><td>Тест-чеклист звонков (уже в фазе 3)</td></tr><tr><td>7</td><td>Двойная бронь / не та услуга</td><td>Клиент получает подтверждение с финальным проговариванием деталей</td><td>Подтверждение слота до create_booking; лог + откат; журнал аудита</td><td>Разбор инцидента (LIABILITY_OPTIONS.md)</td><td>Блокировка create без финального подтверждения</td></tr><tr><td>8</td><td>Домен/TLS/вебхуки</td><td>Текстовые каналы молчат</td><td>Мониторинг сертификатов</td><td>Продление/перевыпуск</td><td>Алерт за 14 дней до истечения TLS</td></tr><tr><td>9</td><td>БД (сбой, потеря данных)</td><td>Возможна деградация ответов</td><td>Managed PG: автоматические бэкапы + PITR</td><td>Restore по runbook</td><td>RTO ≤ 2 ч; регламент восстановления</td></tr><tr><td>10</td><td>Каскадный сбой YC-региона</td><td>Широкая деградация</td><td>—</td><td>Мониторинг статуса YC, коммуникация салонам</td><td>На MVP принимаем риск; позже — multi-AZ/K8s</td></tr></tbody></table></div>
+<h2 id="s1"><span class="num">1</span><span>Что решаем позже (вернуться перед фазой 3)</span><span class="tag t-mut">отложено</span></h2>
+<ol><li>Пороговые значения таймаутов и порядок эскалации по каждому сценарию.</li><li>Фактический выбор fallback-провайдеров STT/TTS и LLM (закупка/доступы).</li><li>Формат ночного алерта основателю (канал, пороги, дедупликация).</li><li>Регламент «что говорим салону при сбое» (шаблон сообщения).</li></ol>
+<footer class="src">Сгенерировано из <code>FAILOVER_SCENARIOS.md</code> · перегенерация: <code>python build_html_docs.py</code> · не редактируйте HTML вручную</footer>
+</article></main>
+<button id="top" title="Наверх">↑</button>
+<script>
+const top=document.getElementById('top');
+addEventListener('scroll',()=>top.classList.toggle('show',scrollY>400));
+top.addEventListener('click',()=>scrollTo({top:0,behavior:'smooth'}));
+</script>
+</body>
+</html>

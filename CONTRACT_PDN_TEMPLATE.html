@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Договор поручения на обработку ПДн — шаблон</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f4f1ea;--paper:#fffefb;--ink:#1e2733;--muted:#63707f;--line:#e4dfd3;--accent:#0f766e;--accent-ink:#0b5d57;--accent-soft:#e3f1ee;--warn-ink:#93261b;--warn-soft:#fceeea;--ok:#1a7f37;--ok-soft:#e8f4ea;--radius:14px;--shadow:0 1px 2px rgba(30,39,51,.04),0 10px 28px rgba(30,39,51,.07)}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.72 "Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+::selection{background:var(--accent);color:#fff}
+h1,h2,h3{font-family:"Manrope","Inter",sans-serif;line-height:1.28;margin:0}
+a{color:var(--accent-ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+main{padding:40px 22px 80px}
+.doc{max-width:920px;margin:0 auto}
+.doc-header{background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:30px 34px 24px;box-shadow:var(--shadow)}
+.kicker{font:700 11.5px "Inter",sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+.doc-header h1{font-size:30px;font-weight:800;letter-spacing:-.01em;margin:10px 0 10px}
+.lead{font-size:16.5px;color:var(--muted);margin:0;max-width:75ch}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.chip{display:inline-flex;align-items:center;gap:7px;font:600 12.5px "Inter",sans-serif;padding:5px 12px;border-radius:999px;background:var(--paper);border:1px solid var(--line)}
+.chip code{font-size:11.5px;padding:1px 6px}
+.dot{flex:none;width:8px;height:8px;border-radius:50%;background:#9aa5b1}
+.dot.warn{background:#e07856}
+.dot.mut{background:#9aa5b1}
+.dot.ok{background:#3fae5a}
+.rule{width:64px;height:3px;border-radius:3px;background:var(--accent);margin:20px 0 14px}
+.toc-chips{display:flex;flex-wrap:wrap;gap:8px}
+.toc-chips a{font:600 12.5px "Inter",sans-serif;padding:5px 12px;border-radius:999px;background:var(--accent-soft);color:var(--accent-ink);text-decoration:none}
+.toc-chips a:hover{background:#d3e8e2}
+h2{display:flex;align-items:center;flex-wrap:wrap;gap:12px;font-size:22.5px;margin:46px 0 14px;scroll-margin-top:14px}
+h2 .num{flex:none;width:34px;height:34px;border-radius:10px;background:var(--accent);color:#fff;display:grid;place-items:center;font:800 16px "Manrope",sans-serif}
+h3{font-size:16.5px;margin:22px 0 8px}
+p{margin:10px 0}
+p.lead-block{background:var(--accent-soft);border:1px solid #c3e0da;border-radius:12px;padding:12px 16px;font-size:15px}
+.tag{display:inline-block;font:700 11px "Inter",sans-serif;padding:3px 9px;border-radius:999px;letter-spacing:.06em;text-transform:uppercase}
+.t-warn{background:#fbe3df;color:var(--warn-ink)}
+.t-ok{background:var(--ok-soft);color:var(--ok)}
+.t-mut{background:#ece9e1;color:var(--muted)}
+blockquote.callout{border:1px solid #f0cdc6;background:var(--warn-soft);border-radius:12px;padding:13px 16px;margin:14px 0;font-size:15px}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);background:var(--paper);margin:14px 0 8px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+table.wide{min-width:900px}
+th{background:#edf4f1;color:var(--accent-ink);font:600 12.5px "Inter",sans-serif;text-align:left;padding:9px 12px;border:1px solid var(--line);white-space:nowrap}
+td{padding:9px 12px;border:1px solid var(--line);vertical-align:top}
+tbody tr:nth-child(even) td{background:#faf8f2}
+tbody tr:hover td{background:#f3f7f5}
+ul,ol{margin:10px 0;padding-left:24px}
+li{margin:6px 0}
+li::marker{color:var(--accent)}
+li .cb{color:var(--accent-ink);font-weight:700}
+code{font:500 .92em "JetBrains Mono",Consolas,monospace;background:#eef0f6;padding:2px 6px;border-radius:6px;color:#24304a}
+strong{color:#101828}
+hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+.src{margin-top:46px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--muted);font-style:italic}
+.src code{font-style:normal;background:#efece4}
+#top{position:fixed;right:22px;bottom:22px;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-size:17px;cursor:pointer;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .25s;z-index:55}
+#top.show{opacity:1;pointer-events:auto}
+#top:hover{background:var(--accent-soft)}
+@media print{body{background:#fff}main{padding:0}.doc-header{box-shadow:none;border-radius:0}#top{display:none}h2{break-after:avoid}.tbl-wrap{box-shadow:none;overflow:visible}table{font-size:12px}}
+</style>
+</head>
+<body>
+<main><article class="doc">
+<header class="doc-header">
+<div class="kicker">Юридический шаблон</div>
+<h1>Договор поручения на обработку ПДн — шаблон</h1>
+<p class="lead">Четырнадцать разделов и приложение: роли сторон, состав данных, меры защиты, доступ салона к записям звонков, экспорт при расторжении.</p>
+<div class="chips">
+<span class="chip"><span class="dot warn"></span>Проверить у юриста</span>
+<span class="chip">обновлено 20.09.2026</span>
+<span class="chip">источник: <code>CONTRACT_PDN_TEMPLATE.md</code></span>
+</div>
+<div class="rule"></div>
+<nav class="toc-chips"><a href="#s1">1. Предмет</a><a href="#s2">2. Цели обработки</a><a href="#s3">3. Перечень действий с ПДн</a><a href="#s4">4. Категории субъектов и состав ПДн</a><a href="#s5">5. Срок обработки и хранения</a><a href="#s6">6. Меры защиты</a><a href="#s7">7. Трансграничная передача</a><a href="#s8">8. Поручение обработки третьим лицам (субобработчики)</a><a href="#s9">9. Доступ Салона к записям (решение владельца проекта от 20.09.2026)</a><a href="#s10">10. Конфиденциальность и инциденты</a><a href="#s11">11. Прекращение обработки (решение: «выдаём всё»)</a><a href="#s12">12. Ответственность</a><a href="#s13">13. Изменение/отзыв поручения</a><a href="#s14">14. Реквизиты и подписи</a></nav>
+</header>
+<h1>Договор поручения на обработку персональных данных — ШАБЛОН (20.09.2026)</h1>
+<blockquote class="callout c-warn">⚠️ <strong>Это шаблон для согласования с юристом, не готовый юридический документ.</strong><br>Роли (юридически корректная модель по ч. 3 ст. 6 152-ФЗ): <strong>Салон = Оператор</strong> ПДн своих клиентов (определяет цели и содержание обработки), <strong>Мы = Лицо, обрабатывающее ПДн по поручению Оператора</strong>. Параллельно <strong>Мы — самостоятельный Оператор</strong> для данных учётных записей, биллинга и логов салонов. Решение владельца проекта («оператор — мы, салон имеет доступ к записям») реализовано разделом 9 (доступ Салона) и примечанием о второй роли. Модель уточнить у юриста перед подписанием.</blockquote>
+<p><strong>Стороны:</strong> «Салон» ([наименование, ИНН] — Оператор) и «Платформа» ([наименование, ИП, ИНН] — Обработчик по поручению / Оператор для своих данных).</p>
+<h2 id="s1"><span class="num">1</span><span>Предмет</span></h2>
+<p>Салон поручает, Платформа принимает на себя обработку ПДн клиентов Салона в интересах Салона на условиях настоящего договора.</p>
+<h2 id="s2"><span class="num">2</span><span>Цели обработки</span></h2>
+<p>Запись клиентов на услуги (создание/перенос/отмена), ответы на вопросы, напоминания и подтверждения визитов, учёт истории обслуживания, ведение расписания Салона.</p>
+<h2 id="s3"><span class="num">3</span><span>Перечень действий с ПДн</span></h2>
+<p>Сбор (по телефону/в чатах), запись аудиоразговоров и транскрипция, систематизация, накопление, хранение, уточнение, использование для целей раздела 2, блокирование, удаление, уничтожение.</p>
+<h2 id="s4"><span class="num">4</span><span>Категории субъектов и состав ПДн</span></h2>
+<p>Субъекты: клиенты Салона. Состав: имя/ФИО, номер телефона, содержание диалогов и переписки, история записей и предпочтения (любимый мастер, скидки), аудиозаписи разговоров и транскрипты.</p>
+<h2 id="s5"><span class="num">5</span><span>Срок обработки и хранения</span></h2>
+<p>На срок действия договора. Аудиозаписи и транскрипты: <strong>[90] дней</strong> (параметр согласуется в ЛК), затем автоматическое удаление/обезличивание. Записи клиентов — до расторжения + [30] дней.</p>
+<h2 id="s6"><span class="num">6</span><span>Меры защиты</span></h2>
+<p>ИСПДн размещается в РФ (Yandex Cloud); разграничение доступа по ролям (RBAC), аудит действий, шифрование трафика (TLS) и хранилищ, резервное копирование, назначение ответственного за организацию обработки, обучение персонала Платформы.</p>
+<h2 id="s7"><span class="num">7</span><span>Трансграничная передача</span></h2>
+<p>Не осуществляется. Зарубежные LLM-подсистемы используются только для <strong>обезличенных</strong> данных (PDN_LLM_OPTIONS.md, вариант 5); персональные данные обрабатываются подсистемами на территории РФ.</p>
+<h2 id="s8"><span class="num">8</span><span>Поручение обработки третьим лицам (субобработчики)</span></h2>
+<p>Платформа вправе привлекать: Yandex Cloud (хостинг, СУБД, Object Storage), телеком-оператора (телефония), LLM-провайдера (с обезличиванием). Перечень актуализируется и доводится до Салона; новое привлечение — с обеспечением равных требований защиты.</p>
+<h2 id="s9"><span class="num">9</span><span>Доступ Салона к записям (решение владельца проекта от 20.09.2026)</span></h2>
+<p>Салон через личный кабинет имеет доступ <strong>только к своим данным</strong>: прослушивание и скачивание аудиозаписей звонков своих клиентов, транскрипты, статистика, экспорт. Передача третьим лицам — запрещена, кроме случаев, предусмотренных законом.</p>
+<h2 id="s10"><span class="num">10</span><span>Конфиденциальность и инциденты</span></h2>
+<p>Персонал Платформы обязуется не разглашать ПДн. Об инциденте (утечка/несанкционированный доступ) — уведомление Салона <strong>≤ 24 часов</strong> с описанием и планом реагирования.</p>
+<h2 id="s11"><span class="num">11</span><span>Прекращение обработки (решение: «выдаём всё»)</span></h2>
+<p>При расторжении: полный экспорт данных Салона в машиночитаемом виде (≤ 5 рабочих дней), затем удаление или обезличивание ПДн (≤ 30 дней) с письменным подтверждением (акт).</p>
+<h2 id="s12"><span class="num">12</span><span>Ответственность</span></h2>
+<p>Согласно выбранному варианту LIABILITY_OPTIONS.md (рекомендация: лимит = стоимость тарифа за месяц + SLA-компенсации). Данные, подтверждённые Салоном в ЛК (прайс, расписание, FAQ), — зона ответственности Салона.</p>
+<h2 id="s13"><span class="num">13</span><span>Изменение/отзыв поручения</span></h2>
+<p>Салон вправе давать обязательные указания по обработке (запрос через ЛК/почту); Платформа отчитывается о выполнении.</p>
+<h2 id="s14"><span class="num">14</span><span>Реквизиты и подписи</span></h2>
+<p>[Заполняется]</p>
+<h3>Приложение 1. Инструкция по доступу Салона к записям в ЛК</h3>
+<p>[Составляется к фазе 4: вход, роли, прослушивание, скачивание, срок хранения, запрос экспорта]</p>
+<footer class="src">Сгенерировано из <code>CONTRACT_PDN_TEMPLATE.md</code> · перегенерация: <code>python build_html_docs.py</code> · не редактируйте HTML вручную</footer>
+</article></main>
+<button id="top" title="Наверх">↑</button>
+<script>
+const top=document.getElementById('top');
+addEventListener('scroll',()=>top.classList.toggle('show',scrollY>400));
+top.addEventListener('click',()=>scrollTo({top:0,behavior:'smooth'}));
+</script>
+</body>
+</html>

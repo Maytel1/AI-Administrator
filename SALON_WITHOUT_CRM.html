@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Салон без YCLIENTS / Altegio — сценарии работы</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f4f1ea;--paper:#fffefb;--ink:#1e2733;--muted:#63707f;--line:#e4dfd3;--accent:#0f766e;--accent-ink:#0b5d57;--accent-soft:#e3f1ee;--warn-ink:#93261b;--warn-soft:#fceeea;--ok:#1a7f37;--ok-soft:#e8f4ea;--radius:14px;--shadow:0 1px 2px rgba(30,39,51,.04),0 10px 28px rgba(30,39,51,.07)}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.72 "Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+::selection{background:var(--accent);color:#fff}
+h1,h2,h3{font-family:"Manrope","Inter",sans-serif;line-height:1.28;margin:0}
+a{color:var(--accent-ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+main{padding:40px 22px 80px}
+.doc{max-width:920px;margin:0 auto}
+.doc-header{background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:30px 34px 24px;box-shadow:var(--shadow)}
+.kicker{font:700 11.5px "Inter",sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+.doc-header h1{font-size:30px;font-weight:800;letter-spacing:-.01em;margin:10px 0 10px}
+.lead{font-size:16.5px;color:var(--muted);margin:0;max-width:75ch}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.chip{display:inline-flex;align-items:center;gap:7px;font:600 12.5px "Inter",sans-serif;padding:5px 12px;border-radius:999px;background:var(--paper);border:1px solid var(--line)}
+.chip code{font-size:11.5px;padding:1px 6px}
+.dot{flex:none;width:8px;height:8px;border-radius:50%;background:#9aa5b1}
+.dot.warn{background:#e07856}
+.dot.mut{background:#9aa5b1}
+.dot.ok{background:#3fae5a}
+.rule{width:64px;height:3px;border-radius:3px;background:var(--accent);margin:20px 0 14px}
+.toc-chips{display:flex;flex-wrap:wrap;gap:8px}
+.toc-chips a{font:600 12.5px "Inter",sans-serif;padding:5px 12px;border-radius:999px;background:var(--accent-soft);color:var(--accent-ink);text-decoration:none}
+.toc-chips a:hover{background:#d3e8e2}
+h2{display:flex;align-items:center;flex-wrap:wrap;gap:12px;font-size:22.5px;margin:46px 0 14px;scroll-margin-top:14px}
+h2 .num{flex:none;width:34px;height:34px;border-radius:10px;background:var(--accent);color:#fff;display:grid;place-items:center;font:800 16px "Manrope",sans-serif}
+h3{font-size:16.5px;margin:22px 0 8px}
+p{margin:10px 0}
+p.lead-block{background:var(--accent-soft);border:1px solid #c3e0da;border-radius:12px;padding:12px 16px;font-size:15px}
+.tag{display:inline-block;font:700 11px "Inter",sans-serif;padding:3px 9px;border-radius:999px;letter-spacing:.06em;text-transform:uppercase}
+.t-warn{background:#fbe3df;color:var(--warn-ink)}
+.t-ok{background:var(--ok-soft);color:var(--ok)}
+.t-mut{background:#ece9e1;color:var(--muted)}
+blockquote.callout{border:1px solid #f0cdc6;background:var(--warn-soft);border-radius:12px;padding:13px 16px;margin:14px 0;font-size:15px}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);background:var(--paper);margin:14px 0 8px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+table.wide{min-width:900px}
+th{background:#edf4f1;color:var(--accent-ink);font:600 12.5px "Inter",sans-serif;text-align:left;padding:9px 12px;border:1px solid var(--line);white-space:nowrap}
+td{padding:9px 12px;border:1px solid var(--line);vertical-align:top}
+tbody tr:nth-child(even) td{background:#faf8f2}
+tbody tr:hover td{background:#f3f7f5}
+ul,ol{margin:10px 0;padding-left:24px}
+li{margin:6px 0}
+li::marker{color:var(--accent)}
+li .cb{color:var(--accent-ink);font-weight:700}
+code{font:500 .92em "JetBrains Mono",Consolas,monospace;background:#eef0f6;padding:2px 6px;border-radius:6px;color:#24304a}
+strong{color:#101828}
+hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+.src{margin-top:46px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--muted);font-style:italic}
+.src code{font-style:normal;background:#efece4}
+#top{position:fixed;right:22px;bottom:22px;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-size:17px;cursor:pointer;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .25s;z-index:55}
+#top.show{opacity:1;pointer-events:auto}
+#top:hover{background:var(--accent-soft)}
+@media print{body{background:#fff}main{padding:0}.doc-header{box-shadow:none;border-radius:0}#top{display:none}h2{break-after:avoid}.tbl-wrap{box-shadow:none;overflow:visible}table{font-size:12px}}
+</style>
+</head>
+<body>
+<main><article class="doc">
+<header class="doc-header">
+<div class="kicker">Продукт</div>
+<h1>Салон без YCLIENTS / Altegio — сценарии работы</h1>
+<p class="lead">Пять сценариев для микросалонов с тетрадкой и WhatsApp: от внутреннего календаря продукта до онбординга в Altegio. Выбор определяет фазу 4 и setup.</p>
+<div class="chips">
+<span class="chip"><span class="dot warn"></span>Ждёт выбора владельца</span>
+<span class="chip">обновлено 20.09.2026</span>
+<span class="chip">источник: <code>SALON_WITHOUT_CRM.md</code></span>
+</div>
+<div class="rule"></div>
+<nav class="toc-chips"><a href="#s1">Сценарий A. Внутренний календарь продукта (кандидат в MVP)</a><a href="#s2">Сценарий B. Адаптер Google (Sheets / Calendar)</a><a href="#s3">Сценарий C. Гибрид «бот + подтверждение админом»</a><a href="#s4">Сценарий D. Онбординг салона в Altegio (DIKIDI) как услуга</a><a href="#s5">Сценарий E. Только подтверждения (входной продукт)</a><a href="#s6">Рекомендация</a><a href="#s7">Открытые пункты</a></nav>
+</header>
+<h1>Салон без YCLIENTS / Altegio — сценарии работы (20.09.2026)</h1>
+<p>Контекст (вопрос 6): в Тюмени много микросалонов, ведущих запись в тетради, WhatsApp и телефонной книжке. Для них YCLIENTS-интеграция не сработает. Ниже 5 сценариев; выбираем, что включаем в MVP. Итоговый выбор зафиксирую в DEVELOPMENT_PLAN.md (фаза 4) и TARIFFS.md (setup).</p>
+<h2 id="s1"><span class="num">1</span><span>Сценарий A. Внутренний календарь продукта (кандидат в MVP)</span></h2>
+<ul><li><strong>Что:</strong> услуги, мастера, график и записи хранятся в нашей БД; при онбординге владелец вносит прайс в ЛК (или мы переносим за него — дороже setup), бот создаёт записи в нашем календаре.</li><li><strong>Видит владелец:</strong> ЛК (записи, расписание, статистика) + уведомления в Telegram о каждой записи.</li><li><strong>Правило процесса:</strong> «телефонная/чатовая запись — только через нас», иначе двойные брони с бумажным журналом; проговариваем на онбординге и пишем в договоре.</li><li><strong>Плюсы:</strong> работает сразу, полный контроль, не зависим от чужих API. <strong>Минусы:</strong> ручной ввод прайса (setup +10 000 ₽), салон должен доверить нам запись как единственный канал.</li><li>Онбординг: максимальная оценка 4–6,5 ч (DEVELOPMENT_PLAN.md, раздел 8.1).</li></ul>
+<h2 id="s2"><span class="num">2</span><span>Сценарий B. Адаптер Google (Sheets / Calendar)</span></h2>
+<ul><li>Расписание салона живёт в Google-таблице/календаре; бот читает и пишет через API сервисного аккаунта.</li><li><strong>Плюсы:</strong> бесплатно, привычно тем, кто уже ведёт таблицы. <strong>Минусы:</strong> слабый контроль накладок, «сломанная» таблица ломает бота, вопросы безопасности доступа.</li><li>Вердикт: возможно, позже; не как ядро MVP.</li></ul>
+<h2 id="s3"><span class="num">3</span><span>Сценарий C. Гибрид «бот + подтверждение админом»</span></h2>
+<ul><li>Бот собирает заявку (услуга → мастер → время) и шлёт админу салона в Telegram: «подтверди слот»; после подтверждения бот фиксирует запись и сообщает клиенту.</li><li><strong>Плюсы:</strong> минимальный риск ошибок на старте; консервативные салоны соглашаются легко. <strong>Минусы:</strong> ценность падает — вечером/ночью некому подтвердить (а это наш главный сценарий).</li><li>Компромисс: днём подтверждает админ, ночью — авто-подтверждение по правилам (для проверенных салонов).</li></ul>
+<h2 id="s4"><span class="num">4</span><span>Сценарий D. Онбординг салона в Altegio (DIKIDI) как услуга</span></h2>
+<ul><li>Мы бесплатно регистрируем салону Altegio (есть бесплатный тариф), переносим прайс и подключаем нашего бота по API.</li><li><strong>Плюсы:</strong> полноценная автоматизация (слоты, напоминания, онлайн-запись), мы становимся «ИТ-департаментом» салона — самый сильный ров. <strong>Минусы:</strong> 1–2 дополнительные встречи на обучение, сопротивление «зачем мне новая программа».</li><li>Стратегически: путь A → D (начали с нашего календаря — мигрировали в Altegio при росте).</li></ul>
+<h2 id="s5"><span class="num">5</span><span>Сценарий E. Только подтверждения (входной продукт)</span></h2>
+<ul><li>Салон ведёт запись как привык; мы обзваниваем/пишем клиентам накануне визита («подтвердите запись») по списку из экспорта.</li><li><strong>Плюсы:</strong> самый дешёвый вход, ноль риска ошибок записи. <strong>Минусы:</strong> маленький чек. Связка: рободо-звон (вопрос 28, DEVELOPMENT_PLAN.md, фаза 5).</li></ul>
+<h2 id="s6"><span class="num">6</span><span>Рекомендация</span><span class="tag t-ok">рекомендация</span></h2>
+<p>MVP = <strong>A</strong> (салоны без CRM) + <strong>D</strong> как целевая модель для готовых; <strong>C</strong> для консервативных на первый месяц; <strong>E</strong> — позже как самостоятельный дешёвый продукт.</p>
+<h2 id="s7"><span class="num">7</span><span>Открытые пункты</span><span class="tag t-warn">открытые пункты</span></h2>
+<ol><li>Включать ли сценарий A в MVP (фаза 4)?</li><li>Доплата setup «без CRM»: +10 000 ₽ к базовому — ок?</li><li>Нужен ли вообще B (Google-адаптер) или отложить?</li></ol>
+<footer class="src">Сгенерировано из <code>SALON_WITHOUT_CRM.md</code> · перегенерация: <code>python build_html_docs.py</code> · не редактируйте HTML вручную</footer>
+</article></main>
+<button id="top" title="Наверх">↑</button>
+<script>
+const top=document.getElementById('top');
+addEventListener('scroll',()=>top.classList.toggle('show',scrollY>400));
+top.addEventListener('click',()=>scrollTo({top:0,behavior:'smooth'}));
+</script>
+</body>
+</html>

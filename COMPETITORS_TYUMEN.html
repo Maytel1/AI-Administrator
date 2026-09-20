@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Анализ конкурентов и аналогов — голосовой AI-администратор, Тюмень</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f1ea; --paper:#fffefb; --ink:#1e2733; --muted:#63707f; --line:#e4dfd3;
+  --accent:#0f766e; --accent-ink:#0b5d57; --accent-soft:#e3f1ee;
+  --warn-ink:#93261b; --warn-soft:#fceeea;
+  --ok:#1a7f37; --ok-soft:#e8f4ea;
+  --radius:14px; --sbw:296px;
+  --shadow:0 1px 2px rgba(30,39,51,.04),0 10px 28px rgba(30,39,51,.07);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.72 "Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+::selection{background:var(--accent);color:#fff}
+h1,h2,h3{font-family:"Manrope","Inter",sans-serif;line-height:1.28;margin:0}
+a{color:var(--accent-ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ---------- sidebar ---------- */
+#sidebar{position:fixed;top:0;bottom:0;left:0;width:var(--sbw);background:var(--paper);border-right:1px solid var(--line);padding:22px 18px;overflow-y:auto;display:flex;flex-direction:column;gap:13px;z-index:50;transition:transform .28s ease}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-badge{flex:none;width:38px;height:38px;border-radius:11px;background:var(--accent);display:grid;place-items:center;font-size:19px;box-shadow:var(--shadow)}
+.brand-title{font:800 14.5px/1.2 "Manrope",sans-serif;color:var(--ink)}
+.brand-sub{font-size:11.5px;color:var(--muted);margin-top:2px}
+.search{position:relative}
+#q{width:100%;padding:9px 30px 9px 12px;border:1px solid var(--line);border-radius:10px;font:13.5px "Inter",sans-serif;background:#faf8f2;color:var(--ink)}
+#q::placeholder{color:#9aa5b1}
+#q:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(15,118,110,.14)}
+#clearBtn{position:absolute;right:5px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--muted);font-size:13px;cursor:pointer;padding:4px 6px;border-radius:6px}
+#clearBtn:hover{background:#efece4}
+.count{font-size:11.5px;color:var(--muted);min-height:15px;padding:0 4px}
+.toc-h{font:700 10.5px "Inter",sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:2px 8px 4px}
+#toc{display:flex;flex-direction:column;gap:1px}
+#toc a{display:block;padding:5px 10px;border-radius:8px;border-left:2px solid transparent;color:var(--muted);text-decoration:none;font-size:13.5px;line-height:1.35}
+#toc a:hover{background:#f1eee6;color:var(--ink)}
+#toc a.active{background:var(--accent-soft);border-left-color:var(--accent);color:var(--accent-ink);font-weight:600}
+#toc a.sub{margin-left:14px;font-size:12.5px;padding:4px 10px 4px 12px}
+.kbd-hint{font-size:11px;color:var(--muted);padding:0 4px}
+.kbd-hint kbd{font:11px "JetBrains Mono",monospace;background:#f1eee6;border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+.sb-meta{margin-top:auto;font-size:11.5px;color:var(--muted);border-top:1px dashed var(--line);padding-top:12px}
+
+/* ---------- layout ---------- */
+main{margin-left:var(--sbw);padding:42px 48px 90px}
+.doc{max-width:880px}
+
+/* ---------- header ---------- */
+.kicker{font:700 11.5px "Inter",sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+.doc-header h1{font-size:31px;font-weight:800;margin:10px 0 12px;letter-spacing:-.01em}
+.lead{font-size:17px;color:var(--muted);max-width:72ch;margin:0}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.chip{font:600 12.5px "Inter",sans-serif;padding:5px 12px;border-radius:999px;background:var(--paper);border:1px solid var(--line)}
+.rule{width:64px;height:3px;border-radius:3px;background:var(--accent);margin:20px 0 4px}
+
+/* ---------- sections ---------- */
+section{scroll-margin-top:16px}
+h2{display:flex;align-items:center;flex-wrap:wrap;gap:12px;font-size:22.5px;margin:48px 0 16px}
+h2 .num{flex:none;width:34px;height:34px;border-radius:10px;background:var(--accent);color:#fff;display:grid;place-items:center;font:800 16px "Manrope",sans-serif}
+.h2sub{font:600 13.5px "Inter",sans-serif;color:var(--muted)}
+.h3sub{font:600 12.5px "Inter",sans-serif;color:var(--muted)}
+.comp{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;margin:16px 0;box-shadow:var(--shadow);scroll-margin-top:20px}
+.comp>h3{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:16.5px;margin:0 0 10px}
+.comp p{margin:8px 0}
+ul,ol{margin:8px 0;padding-left:22px}
+li{margin:4.5px 0}
+li::marker{color:var(--accent);font-weight:700}
+ol.resume{padding-left:26px}
+ol.resume li{margin:11px 0}
+.dom{font:500 11.5px "JetBrains Mono",monospace;color:var(--muted);background:#f1eee6;border:1px solid var(--line);padding:2px 7px;border-radius:6px}
+.tag{display:inline-block;font:700 11px "Inter",sans-serif;padding:3px 9px;border-radius:999px;letter-spacing:.02em}
+.t-warn{background:#fbe3df;color:var(--warn-ink)}
+.t-ok{background:var(--ok-soft);color:var(--ok)}
+.t-mut{background:#ece9e1;color:var(--muted)}
+.mut{color:var(--muted)}
+.price{font-weight:700;color:var(--accent-ink);white-space:nowrap}
+.callout{border:1px solid;border-radius:12px;padding:13px 16px;margin:13px 0;font-size:15px}
+.c-warn{background:var(--warn-soft);border-color:#f0cdc6}
+.c-note{background:var(--accent-soft);border-color:#c3e0da}
+.c-rec{background:linear-gradient(135deg,var(--accent-soft),#f4fbf9);border-left:5px solid var(--accent);border-color:#b8dcd4}
+
+/* ---------- stats ---------- */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0 22px}
+.stat{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow)}
+.stat b{display:block;font:800 20px/1.25 "Manrope",sans-serif;color:var(--accent-ink);margin-bottom:4px}
+.stat span{font-size:12.5px;color:var(--muted);line-height:1.45;display:block}
+
+/* ---------- tables ---------- */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);background:var(--paper);margin:14px 0 8px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{background:#edf4f1;color:var(--accent-ink);font:600 12.5px "Inter",sans-serif;text-align:left;padding:9px 12px;border:1px solid var(--line);white-space:nowrap}
+td{padding:9px 12px;border:1px solid var(--line);vertical-align:top}
+tbody tr:nth-child(even) td{background:#faf8f2}
+tbody tr:hover td{background:#f3f7f5}
+table.wide{min-width:920px}
+.row-hl td{background:#fdf3f1!important}
+.row-mut td{color:var(--muted);font-style:italic}
+
+/* ---------- misc ---------- */
+.src{margin-top:46px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--muted);font-style:italic}
+#top{position:fixed;right:22px;bottom:22px;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-size:17px;cursor:pointer;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .25s;z-index:55}
+#top.show{opacity:1;pointer-events:auto}
+#top:hover{background:var(--accent-soft)}
+.dimmed{opacity:.25;filter:saturate(.3);transition:opacity .2s}
+#menuBtn{display:none;position:fixed;top:13px;left:13px;z-index:60;width:42px;height:42px;border-radius:11px;border:1px solid var(--line);background:var(--paper);box-shadow:var(--shadow);font-size:17px;cursor:pointer}
+#scrim{position:fixed;inset:0;background:rgba(20,28,40,.38);opacity:0;pointer-events:none;transition:opacity .25s;z-index:45}
+body.nav-open #scrim{opacity:1;pointer-events:auto}
+body.nav-open{overflow:hidden}
+
+@media(max-width:1080px){
+  #sidebar{transform:translateX(-104%);box-shadow:none}
+  body.nav-open #sidebar{transform:none;box-shadow:0 10px 44px rgba(0,0,0,.2)}
+  main{margin-left:0;padding:76px 20px 70px}
+  #menuBtn{display:block}
+}
+@media(max-width:700px){
+  .stats{grid-template-columns:1fr 1fr}
+  .doc-header h1{font-size:24px}
+  .comp{padding:16px}
+  h2{font-size:20px}
+}
+@media print{
+  #sidebar,#top,#menuBtn,#scrim,.kbd-hint{display:none!important}
+  main{margin:0;padding:0}
+  body{background:#fff}
+  .comp,.tbl-wrap,.stat{box-shadow:none;break-inside:avoid}
+}
+</style>
+</head>
+<body>
+<button id="menuBtn" aria-label="Открыть содержание">☰</button>
+<div id="scrim"></div>
+<aside id="sidebar">
+  <div class="brand">
+    <div class="brand-badge">📊</div>
+    <div>
+      <div class="brand-title">Конкурентный анализ</div>
+      <div class="brand-sub">Голосовой AI-администратор · Тюмень</div>
+    </div>
+  </div>
+  <div class="search">
+    <input id="q" type="search" placeholder="Поиск по отчёту…" autocomplete="off" spellcheck="false">
+    <button id="clearBtn" hidden aria-label="Очистить поиск">✕</button>
+  </div>
+  <div id="count" class="count"></div>
+  <div class="toc-h">Содержание</div>
+  <nav id="toc">
+    <a class="l1" href="#s1">1. Резюме — главные выводы</a>
+    <a class="l1" href="#s2">2. Прямые конкуренты — голосовые</a>
+    <a class="sub" href="#s21">2.1 · Likesoft Voice</a>
+    <a class="sub" href="#s22">2.2 · ZvonIII</a>
+    <a class="sub" href="#s23">2.3 · ipt-ai</a>
+    <a class="sub" href="#s24">2.4 · Noltis</a>
+    <a class="sub" href="#s25">2.5 · Прочие (цены по запросу)</a>
+    <a class="sub" href="#s26">2.6 · Внедренцы ботов</a>
+    <a class="l1" href="#s3">3. Текстовые ИИ-администраторы</a>
+    <a class="sub" href="#s31">3.1 · Daria AI</a>
+    <a class="sub" href="#s32">3.2 · jAutomation</a>
+    <a class="l1" href="#s4">4. Платформенные альтернативы</a>
+    <a class="l1" href="#s5">5. Локальная ситуация в Тюмени</a>
+    <a class="sub" href="#s51">5.1 · Провайдеры Тюмени</a>
+    <a class="sub" href="#s52">5.2 · Бенчмарк: живой админ</a>
+    <a class="l1" href="#s6">6. Сводная сравнительная таблица</a>
+    <a class="l1" href="#s7">7. Выводы и рекомендации</a>
+  </nav>
+  <div class="kbd-hint"><kbd>Ctrl</kbd>+<kbd>K</kbd> — быстрый поиск</div>
+  <div class="sb-meta">Отчёт: 19.09.2026 · 7 разделов<br>~15 игроков · HTML-версия COMPETITORS_TYUMEN.md</div>
+</aside>
+<main id="content"><div class="doc">
+<header class="doc-header">
+  <div class="kicker">Конкурентная разведка · Отчёт от 19.09.2026</div>
+  <h1>Анализ конкурентов и аналогов: голосовой AI-администратор для салонов красоты и барбершопов в Тюмени</h1>
+  <p class="lead">Метод: анализ сайтов, тарифных страниц и открытых источников. Наш проект — голосовой AI-администратор: перехват входящих звонков + запись клиентов для салонов красоты и барбершопов Тюмени.</p>
+  <div class="chips">
+    <span class="chip">🎯 Перехват звонков 24/7</span>
+    <span class="chip">✍️ Запись клиентов</span>
+    <span class="chip">📍 Тюмень</span>
+    <span class="chip">💈 Салоны красоты / барбершопы</span>
+  </div>
+  <div class="rule"></div>
+</header>
+<section id="s1">
+<h2><span class="num">1</span>Резюме — главные выводы</h2>
+<div class="stats">
+  <div class="stat"><b>0</b><span>прямых конкурентов с голосовым AI-администратором в Тюмени</span></div>
+  <div class="stat"><b>30–120 тыс ₽</b><span>разовое внедрение у ближайшего локального игрока (SEOmi)</span></div>
+  <div class="stat"><b>от 30 000 ₽/мес</b><span>Likesoft Voice — прямой федеральный конкурент (+ setup 30 000 ₽)</span></div>
+  <div class="stat"><b>40–60 тыс ₽</b><span>живой администратор в Тюмени — бенчмарк замещения</span></div>
+</div>
+<ol class="resume">
+  <li><b>Прямых локальных конкурентов в Тюмени НЕТ.</b> Ни одна найденная тюменская компания не продаёт именно голосового ИИ-администратора для салонов красоты. Ближайший локальный игрок — <b>SEOmi</b> (офис на ул. Республики, 253с1), но он продаёт универсальных «ИИ-сотрудников» (чат + обзвон) за разовое внедрение 30–120 тыс. ₽, без отраслевой специализации.</li>
+  <li><b>Прямые конкуренты — федеральные, продают дистанционно:</b> <b>Likesoft Voice</b> — полное совпадение по продукту (голос 24/7 + YCLIENTS/Altegio), от <span class="price">30 000 ₽/мес</span> за точку + setup <span class="price">30 000 ₽</span>. <b>ZvonIII</b> — beauty-фокус, цены по запросу.</li>
+  <li><b>Текстовые ИИ-администраторы (мессенджеры, не звонки) — зрелый сегмент:</b> Daria AI, jAutomation — от <span class="price">0 до 5 000 ₽/мес</span>. Они НЕ закрывают звонки — это наше ключевое отличие.</li>
+  <li><b>Ценовая вилка рынка голосовых решений:</b> 6–9 ₽/мин (ipt-ai) → от 30 000 ₽/мес за точку (Likesoft) → до 60 000 ₽/мес за сеть (Likesoft «Бизнес»). Живой администратор в Тюмени стоит <span class="price">40–60 тыс. ₽/мес</span> (ночная смена 60–90 тыс. ₽).</li>
+  <li><b>Стандарт рынка:</b> бесплатный период 3–14 дней, пилот на 1 точке, setup-платёж, подписка с лимитами минут/диалогов + доплата сверх пакета, интеграция с YCLIENTS / DIKIDI (Altegio), эскалация сложных вопросов человеку, уведомление о записи разговора (152-ФЗ).</li>
+</ol>
+</section>
+
+<section id="s2">
+<h2><span class="num">2</span>Прямые конкуренты — голосовые ИИ-администраторы</h2>
+
+<div class="comp" id="s21">
+  <h3>Likesoft Voice <span class="dom">likesoft.io</span> <span class="tag t-warn">⚠️ полное совпадение с нашим продуктом</span></h3>
+  <p><b>Продукт:</b> «AI-администратор для салонов — закрывает 100% звонков, в том числе вечером и в выходные». Голос близок к живому, запись/перенос/FAQ, эскалация на живого админа в Telegram, SMS-подтверждение клиенту, ежедневный дайджест в TG.</p>
+  <p><b>Тарифы</b> (тариф «Сеть» — по запросу, только для сетей 8+ точек):</p>
+  <div class="tbl-wrap"><table>
+  <thead><tr><th>Тариф</th><th>Для кого</th><th>Цена</th><th>Что входит</th></tr></thead>
+  <tbody>
+  <tr><td><b>Базовый</b></td><td>1–2 точки</td><td><span class="price">от 30 000 ₽/мес</span><br><span class="mut">+ setup 30 000 ₽</span></td><td>до 1 000 мин/мес, 1 интеграция (YCLIENTS/Altegio), FAQ из скрипта, ежедневный дайджест в TG; сверх пакета — <span class="price">9 ₽/мин</span></td></tr>
+  <tr><td><b>Бизнес</b></td><td>сеть 3–7 точек</td><td><span class="price">от 60 000 ₽/мес</span><br><span class="mut">+ setup 60 000 ₽</span></td><td>до 3 000 мин, 2 интеграции + телефония, кастомные сценарии акций/абонементов, еженедельный разбор звонков; сверх пакета — <span class="price">7 ₽/мин</span></td></tr>
+  <tr><td><b>Сеть</b></td><td>8+ точек / премиум</td><td><span class="tag t-mut">по запросу</span></td><td>от 5 000 мин, все интеграции + кастомный голос, речевая аналитика Dialogik; сверх пакета — от <span class="price">5 ₽/мин</span></td></tr>
+  </tbody></table></div>
+  <p><b>Условия:</b> запуск за 4 недели; демо-номер «позвони и попробуй записаться»; пилот на 1 точке — «если за месяц нет эффекта — стоп без претензий»; запись разговоров хранится в Yandex Cloud (РФ), голосовое уведомление о записи в начале звонка (152-ФЗ); вторая CRM по API — +5–10 дней.</p>
+  <p><b>Интеграции:</b> YCLIENTS, Altegio (бывший DIKIDI), 1С-Салон, Mango Office / Sipuni / Telphin, Telegram-бот для админа, кастомные CRM по API.</p>
+</div>
+
+<div class="comp" id="s22">
+  <h3>ZvonIII <span class="tag t-mut">beauty-фокус · цены по запросу</span></h3>
+  <p>Голосовые ИИ-администраторы для салонов красоты и других отраслей. Тарифная страница публично не раскрывает цены — только заявка. Позиционирование и кейсы пересекаются с нашим продуктом.</p>
+</div>
+
+<div class="comp" id="s23">
+  <h3>ipt-ai <span class="dom">ipt-ai.ru</span> <span class="tag t-ok">голосовой ИИ-робот на GPT · конвейерный подход</span></h3>
+  <ul>
+    <li>Голосовой робот: <span class="price">от 6 ₽/мин</span>, до 1 000 звонков одновременно, <b>7 дней бесплатно</b>.</li>
+    <li>Текстовый бот: <span class="price">от 3 000 ₽</span> за тариф на 1 000 сообщений.</li>
+    <li>Разработка логики под ключ: <span class="price">от 50 000 ₽</span> + помесячная оплата за объём.</li>
+    <li>Голос = стоимость текстового бота × 2 (пример: текстовый за 20 000 ₽ → голосовой 40 000 ₽).</li>
+    <li>Гарантия 30 дней на исправление ошибок разработки.</li>
+  </ul>
+  <p><b>Интеграции:</b> amoCRM, Битрикс24, YCLIENTS, МИС Renovatio; телефония по SIP — Mango Office, Zadarma, UIS, МТС, Telfin, Ростелеком, Новофон. Каналы: WhatsApp, Telegram, Instagram, VK, Авито.</p>
+  <div class="callout c-warn"><b>Слабое место для нас:</b> универсальный конвейер, нет beauty-специализации (не кейсы салонов, а автосервисы / ЖКХ / недвижимость).</div>
+</div>
+
+<div class="comp" id="s24">
+  <h3>Noltis <span class="dom">noltis.ru</span> <span class="tag t-mut">голосовой ИИ-агент для колл-центра · «инженерный» подход</span></h3>
+  <p><b>Условия:</b> цена по расчёту после брифа (расчёт за 24 часа); бесплатный аудит бизнес-процессов (заявлено «100 000 ₽ → 0 ₽»); окупаемость при нагрузке от 1 500 звонков/мес; запуск 2–3 недели (простой сценарий) / 4–6 недель (сложный). Кейс: колл-центр ~70 000 ₽/мес → голосовой ИИ ~45 000 ₽/мес.</p>
+  <p><b>Стек:</b> Yandex SpeechKit / Whisper (STT+TTS), Voximplant, Mango Office / UIS, локальная LLM; on-prem развёртывание для 152-ФЗ и NDA. Эскалация на оператора с готовым контекстом, транскрипты и аналитика каждого звонка.</p>
+</div>
+
+<div class="comp" id="s25">
+  <h3>Прочие игроки с ценами по запросу</h3>
+  <div class="tbl-wrap"><table>
+  <thead><tr><th>Компания</th><th>Продукт</th><th>Цены</th></tr></thead>
+  <tbody>
+  <tr><td><b>SmartAgentix</b></td><td>ИИ-администратор / автоответчики</td><td>по запросу</td></tr>
+  <tr><td><b>NodeWorks</b></td><td>голосовые боты</td><td>по запросу</td></tr>
+  <tr><td><b>МТС Exolve</b></td><td>голосовые роботы</td><td>токенная тарификация (по запросу)</td></tr>
+  <tr><td><b>Gravitel AiCall</b></td><td>робот для АТС: понимает естественную речь, эскалация на операторов, «до 80% рутинных звонков»</td><td>по запросу; АТС — 14 дней бесплатно</td></tr>
+  </tbody></table></div>
+</div>
+
+<div class="comp" id="s26">
+  <h3>Внедренцы ботов <span class="h3sub">(разовые проекты)</span></h3>
+  <ul>
+    <li><b>Р52.РУ</b> (Тюмень): боты <span class="price">от 50 000 ₽</span> (разовая разработка).</li>
+    <li><b>ZayavkaAI</b>: пилот <span class="price">от 30 000 ₽</span>.</li>
+  </ul>
+</div>
+</section>
+<section id="s3">
+<h2><span class="num">3</span>Текстовые ИИ-администраторы для салонов <span class="h2sub">(не голос — но бьют по той же боли)</span></h2>
+
+<div class="comp" id="s31">
+  <h3>Daria AI <span class="dom">dariabot.ru</span> <span class="tag t-mut">мессенджеры + YCLIENTS</span></h3>
+  <p>Работает <b>только</b> через интеграцию с YCLIENTS (подключение 5 минут). Каналы: MAX, WhatsApp, Telegram, VK, Instagram Direct. Бесплатный тест 3 дня без карты.</p>
+  <div class="tbl-wrap"><table>
+  <thead><tr><th>Тариф</th><th>Лимит</th><th>Сотрудники</th><th>Примечание</th></tr></thead>
+  <tbody>
+  <tr><td><b>Лайт</b></td><td>до 225 диалогов/мес</td><td>до 10</td><td>WhatsApp + YCLIENTS</td></tr>
+  <tr><td><b>Стандарт</b></td><td>до 450 диалогов/мес</td><td>до 20</td><td>популярный</td></tr>
+  <tr><td><b>Премиум</b></td><td>до 675 диалогов/мес</td><td>безлимит</td><td>приоритетная поддержка</td></tr>
+  </tbody></table></div>
+  <div class="callout c-note">На момент проверки все три тарифа показаны как <span class="price">«0 ₽/мес / филиал»</span> — промо/launch-цены, реальную стоимость дают по заявке. Допы: доп. каналы (TG, VK, IG) — <span class="price">+750 ₽/мес</span>; доп. +10 диалогов — <span class="price">+300 ₽</span>; рассылки — <span class="price">+2 490 ₽/мес</span>.</div>
+</div>
+
+<div class="comp" id="s32">
+  <h3>jAutomation <span class="dom">jautomation.ru</span> <span class="tag t-ok">Telegram · «в 10 раз дешевле живого»</span></h3>
+  <p><span class="price">от 5 000 ₽/мес</span> (цена зависит от количества мастеров), <b>7 дней бесплатно</b>. Telegram-канал, интеграция YCLIENTS (автосоздание брони: услуга, мастер, время), ответы за 5 секунд, передача сложных вопросов владельцу в TG, уведомления о каждой записи, ежедневные отчёты, полный просмотр диалогов.</p>
+  <p class="mut">Позиционируется против живого администратора «50–60 тыс. ₽/мес» — это подтверждает наши зарплатные бенчмарки.</p>
+</div>
+</section>
+
+<section id="s4">
+<h2><span class="num">4</span>Платформенные альтернативы <span class="h2sub">(CRM онлайн-записи со встроенной автоматизацией)</span></h2>
+<div class="tbl-wrap"><table>
+<thead><tr><th>Платформа</th><th>Цена</th><th>Автоматизация</th></tr></thead>
+<tbody>
+<tr><td><b>YCLIENTS</b></td><td>базовый <span class="price">~857 ₽/мес</span>; премиум <span class="price">~4 285 ₽/мес</span> <span class="mut">(вторичные источники)</span></td><td>онлайн-запись, SMS-напоминания; маркетплейс интеграций (Daria AI ставится как приложение)</td></tr>
+<tr><td><b>DIKIDI / Altegio</b></td><td>Free (0 ₽); LITE <span class="price">от 450 ₽/мес</span>; PRO</td><td>автонапоминания, онлайн-запись; у Altegio есть API, который уже используют голосовые боты</td></tr>
+</tbody></table></div>
+<div class="callout c-note">Это не конкуренты, а <b>среда, в которой мы обязаны работать</b>: интеграция с YCLIENTS и DIKIDI/Altegio — обязательное требование рынка.</div>
+</section>
+
+<section id="s5">
+<h2><span class="num">5</span>Локальная ситуация в Тюмени</h2>
+
+<div class="comp" id="s51">
+  <h3>Найденные тюменские провайдеры ИИ</h3>
+  <div class="tbl-wrap"><table>
+  <thead><tr><th>Провайдер</th><th>Предложение</th><th>Цена</th><th>Комментарий</th></tr></thead>
+  <tbody>
+  <tr><td><b>SEOmi</b> <span class="mut">(tyumen.seomi.ru, офис: ул. Республики, 253с1)</span></td><td>«ИИ-сотрудник для бизнеса»</td><td>ИИ-ассистент <span class="price">30 000 ₽</span> (чат-бот сайт + мессенджеры, CRM, 24/7, обучение, аналитика); ИИ-менеджер <span class="price">90 000 ₽</span> (+карточки CRM, маршрутизация, рассылки/обзвоны через ИИ); ИИ-сотрудник под ключ <span class="price">120 000 ₽</span> (+голосовой робот для входящих и обзвонов, 1С/касса, выделенный куратор, персональная модель)</td><td>Разовое внедрение, не подписка. Голос — только в топ-тарифе. Универсальный, не beauty. Команда 11+ чел., с 2014 г.</td></tr>
+  <tr><td><b>Meldana</b></td><td>голосовые боты</td><td>по запросу</td><td>универсальный подрядчик</td></tr>
+  <tr><td><b>1С-Битрикс партнёры</b> (Тюмень)</td><td>внедрение ботов в CRM-экосистему 1С</td><td>по проекту</td><td>для салонов на 1С-Салон</td></tr>
+  <tr><td><b>МегаФон</b> (Тюмень)</td><td>виртуальный сотрудник / голосовые сервисы</td><td>по запросу</td><td>операторский пакет</td></tr>
+  <tr><td><b>Р52.РУ</b> (Тюмень)</td><td>боты под ключ</td><td><span class="price">от 50 000 ₽</span></td><td>разовая разработка</td></tr>
+  </tbody></table></div>
+</div>
+
+<div class="comp" id="s52">
+  <h3>Бенчмарк: живой администратор в Тюмени</h3>
+  <ul>
+    <li>Зарплаты администраторов салонов (hh.ru, Тюмень): <span class="price">40–60 тыс. ₽/мес</span>.</li>
+    <li>jAutomation использует ориентир <span class="price">50–60 тыс. ₽/мес</span>; Likesoft оценивает ночную смену 24/7 в <span class="price">60–90 тыс. ₽/мес</span>.</li>
+  </ul>
+  <div class="callout c-note"><b>Вывод:</b> наш ценовой потолок для одного салона — ~40–50 тыс. ₽/мес (стоимость замещения администратора), рабочая зона — <span class="price">10–30 тыс. ₽/мес</span>.</div>
+</div>
+</section>
+<section id="s6">
+<h2><span class="num">6</span>Сводная сравнительная таблица</h2>
+<div class="tbl-wrap"><table class="wide">
+<thead><tr><th>Игрок</th><th>Тип</th><th>Канал</th><th>Цена входа</th><th>Модель оплаты</th><th>YCLIENTS</th><th>DIKIDI/Altegio</th><th>Бесплатный период</th></tr></thead>
+<tbody>
+<tr class="row-hl"><td><b>Likesoft Voice</b></td><td>голос, beauty</td><td>звонки 24/7</td><td>30 000 ₽ setup + от 30 000 ₽/мес</td><td>подписка (минуты) + overage 9→5 ₽/мин</td><td>✅</td><td>✅</td><td>пилот, стоп без претензий</td></tr>
+<tr><td><b>ZvonIII</b></td><td>голос, beauty</td><td>звонки</td><td>по запросу</td><td>?</td><td>заявлено</td><td>?</td><td>?</td></tr>
+<tr><td><b>ipt-ai</b></td><td>голос универсальный</td><td>звонки + мессенджеры</td><td>от 6 ₽/мин; разработка от 50 000 ₽</td><td>поминутно + проект</td><td>✅</td><td>—</td><td>7 дней</td></tr>
+<tr><td><b>Noltis</b></td><td>голос универсальный</td><td>звонки</td><td>по расчёту</td><td>проект/подписка</td><td>по API</td><td>—</td><td>бесплатный аудит</td></tr>
+<tr><td><b>Daria AI</b></td><td>текст, beauty</td><td>мессенджеры</td><td>промо 0 ₽ (по заявке)</td><td>подписка (диалоги)</td><td>✅ (обязателен)</td><td>—</td><td>3 дня</td></tr>
+<tr><td><b>jAutomation</b></td><td>текст, beauty</td><td>Telegram</td><td>от 5 000 ₽/мес</td><td>подписка (мастера)</td><td>✅</td><td>—</td><td>7 дней</td></tr>
+<tr><td><b>SEOmi</b> (Тюмень)</td><td>чат + голос (универсал)</td><td>сайт/мессенджеры/обзвон</td><td>30 000–120 000 ₽</td><td>разовое внедрение</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td><b>Р52.РУ</b> (Тюмень)</td><td>боты под ключ</td><td>по проекту</td><td>от 50 000 ₽</td><td>разовая разработка</td><td>—</td><td>—</td><td>—</td></tr>
+<tr class="row-mut"><td><b>Живой администратор</b> (Тюмень)</td><td>человек</td><td>звонки + всё</td><td>40–60 тыс. ₽/мес</td><td>оклад</td><td>руками</td><td>руками</td><td>—</td></tr>
+</tbody></table></div>
+</section>
+
+<section id="s7">
+<h2><span class="num">7</span>Выводы и рекомендации для нашего проекта</h2>
+
+<div class="comp">
+  <h3>Ниша свободна, но время ограничено</h3>
+  <p>В Тюмени никто не продаёт голосового ИИ-администратора для салонов. Федеральные конкуренты (Likesoft, ZvonIII) работают дистанционно и через соцрекламу — они могут выйти в наш регион в любой момент. Наше окно — <b>локальность + живая демонстрация + быстрое подключение</b>.</p>
+</div>
+
+<div class="comp">
+  <h3>Ценовое позиционирование</h3>
+  <p>Рынок разделился на три эшелона:</p>
+  <ol>
+    <li><b>Текстовые боты</b> — 0–5 000 ₽/мес (Daria AI, jAutomation).</li>
+    <li><b>Голосовые для салонов</b> — 30 000–60 000 ₽/мес + setup 30 000–60 000 ₽ (Likesoft) — это дорого для одиночного салона Тюмени.</li>
+    <li><b>Поминутные универсальные</b> — от 6 ₽/мин (ipt-ai) — дёшево, но нет beauty-логики.</li>
+  </ol>
+  <div class="callout c-rec"><b>Рекомендация:</b> войти между 1 и 2 эшелоном — голосовой администратор для одного салона в диапазоне <span class="price">10–20 тыс. ₽/мес</span> + setup от <span class="price">15–30 тыс. ₽</span>, с тарифной сеткой по числу мастеров (по образцу jAutomation). Для сетей — от <span class="price">8–12 тыс. ₽/мес за точку</span>.</div>
+</div>
+
+<div class="comp">
+  <h3>Обязательные элементы оффера <span class="h3sub">(стандарт рынка, без них не покупают)</span></h3>
+  <ul>
+    <li>Интеграция с <b>YCLIENTS</b> и <b>DIKIDI/Altegio</b> (у Likesoft типовая интеграция уже есть — нам нужно то же).</li>
+    <li>Бесплатный период <b>7 дней</b> (максимум у конкурентов — 14; минимум — 3).</li>
+    <li>Эскалация сложных вопросов человеку в Telegram + видимость всех диалогов и перехват.</li>
+    <li>Демо-номер, на который можно позвонить и «записаться» (у Likesoft — сильный приём).</li>
+    <li>Уведомление о записи разговора в начале звонка + хранение записей в РФ (152-ФЗ) — юридический аргумент для владельцев.</li>
+    <li>Пилот на 1 точке с условием «нет эффекта — стоп».</li>
+  </ul>
+</div>
+
+<div class="comp">
+  <h3>Экономическое ядро продаж</h3>
+  <p>Аргумент одинаковый у всех конкурентов: живой администратор <span class="price">40–60 тыс. ₽/мес</span> (ночь 60–90 тыс.) против ИИ-решения. Наш расчёт для клиента: пропущенные звонки <b>18–30% в пик</b>, <b>60% звонков вечером/в выходные</b> — каждый пропущенный звонок уходит конкуренту. Окупаемость ИИ даже при 15 тыс. ₽/мес наступает, если он спасает 1–2 записи в неделю.</p>
+</div>
+
+<div class="comp">
+  <h3>Риски</h3>
+  <ol>
+    <li><b>Likesoft Voice</b> — прямое совпадение продукта и уже с публичными тарифами; их «от 30 000 ₽/мес» задаёт верхнюю планку, но и отпугивает малые салоны — наша возможность.</li>
+    <li><b>Промо-цены Daria AI (0 ₽)</b> могут временно демпинговать в мессенджер-канале — но они не закрывают звонки.</li>
+    <li><b>Универсальные поминутные роботы</b> (ipt-ai от 6 ₽/мин) дешевле нас при малой нагрузке — контраргумент: без beauty-логики (услуги, мастера, слоты) робот не может реально записать клиента в YCLIENTS.</li>
+  </ol>
+</div>
+</section>
+
+<footer class="src">Источники: likesoft.io/voice/salony · jautomation.ru · dariabot.ru/pricing · ipt-ai.ru/voice · noltis.ru/product/voice-ai · tyumen.seomi.ru/services/ii-sotrudnik-dlya-biznesa · gravitel.ru · diexpert / агрегаторы тарифов YCLIENTS и DIKIDI (вторичные данные) · hh.ru (зарплаты Тюмень).<br>HTML-версия отчёта COMPETITORS_TYUMEN.md от 19.09.2026.</footer>
+</div></main>
+<button id="top" aria-label="Наверх">↑</button>
+<script>
+(function(){
+"use strict";
+var $=function(s){return document.querySelector(s)},
+    $$=function(s){return Array.prototype.slice.call(document.querySelectorAll(s))};
+var tocLinks=$$('#toc a'),
+    topBtn=$('#top'),menuBtn=$('#menuBtn'),scrim=$('#scrim'),
+    q=$('#q'),clearBtn=$('#clearBtn'),count=$('#count'),
+    l1=tocLinks.filter(function(a){return a.classList.contains('l1')}),
+    secs=l1.map(function(a){return document.querySelector(a.getAttribute('href'))});
+
+if('IntersectionObserver' in window){
+  var spy=new IntersectionObserver(function(es){
+    es.forEach(function(e){
+      if(e.isIntersecting){
+        l1.forEach(function(a){a.classList.toggle('active',a.getAttribute('href')==='#'+e.target.id)});
+      }
+    });
+  },{rootMargin:'-12% 0px -62% 0px'});
+  secs.forEach(function(s){if(s)spy.observe(s)});
+}
+window.addEventListener('scroll',function(){topBtn.classList.toggle('show',window.scrollY>640)},{passive:true});
+topBtn.addEventListener('click',function(){window.scrollTo({top:0,behavior:'smooth'})});
+menuBtn.addEventListener('click',function(){document.body.classList.toggle('nav-open')});
+scrim.addEventListener('click',function(){document.body.classList.remove('nav-open')});
+tocLinks.forEach(function(a){a.addEventListener('click',function(){document.body.classList.remove('nav-open')})});
+
+function runSearch(){
+  var v=q.value.trim().toLowerCase(),hits=0;
+  clearBtn.hidden=!v;
+  tocLinks.forEach(function(a){
+    var ok=!v||a.textContent.toLowerCase().indexOf(v)>-1;
+    a.style.display=ok?'':'none';
+    if(ok)hits++;
+  });
+  secs.forEach(function(s){
+    if(!s)return;
+    s.classList.toggle('dimmed',!!v&&s.textContent.toLowerCase().indexOf(v)===-1);
+  });
+  count.textContent=v?(hits?'совпадений: '+hits:'ничего не найдено'):'';
+}
+q.addEventListener('input',runSearch);
+clearBtn.addEventListener('click',function(){q.value='';runSearch();q.focus()});
+document.addEventListener('keydown',function(e){
+  if((e.ctrlKey||e.metaKey)&&(e.key==='k'||e.key==='K'||e.key==='л')){e.preventDefault();q.focus()}
+});
+})();
+</script>
+</body>
+</html>

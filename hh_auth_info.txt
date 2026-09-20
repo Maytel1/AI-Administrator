@@ -1,0 +1,57 @@
+securitySchemes:
+    OauthToken:
+      description: |
+        Токен доступа для авторизации, передаваемый в заголовке в формате `Authorization: Bearer {ACCESS_TOKEN}` (см. [Авторизация](#section/Avtorizaciya))
+      flows:
+        authorizationCode:
+          authorizationUrl: 'https://hh.ru/oauth/authorize'
+          refreshUrl: 'https://api.hh.ru/token'
+          scopes: {}
+          tokenUrl: 'https://api.hh.ru/token'
+        clientCredentials:
+          scopes: {}
+          tokenUrl: 'https://api.hh.ru/token'
+      type: oauth2
+info:
+  contact:
+    email: api@hh.ru
+    name: API Support
+    url: 'https://api.hh.ru/openapi/redoc'
+  description: |
+    По-русски | [Switch to English](https://api.hh.ru/openapi/en/redoc)
+
+    Для поиска по документации можно использовать Ctrl+F.
+
+    # Общая информация
+
+    * Всё API работает по протоколу HTTPS.
+    * Авторизация осуществляется по протоколу OAuth2.
+    * Все данные доступны только в формате JSON.
+    * Базовый URL — `https://api.hh.ru/`
+    * Возможны запросы к данным [любого сайта группы компаний HeadHunter](#section/Obshaya-informaciya/Vybor-sajta)
+    * <a name="date-format"></a> Даты форматируются в соответствии с
+    [ISO 8601](https://en.wikipedia.org/wiki/ISO_8601): `YYYY-MM-DDThh:mm:ss±hhmm`.
+
+
+    <a name="request-requirements"></a>
+    ## Требования к запросам
+
+    В запросе необходимо передавать заголовок `User-Agent`, но если ваша реализация
+    http клиента не позволяет, можно отправить `HH-User-Agent`. Если не от
+=====VACANCIES=====
+/vacancies:
+    x-name: /vacancies
+    post:
+      operationId: publish-vacancy
+      tags:
+        - Управление вакансиями
+        - Управление вакансиями на уровне работодателя
+      summary: Публикация вакансии
+      description: |
+        Создает новую вакансию с полями, передаваемыми в теле запроса. 
+
+        В соответствии с [законом РФ № 1032-1 от 19.04.1991 в ред. от 02.07.2013 г.](https://hh.ru/article/13967) запрещено размещать информацию, ограничивающую права или устанавливающую преимущества для соискателей по полу, возрасту, семейному положению и другим обстоятельствам, не связанным с деловыми качествами работников.
+
+        Примечания:
+
+        * При успешной публикации будут сп
