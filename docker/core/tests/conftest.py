@@ -4,7 +4,7 @@ import uuid
 
 import asyncpg
 import pytest
-from datetime import time, datetime
+from datetime import time
 
 from admin_core.config import get_settings
 from admin_core.crm.internal import InternalCRM
@@ -44,11 +44,12 @@ async def demo(pool):
             "INSERT INTO master_services (master_id, service_id) VALUES ($1, $2)",
             master["id"], svc["id"],
         )
-        await conn.execute(
-            "INSERT INTO working_hours (master_id, weekday, start_time, end_time) "
-            "VALUES ($1, $2, $3, $4)",
-            master["id"], datetime.now().weekday(), time(10, 0), time(20, 0),
-        )
+        for weekday in range(7):  # все дни: чтобы «завтра» всегда был покрыт слотами
+            await conn.execute(
+                "INSERT INTO working_hours (master_id, weekday, start_time, end_time) "
+                "VALUES ($1, $2, $3, $4)",
+                master["id"], weekday, time(10, 0), time(20, 0),
+            )
         client = await crm.ensure_client(
             str(salon["id"]), f"+7900{uuid.uuid4().int % 10000000:08d}", "Тест Клиент"
         )
