@@ -69,5 +69,24 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  cli:
+    build:
+      context: .
+      dockerfile: services/cli/Dockerfile
+    container_name: ai-admin-cli
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-aiadmin}:${POSTGRES_PASSWORD:-aiadmin_dev}@postgres:5432/${POSTGRES_DB:-aiadmin}
+      SERVICE_NAME: cli
+      MIGRATIONS_DIR: /app/migrations
+    env_file:
+      - path: .env
+        required: false
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles: ["tools"]     # не запускается в общем стеке: только docker compose run --rm cli
+    stdin_open: true
+    tty: true
+
 volumes:
   pgdata:

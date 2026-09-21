@@ -27,6 +27,22 @@ docker compose logs -f bot-service
 
 Каждый сервис при старте печатает отчёт конфигурации (какие ключи заданы в `.env`) и ждёт PostgreSQL.
 
+## Ядро фазы 1 (core/ + сервис cli)
+
+`core/admin_core/` — общий «мозг»: LLM-провайдеры (`fake` / `yandexgpt` / `openai`),
+CRM-адаптеры (`internal` — наш календарь, сценарий A; `altegio` — заготовка по API),
+диалоговый агент (system prompt, tools, обработка ошибки 23P01), обезличивание ПДн.
+
+По умолчанию `LLM_PROVIDER=fake` — **полный сценарий записи работает без внешних ключей**.
+
+```
+docker compose run --rm cli python cli.py --seed     # демо-данные: салон «Виктория», 2 мастера, 4 услуги
+docker compose run --rm cli python cli.py            # диалог в терминале
+docker compose run --rm cli python -m pytest -q      # тесты (нужен запущенный postgres)
+```
+
+После создания YC-аккаунта: в `docker/.env` → `LLM_PROVIDER=yandexgpt`, `YC_API_KEY`, `YC_FOLDER_ID`.
+
 ## Дорога по фазам
 
 1. **Фаза 1** — схема БД (миграции в `postgres/init/`), CRM-адаптер (Altegio/YCLIENTS), LLM-агент, CLI-режим диалога. Критерий: 90% тестовых диалогов пишут запись в CRM.

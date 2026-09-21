@@ -10,3 +10,6 @@ skills/alirezarezvani-claude-skills/
 
 # hh.ru app client_secret - do not publish
 hh_app_auth.txt
+
+# локальный архив проекта - не храним в git
+project.rar
