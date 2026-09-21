@@ -13,3 +13,9 @@ hh_app_auth.txt
 
 # локальный архив проекта - не храним в git
 project.rar
+
+# временные логи сборки docker
+docker/b_log.txt
+docker/b_err.txt
+docker/up_log.txt
+docker/up_err.txt
