@@ -49,3 +49,23 @@ Markdown — источник истины (`DEVELOPMENT_PLAN.html` генери
 таблицы и чек-листы в HTML совпадают с MD). Нумерация секций берётся из MD, поэтому
 ссылки вида «§4.4» в тексте указывают на тот же раздел и в HTML.
 `index.html` и этот README обновляются вручную при добавлении новых документов.
+
+## Контроль качества и CI
+
+```bash
+# линтер и типы (локально):
+pip install ruff mypy
+ruff check docker                                  # стиль/импорты/баги
+python -m mypy docker/core/admin_core --ignore-missing-imports
+
+# тесты (нужен запущенный postgres из docker/):
+cd docker && docker compose run --rm cli python -m pytest -q   # 22 теста
+```
+
+CI — `.github/workflows/ci.yml`, на каждый push/PR: **lint** (ruff + mypy + compileall) →
+**тесты** (pytest с сервисом postgres 16 и накатом init-схемы 001–004) → **документы**
+(сборка 13 MD → HTML + валидация + проверка совпадения сгенерированного HTML с репозиторием).
+
+Мониторинг ТГ-бота: `GET :8080/health` (JSON, 503 при недоступной БД) и `GET :8080/metrics`
+(Prometheus-формат) — модуль `docker/core/admin_core/health.py`; rate-limit сообщений —
+`docker/core/admin_core/ratelimit.py`.

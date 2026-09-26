@@ -160,7 +160,7 @@
 - [ ] Схема номера (решено 20.09): по умолчанию переадресация с рабочего номера точки на наш SIP; опция — выдача нового номера
 - [ ] Решить по Google-контуру (Sheets/Drive): интеграция или локальный эмулятор (§3.1)
 - [x] docker-compose-скелет — папка `docker/`: postgres:16-alpine + bot-service + call-service + worker + cli (+ `.env.example`, init БД, README)
-- [ ] CI (GitHub Actions: lint → тесты → сборка → деплой)
+- [x] CI (GitHub Actions: lint → тесты → сборка → деплой) — частично: `.github/workflows/ci.yml` = ruff + mypy + pytest (postgres 16, накат init-схемы) + сборка/валидация HTML-документов; деплой — фаза 5 (26.09.2026)
 
 **Риск фазы:** доступ к партнёрскому API YCLIENTS — самый долгий внешний шаг (от 2 недель). Параллельно готовим Altegio API (доступ быстрее) как первый интегрируемый объект.
 

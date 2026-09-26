@@ -57,6 +57,11 @@ docker compose logs -f bot-service
 - Проверка прокси без токена: `curl https://<worker>.workers.dev/bot123456789:FakeToken/getMe`
   → `{"ok":false,"error_code":401,"description":"Unauthorized"}` (это ответ Telegram, значит прокси жив).
 - Успешный старт в логах: `[bot] Telegram API: https://<worker>.workers.dev` и `[bot] polling as @<username> (LLM: fake)`.
+- **Наблюдаемость:** бот поднимает HTTP на `BOT_HTTP_PORT` (по умолчанию 8080, порт проброшен в compose):
+  `curl http://localhost:8080/health` → JSON `{status, db, llm, uptime_sec, chat_sessions}` (503 при недоступной БД),
+  `curl http://localhost:8080/metrics` → Prometheus-формат (сообщения, ошибки, rate-limit, аптайм) — `admin_core/health.py`.
+- **Rate-limit/антиспам:** `TG_RATE_LIMIT` / `TG_RATE_WINDOW` в `.env` (по умолчанию 6 сообщений за 10 с на чат;
+  повторы одного текста и слишком длинные сообщения отсекаются) — `admin_core/ratelimit.py`, тесты `tests/test_ratelimit.py`.
 - Токен бота лежит только в `docker/.env` (в git не попадает) и в логи не выводится — печатается лишь имя бота.
 - `pywa` (WhatsApp) добавится на тот же роутер, когда подтвердится легальность WhatsApp Business API в РФ.
 
