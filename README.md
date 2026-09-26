@@ -35,12 +35,13 @@ Branch: `main`, папка: `/ (root)` → `Save`. Через ~1 минуту и
 | ПДн и LLM | [PDN_LLM_OPTIONS.html](PDN_LLM_OPTIONS.html) | [PDN_LLM_OPTIONS.md](PDN_LLM_OPTIONS.md) | ждёт выбора варианта |
 | Договор ПДн | [CONTRACT_PDN_TEMPLATE.html](CONTRACT_PDN_TEMPLATE.html) | [CONTRACT_PDN_TEMPLATE.md](CONTRACT_PDN_TEMPLATE.md) | проверить у юриста |
 | Сбои и failover | [FAILOVER_SCENARIOS.html](FAILOVER_SCENARIOS.html) | [FAILOVER_SCENARIOS.md](FAILOVER_SCENARIOS.md) | перед фазой 3 |
-| Открытые вопросы | [OPEN_QUESTIONS.html](OPEN_QUESTIONS.html) | [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) | парк вопросов |
+| Открытые вопросы | [OPEN_QUESTIONS.html](OPEN_QUESTIONS.html) | [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) | парк вопросов (29) |
+| Аудит проекта | [GAP_ANALYSIS.html](GAP_ANALYSIS.html) | [GAP_ANALYSIS.md](GAP_ANALYSIS.md) | новый · 26.09.2026 |
 
 ## Перегенерация
 
 ```bash
-python build_html_docs.py     # 12 документов md -> html + валидация разметки
+python build_html_docs.py     # 13 документов md -> html + валидация разметки
 python validate_plan_html.py  # паритет DEVELOPMENT_PLAN.html ↔ DEVELOPMENT_PLAN.md
 ```
 
