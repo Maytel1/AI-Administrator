@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
-<title>AI-администратор салонов — документы проекта</title>
+<title>AI-администратор для автосервисов и стоматологий — документы проекта</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
@@ -58,12 +58,12 @@ code{font:500 .92em "JetBrains Mono",Consolas,monospace;background:#eef0f6;paddi
 <main><article class="doc">
 <header class="doc-header">
 <div class="kicker">Документы проекта</div>
-<h1>AI-администратор для салонов красоты</h1>
-<p class="lead">Голосовой и текстовый AI-администратор (звонки 24/7 + WhatsApp/Telegram/VK, запись в YCLIENTS/Altegio) для салонов и барбершопов Тюмени. Индекс всех рабочих документов: стратегия и исследование, план разработки, решения на согласование, право и надёжность.</p>
+<h1>AI-администратор для автосервисов и стоматологий</h1>
+<p class="lead">Голосовой и текстовый AI-администратор (звонки 24/7 + WhatsApp/Telegram, запись в YCLIENTS/Altegio, AMO CRM, I-dent, 1С:Медицина, Medesk) для автосервисов и стоматологий Тюмени. LLM-ядро — YandexGPT 5.1 на целевом стеке Yandex Cloud (152-ФЗ). Индекс всех рабочих документов: стратегия и исследование, план разработки v2.0, экономика и первые клиенты, решения на согласование, право и надёжность.</p>
 <div class="chips">
-<span class="chip"><span class="dot ok"></span>План разработки v1.2</span>
-<span class="chip">Тюмень · старт: салоны и барбершопы</span>
-<span class="chip">обновлено 20.09.2026</span>
+<span class="chip"><span class="dot ok"></span>План разработки v2.0</span>
+<span class="chip">Тюмень · автосервисы (1 444 СТО) и стоматологии (300+ клиник)</span>
+<span class="chip">обновлено 26.09.2026</span>
 <span class="chip">11 документов + 2 материала</span>
 </div>
 <div class="rule"></div>
@@ -77,7 +77,7 @@ code{font:500 .92em "JetBrains Mono",Consolas,monospace;background:#eef0f6;paddi
 </div>
 <div class="card">
 <h3><span class="tag t-ok">рабочий план</span>План проекта</h3>
-<p>Приоритетная сфера (салоны/барбершопы Тюмени), формат продукта, источники данных и custdev по Mom Test; дополнения после ответов на 28 вопросов.</p>
+<p>Приоритетная сфера (автосервисы и стоматологии Тюмени), формат продукта, источники данных и custdev по Mom Test; дополнения после ответов на 28 вопросов.</p>
 <div class="acts"><a class="btn" href="PLAN.html">Открыть документ</a><a class="btn ghost" href="PLAN.md">MD</a></div>
 </div>
 <div class="card">
@@ -89,9 +89,19 @@ code{font:500 .92em "JetBrains Mono",Consolas,monospace;background:#eef0f6;paddi
 <div class="grp">Разработка</div>
 <div class="grid">
 <div class="card">
-<h3><span class="tag t-ok">v1.2</span>План разработки</h3>
-<p>Стек из 13 компонентов, архитектура «один мозг — два рта», фазы 0–5 (12–14 недель до платного пилота), экономика, риски и раздел 8 с решениями от 20.09.2026.</p>
+<h3><span class="tag t-ok">v2.1</span>План разработки</h3>
+<p>Единый AI-администратор для автосервисов и стоматологий: стек из 13 компонентов, YandexGPT 5.1 + Yandex Cloud, архитектура «один мозг — два рта», фазы 0–5, экономика на клиента (§4.4), первые клиенты и ROI (§9), скрипты продаж (§10), монетизация, юр. рамка и дорожная карта 30 дней. Ядро уже готово: 12 тестов зелёные, Telegram работает через прокси Cloudflare Worker. Отдельные оценки по каналам — в документах «Текстовый бот» и «Голосовой бот».</p>
 <div class="acts"><a class="btn" href="DEVELOPMENT_PLAN.html">Открыть документ</a><a class="btn ghost" href="DEVELOPMENT_PLAN.md">MD</a></div>
+</div>
+<div class="card">
+<h3><span class="tag t-ok">оценки · текст</span>Текстовый бот</h3>
+<p>Telegram / WhatsApp / SMS по отдельности: что уже работает, 20 человеко-дней до конца фазы 2, себестоимость 1 700–5 200 ₽/мес на точку по формулам (токены → ₽, инфраструктура → доля точки), тарифы 5 000–8 000 ₽/мес, ROI точки, метрики приёмки.</p>
+<div class="acts"><a class="btn" href="TEXT_BOT.html">Открыть документ</a><a class="btn ghost" href="TEXT_BOT.md">MD</a></div>
+</div>
+<div class="card">
+<h3><span class="tag t-warn">оценки · голос</span>Голосовой бот</h3>
+<p>SpeechKit v3 + Pipecat + SIP: бюджет латентности &lt; 1,2 с, 1 800–2 016 минут в месяц на точку, себестоимость 8 985–12 488 ₽/мес, тарифы 25 000–45 000 ₽/мес, ROI 4,4–5,3×, 36 человеко-дней разработки, failover с порогами, записи разговоров и 152-ФЗ.</p>
+<div class="acts"><a class="btn" href="VOICE_BOT.html">Открыть документ</a><a class="btn ghost" href="VOICE_BOT.md">MD</a></div>
 </div>
 </div>
 <div class="grp">Ждут вашего решения</div>
@@ -107,8 +117,8 @@ code{font:500 .92em "JetBrains Mono",Consolas,monospace;background:#eef0f6;paddi
 <div class="acts"><a class="btn" href="LIABILITY_OPTIONS.html">Открыть документ</a><a class="btn ghost" href="LIABILITY_OPTIONS.md">MD</a></div>
 </div>
 <div class="card">
-<h3><span class="tag t-warn">ждёт выбора</span>Салон без CRM</h3>
-<p>Пять сценариев работы для микросалонов с тетрадкой и WhatsApp: внутренний календарь, Google, гибрид с подтверждением, онбординг в Altegio, только подтверждения.</p>
+<h3><span class="tag t-warn">ждёт выбора</span>Точка без CRM</h3>
+<p>Пять сценариев работы для микропредприятий с тетрадкой и WhatsApp (салон, СТО, клиника): внутренний календарь, Google, гибрид с подтверждением, онбординг в Altegio, только подтверждения.</p>
 <div class="acts"><a class="btn" href="SALON_WITHOUT_CRM.html">Открыть документ</a><a class="btn ghost" href="SALON_WITHOUT_CRM.md">MD</a></div>
 </div>
 <div class="card">
@@ -121,7 +131,7 @@ code{font:500 .92em "JetBrains Mono",Consolas,monospace;background:#eef0f6;paddi
 <div class="grid">
 <div class="card">
 <h3><span class="tag t-warn">проверить у юриста</span>Договор ПДн — шаблон</h3>
-<p>14 разделов и приложение: роли сторон, состав данных, меры защиты, доступ салона к записям звонков, экспорт при расторжении.</p>
+<p>14 разделов и приложение: роли сторон, состав данных, меры защиты, доступ точки к записям звонков, экспорт при расторжении.</p>
 <div class="acts"><a class="btn" href="CONTRACT_PDN_TEMPLATE.html">Открыть документ</a><a class="btn ghost" href="CONTRACT_PDN_TEMPLATE.md">MD</a></div>
 </div>
 <div class="card">
@@ -153,7 +163,7 @@ code{font:500 .92em "JetBrains Mono",Consolas,monospace;background:#eef0f6;paddi
 <p><b>GitHub Pages (1 минута, бесплатно):</b> в репозитории откройте <code>Settings → Pages</code>, в «Build and deployment» выберите Source: <code>Deploy from a branch</code>, Branch: <code>main</code>, папка <code>/ (root)</code>, нажмите <code>Save</code>. Через минуту этот индекс откроется по адресу <code>https://&lt;логин&gt;.github.io/&lt;имя-репозитория&gt;/</code> — все ссылки на документы относительные и заработают сразу. Файл <code>.nojekyll</code> уже в репозитории (отключает сборку Jekyll). Для приватного репозитория Pages доступен только на платных планах.</p>
 <p><b>Без настройки Pages:</b> на странице файла GitHub показывает HTML как код — это нормально. Быстрый предпросмотр: <code>https://htmlpreview.github.io/?https://github.com/&lt;логин&gt;/&lt;репозиторий&gt;/blob/main/index.html</code>. Полная инструкция — в <a href="README.md">README.md</a>.</p>
 </div>
-<footer class="src">Индекс собран 20.09.2026 · 11 документов (HTML + MD-источники) · перегенерация разделов: <code>python build_html_docs.py</code></footer>
+<footer class="src">Индекс собран 20.09.2026, обновлён 26.09.2026 (вертикали: автосервисы и стоматологии; план v2.0) · 11 документов (HTML + MD-источники) · перегенерация разделов: <code>python build_html_docs.py</code> · проверка плана: <code>python validate_plan_html.py</code></footer>
 </article></main>
 <button id="top" title="Наверх">↑</button>
 <script>

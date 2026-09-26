@@ -2,7 +2,7 @@
 """
 Генератор HTML-версий новых документов проекта (TARIFFS, LIABILITY_OPTIONS,
 SALON_WITHOUT_CRM, FAILOVER_SCENARIOS, PDN_LLM_OPTIONS, CONTRACT_PDN_TEMPLATE,
-OPEN_QUESTIONS).
+OPEN_QUESTIONS, TEXT_BOT, VOICE_BOT).
 
 Читает Markdown, собирает самодостаточную HTML-страницу в стиле существующих
 документов (DEVELOPMENT_PLAN.html / COMPETITORS_TYUMEN.html) и прогоняет
@@ -24,6 +24,15 @@ ROOT = pathlib.Path(__file__).resolve().parent
 
 # md -> (kicker, заголовок H1, lead, цвет точки статуса, текст статуса)
 DOCS = {
+    "DEVELOPMENT_PLAN.md": (
+        "Development Plan · Тюмень",
+        "План разработки: единый AI-администратор для автосервисов и стоматологий",
+        "Голос 24/7 + мессенджеры (WhatsApp/Telegram) для автосервисов и стоматологий "
+        "Тюмени: запись в YCLIENTS/Altegio, AMO CRM, I-dent. Версия 2.0 (26.09.2026) — "
+        "LLM ядро на YandexGPT 5.1, целевой стек Yandex Cloud, экономика на клиента, "
+        "ROI первых клиентов, скрипты продаж, юр. рамка и дорожная карта 30 дней.",
+        "ok", "Версия 2.1 · 26.09.2026",
+    ),
     "TARIFFS.md": (
         "Ценообразование",
         "Тарифы — на согласование",
@@ -86,6 +95,22 @@ DOCS = {
         "Спецификация голосового AI-администратора, регистрация скиллов, исследование "
         "ниши администраторов (Роструд, Тюмень) и принятые решения, включая 20.09.2026.",
         "ok", "Концепция принята",
+    ),
+    "TEXT_BOT.md": (
+        "Текстовый контур · оценки",
+        "Текстовый бот (Telegram / WhatsApp / SMS) — оценки и расчёты",
+        "Себестоимость по статьям и формулам (токены → ₽, фиксированная инфраструктура → "
+        "доля точки), 20 человеко-дней до конца фазы 2, тарифы 5 000–8 000 ₽/мес, маржа 51–66%, "
+        "ROI точки 12–31×, метрики приёмки и план недель 5–7. Спутник документа VOICE_BOT.md.",
+        "ok", "Работает · осталось 20 дней",
+    ),
+    "VOICE_BOT.md": (
+        "Голосовой контур · оценки",
+        "Голосовой бот — оценки и расчёты",
+        "SpeechKit v3 + Pipecat + SIP: бюджет латентности < 1,2 с, 1 800–2 016 минут в месяц на "
+        "точку, себестоимость 8 985–12 488 ₽/мес, тарифы 25 000–45 000 ₽/мес, маржа 70–75%, "
+        "ROI 4,4–5,3×, 36 человеко-дней, failover с порогами, записи разговоров и 152-ФЗ.",
+        "warn", "Фаза 3 · скелет готов",
     ),
 }
 
@@ -159,9 +184,17 @@ def md_to_body(text: str) -> str:
         m = HEADING.match(s)
         if m:
             lvl, raw = len(m.group(1)), m.group(2).strip()
+            if lvl == 1 and not out:  # # Заголовок в начале файла — дублирует H1 из шапки страницы
+                i += 1
+                continue
             if lvl == 2:
-                h2n += 1
-                shown = re.sub(r"^\d+\.\s+", "", raw)  # номер даёт бейдж .num
+                mnum = re.match(r"^(\d+)\.\s+(.*)$", raw)
+                if mnum:  # номер из Markdown: "## 0. Резюме" -> бейдж «0», якорь #s0
+                    h2n = int(mnum.group(1))
+                    shown = mnum.group(2).strip()
+                else:
+                    h2n += 1
+                    shown = raw
                 out.append(
                     f'<h2 id="s{h2n}"><span class="num">{h2n}</span>'
                     f"<span>{inline(shown)}</span>{h2_extra_tag(raw)}</h2>"
@@ -392,10 +425,17 @@ def main() -> None:
         text = md_path.read_text(encoding="utf-8-sig")
         body = md_to_body(text)
         h2_titles = re.findall(r"(?m)^##\s+(.+)$", text)
-        toc = "".join(
-            f'<a href="#s{i}">{esc(name.strip())}</a>'
-            for i, name in enumerate(h2_titles, 1)
-        )
+        toc_items, auto = [], 0
+        for name in h2_titles:
+            name = name.strip()
+            mnum = re.match(r"^(\d+)\.\s+(.*)$", name)
+            if mnum:  # сквозная нумерация из Markdown ("## 4. Сколько это стоит")
+                auto = int(mnum.group(1))
+                toc_items.append((auto, f"{mnum.group(1)}. {mnum.group(2).strip()}"))
+            else:
+                auto += 1
+                toc_items.append((auto, name))
+        toc = "".join(f'<a href="#s{i}">{esc(label)}</a>' for i, label in toc_items)
         page = page_html(kicker, title, lead, dot, pill_text, today, md_name, toc, body)
         html_path = md_path.with_suffix(".html")
         html_path.write_text(page, encoding="utf-8")
