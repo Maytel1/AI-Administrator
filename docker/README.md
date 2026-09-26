@@ -43,6 +43,23 @@ docker compose run --rm cli python -m pytest -q      # тесты (нужен з
 
 После создания YC-аккаунта: в `docker/.env` → `LLM_PROVIDER=yandexgpt`, `YC_API_KEY`, `YC_FOLDER_ID`.
 
+## Telegram-бот (фаза 2)
+
+```
+docker compose run --rm cli python cli.py --seed    # если БД пустая (нужен tenant)
+docker compose up -d bot-service
+docker compose logs -f bot-service
+```
+
+- В РФ `api.telegram.org` недоступен напрямую (проверено: `Connect call failed ('149.154.167.99', 443)`),
+  поэтому бот ходит через прокси **Cloudflare Worker**: в `docker/.env` → `TG_API_BASE=https://<worker>.workers.dev`.
+  Код подставляет шаблоны сам: `TelegramAPIServer.from_base(TG_API_BASE)` → `/bot{token}/{method}` и `/file/bot{token}/{path}`.
+- Проверка прокси без токена: `curl https://<worker>.workers.dev/bot123456789:FakeToken/getMe`
+  → `{"ok":false,"error_code":401,"description":"Unauthorized"}` (это ответ Telegram, значит прокси жив).
+- Успешный старт в логах: `[bot] Telegram API: https://<worker>.workers.dev` и `[bot] polling as @<username> (LLM: fake)`.
+- Токен бота лежит только в `docker/.env` (в git не попадает) и в логи не выводится — печатается лишь имя бота.
+- `pywa` (WhatsApp) добавится на тот же роутер, когда подтвердится легальность WhatsApp Business API в РФ.
+
 ## Дорога по фазам
 
 1. **Фаза 1** — схема БД (миграции в `postgres/init/`), CRM-адаптер (Altegio/YCLIENTS), LLM-агент, CLI-режим диалога. Критерий: 90% тестовых диалогов пишут запись в CRM.

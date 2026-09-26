@@ -24,7 +24,9 @@ services:
     restart: unless-stopped
 
   bot-service:
-    build: ./services/bot-service
+    build:
+      context: .
+      dockerfile: services/bot-service/Dockerfile
     container_name: ai-admin-bot
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-aiadmin}:${POSTGRES_PASSWORD:-aiadmin_dev}@postgres:5432/${POSTGRES_DB:-aiadmin}
