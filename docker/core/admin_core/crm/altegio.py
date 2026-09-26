@@ -11,7 +11,7 @@
 
 import httpx
 
-from .base import CRMProvider, SlotTakenError
+from .base import CRMProvider
 
 
 class AltegioNotConfigured(RuntimeError):

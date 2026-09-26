@@ -5,3 +5,4 @@ tzdata>=2024.1
 # Тесты (запускаются в контейнере cli):
 pytest>=8
 pytest-asyncio>=0.23
+prometheus-client>=0.20,<2   # рендер /metrics в тестах admin_core.health

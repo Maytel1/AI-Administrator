@@ -9,7 +9,6 @@ import asyncio
 import uuid
 
 import asyncpg
-
 from admin_core.config import get_settings
 from admin_core.crm.base import SlotTakenError
 from admin_core.crm.internal import InternalCRM

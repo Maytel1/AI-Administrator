@@ -1,0 +1,75 @@
+# CI: lint → тесты (postgres 16) → сборка/валидация документов.
+# DEVELOPMENT_PLAN §1.2: «GitHub Actions: lint → тесты → сборка → деплой»;
+# деплой добавляется отдельно (фаза 5), здесь — первые три звена.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: ruff + compileall
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: ruff check docker
+        run: |
+          python -m pip install --quiet ruff mypy
+          ruff check docker
+      - name: mypy (ядро admin_core)
+        run: python -m mypy docker/core/admin_core --ignore-missing-imports
+      - name: синтаксис всего кода
+        run: python -m compileall -q docker/core docker/services
+
+  test:
+    name: pytest (юнит + интеграция с БД)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: aiadmin
+          POSTGRES_PASSWORD: aiadmin_dev
+          POSTGRES_DB: aiadmin
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd "pg_isready -U aiadmin -d aiadmin"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://aiadmin:aiadmin_dev@localhost:5432/aiadmin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: зависимости cli (тестовое окружение)
+        run: python -m pip install --quiet -r docker/services/cli/requirements.txt
+      - name: схема БД (init 001-004, как docker-entrypoint-initdb.d)
+        run: python docker/scripts/init_schema.py
+      - name: pytest
+        working-directory: docker/core
+        run: python -m pytest -q
+
+  docs:
+    name: сборка и валидация документов
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: build 13 документов + validate
+        run: |
+          python build_html_docs.py
+          python validate_plan_html.py
+      - name: сгенерированный HTML совпадает с репозиторием
+        run: git diff --exit-code -- "*.html"

@@ -25,9 +25,16 @@ class OpenAICompatProvider(LLMProvider):
         payload: dict = {"model": self.model, "messages": messages, "temperature": 0.3}
         if tools:
             payload["tools"] = [
-                {"type": "function", "function": {"name": t["name"],
-                                                 "description": t.get("description", ""),
-                                                 "parameters": t.get("parameters", {"type": "object", "properties": {}})}}
+                {
+                    "type": "function",
+                    "function": {
+                        "name": t["name"],
+                        "description": t.get("description", ""),
+                        "parameters": t.get(
+                            "parameters", {"type": "object", "properties": {}}
+                        ),
+                    },
+                }
                 for t in tools
             ]
         async with httpx.AsyncClient(timeout=30) as client:

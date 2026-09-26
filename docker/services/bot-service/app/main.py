@@ -12,16 +12,17 @@ import asyncio
 import os
 import sys
 
+from admin_core.agent.agent import AgentSession
+from admin_core.crm import make_crm
+from admin_core.db import get_pool, run_migrations
+from admin_core.health import ServiceMetrics, make_health_app, start_health_server
+from admin_core.llm import make_provider
+from admin_core.ratelimit import RateLimiter
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.client.telegram import TelegramAPIServer
 from aiogram.filters import CommandStart
 from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup
-
-from admin_core.agent.agent import AgentSession
-from admin_core.crm import make_crm
-from admin_core.db import get_pool, run_migrations
-from admin_core.llm import make_provider
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
@@ -101,6 +102,11 @@ async def main() -> None:
         sys.exit(1)
 
     state = BotState(pool, salon)
+    metrics = ServiceMetrics("bot-service")
+    limiter = RateLimiter(
+        limit=int(os.getenv("TG_RATE_LIMIT", "6")),
+        window=float(os.getenv("TG_RATE_WINDOW", "10")),
+    )
     # TG_API_BASE — обход блокировки api.telegram.org через Cloudflare Worker.
     # from_base() подставляет шаблоны: {base}/bot{token}/{method} и /file/bot{token}/{path}
     tg_base = os.getenv("TG_API_BASE")
@@ -130,20 +136,44 @@ async def main() -> None:
 
     @dp.message(F.text)
     async def text(message: Message) -> None:
+        verdict = limiter.check(str(message.chat.id), message.text or "")
+        if not verdict.allowed:
+            metrics.rate_limited.labels(verdict.reason).inc()
+            if verdict.warn:
+                await message.answer(
+                    "Кажется, сообщения идут слишком часто — напишите, "
+                    "пожалуйста, одним сообщением, я обязательно отвечу."
+                )
+            return
+        metrics.messages.labels("user").inc()
         session = await state.session_for(message.chat.id)
         await state.log(message.chat.id, "user", message.text)
         try:
             reply = await session.run_turn(message.text)
         except Exception:  # noqa: BLE001 — клиенту не показываем трейсы
+            metrics.errors.labels("run_turn").inc()
             reply = "Извините, техническая неполадка — передаю старшему администратору."
+        metrics.messages.labels("assistant").inc()
         await state.log(message.chat.id, "assistant", reply)
         await message.answer(reply)
 
     me = await bot.get_me()
     print(f"[bot] polling as @{me.username} (LLM: {state.provider.name})", flush=True)
+    http_port = int(os.getenv("BOT_HTTP_PORT", "8080"))
+    health_runner = await start_health_server(
+        make_health_app(
+            metrics,
+            pool=pool,
+            provider=state.provider.name,
+            extra=lambda: {"chat_sessions": len(state.sessions)},
+        ),
+        port=http_port,
+    )
+    print(f"[bot] health: :{http_port}/health | metrics: :{http_port}/metrics", flush=True)
     try:
         await dp.start_polling(bot)
     finally:
+        await health_runner.cleanup()
         await pool.close()
 
 

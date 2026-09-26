@@ -1,11 +1,10 @@
 """Общие фикстуры pytest. Тесты требуют БД (docker compose up postgres)."""
 
 import uuid
+from datetime import time
 
 import asyncpg
 import pytest
-from datetime import time
-
 from admin_core.config import get_settings
 from admin_core.crm.internal import InternalCRM
 

@@ -7,12 +7,12 @@ SlotTakenError). Каждый значимый шаг пишется в audit_lo
 
 import json
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import asyncpg
 
-from .base import CRMProvider, SlotTakenError, audit
+from .base import CRMProvider, SlotTakenError
 
 
 def parse_hhmm(text: str) -> tuple[int, int]:

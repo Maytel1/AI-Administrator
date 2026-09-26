@@ -11,7 +11,6 @@
 
 import argparse
 import asyncio
-import uuid
 
 from admin_core.agent.agent import AgentSession
 from admin_core.config import get_settings

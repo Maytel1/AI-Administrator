@@ -1,5 +1,6 @@
 # Фаза 2: Telegram-бот (long polling) на общем «мозге» admin_core.
 aiogram>=3.13,<4
 asyncpg>=0.30,<0.31
+prometheus-client>=0.20,<2   # /metrics в admin_core.health (GAP_ANALYSIS §6.4)
 # Фаза 2 (WhatsApp, через BSP): pywa + SDK провайдера
 

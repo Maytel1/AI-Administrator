@@ -1,7 +1,6 @@
 """InternalCRM: слоты, создание записи, SlotTakenError (23P01), отмена, аудит."""
 
 import pytest
-
 from admin_core.crm.base import SlotTakenError
 
 

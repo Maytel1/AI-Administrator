@@ -1,0 +1,15 @@
+# Линтер проекта (CI: `ruff check docker`).
+# Локально без установки пакетов:
+#   docker run --rm -v "%cd%":/app -w /app astral-sh/ruff check docker
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+extend-exclude = ["skills", "**/__pycache__"]
+
+[tool.ruff.lint]
+# E/W — базовые ошибки стиля, F — pyflakes (мусор и неопределённые имена),
+# I — сортировка импортов, B — типовые баги (bugbear)
+select = ["E", "F", "W", "I", "B"]
+ignore = [
+  "B008",  # вызов в дефолте аргумента — норма для aiohttp/aiogram-хендлеров
+]
