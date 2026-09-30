@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>TAM Тюмень — объём рынка</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f4f1ea;--paper:#fffefb;--ink:#1e2733;--muted:#63707f;--line:#e4dfd3;--accent:#0f766e;--accent-ink:#0b5d57;--accent-soft:#e3f1ee;--warn-ink:#93261b;--warn-soft:#fceeea;--ok:#1a7f37;--ok-soft:#e8f4ea;--radius:14px;--shadow:0 1px 2px rgba(30,39,51,.04),0 10px 28px rgba(30,39,51,.07)}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.72 "Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+::selection{background:var(--accent);color:#fff}
+h1,h2,h3{font-family:"Manrope","Inter",sans-serif;line-height:1.28;margin:0}
+a{color:var(--accent-ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+main{padding:40px 22px 80px}
+.doc{max-width:920px;margin:0 auto}
+.doc-header{background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:30px 34px 24px;box-shadow:var(--shadow)}
+.kicker{font:700 11.5px "Inter",sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+.doc-header h1{font-size:30px;font-weight:800;letter-spacing:-.01em;margin:10px 0 10px}
+.lead{font-size:16.5px;color:var(--muted);margin:0;max-width:75ch}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.chip{display:inline-flex;align-items:center;gap:7px;font:600 12.5px "Inter",sans-serif;padding:5px 12px;border-radius:999px;background:var(--paper);border:1px solid var(--line)}
+.chip code{font-size:11.5px;padding:1px 6px}
+.dot{flex:none;width:8px;height:8px;border-radius:50%;background:#9aa5b1}
+.dot.warn{background:#e07856}
+.dot.mut{background:#9aa5b1}
+.dot.ok{background:#3fae5a}
+.rule{width:64px;height:3px;border-radius:3px;background:var(--accent);margin:20px 0 14px}
+.toc-chips{display:flex;flex-wrap:wrap;gap:8px}
+.toc-chips a{font:600 12.5px "Inter",sans-serif;padding:5px 12px;border-radius:999px;background:var(--accent-soft);color:var(--accent-ink);text-decoration:none}
+.toc-chips a:hover{background:#d3e8e2}
+h2{display:flex;align-items:center;flex-wrap:wrap;gap:12px;font-size:22.5px;margin:46px 0 14px;scroll-margin-top:14px}
+h2 .num{flex:none;width:34px;height:34px;border-radius:10px;background:var(--accent);color:#fff;display:grid;place-items:center;font:800 16px "Manrope",sans-serif}
+h3{font-size:16.5px;margin:22px 0 8px}
+p{margin:10px 0}
+p.lead-block{background:var(--accent-soft);border:1px solid #c3e0da;border-radius:12px;padding:12px 16px;font-size:15px}
+.tag{display:inline-block;font:700 11px "Inter",sans-serif;padding:3px 9px;border-radius:999px;letter-spacing:.06em;text-transform:uppercase}
+.t-warn{background:#fbe3df;color:var(--warn-ink)}
+.t-ok{background:var(--ok-soft);color:var(--ok)}
+.t-mut{background:#ece9e1;color:var(--muted)}
+blockquote.callout{border:1px solid #f0cdc6;background:var(--warn-soft);border-radius:12px;padding:13px 16px;margin:14px 0;font-size:15px}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);background:var(--paper);margin:14px 0 8px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+table.wide{min-width:900px}
+th{background:#edf4f1;color:var(--accent-ink);font:600 12.5px "Inter",sans-serif;text-align:left;padding:9px 12px;border:1px solid var(--line);white-space:nowrap}
+td{padding:9px 12px;border:1px solid var(--line);vertical-align:top}
+tbody tr:nth-child(even) td{background:#faf8f2}
+tbody tr:hover td{background:#f3f7f5}
+ul,ol{margin:10px 0;padding-left:24px}
+li{margin:6px 0}
+li::marker{color:var(--accent)}
+li .cb{color:var(--accent-ink);font-weight:700}
+code{font:500 .92em "JetBrains Mono",Consolas,monospace;background:#eef0f6;padding:2px 6px;border-radius:6px;color:#24304a}
+strong{color:#101828}
+hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+.src{margin-top:46px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--muted);font-style:italic}
+.src code{font-style:normal;background:#efece4}
+#top{position:fixed;right:22px;bottom:22px;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-size:17px;cursor:pointer;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .25s;z-index:55}
+#top.show{opacity:1;pointer-events:auto}
+#top:hover{background:var(--accent-soft)}
+@media print{body{background:#fff}main{padding:0}.doc-header{box-shadow:none;border-radius:0}#top{display:none}h2{break-after:avoid}.tbl-wrap{box-shadow:none;overflow:visible}table{font-size:12px}}
+</style>
+</head>
+<body>
+<main><article class="doc">
+<header class="doc-header">
+<div class="kicker">Рынок</div>
+<h1>TAM Тюмень — объём рынка</h1>
+<p class="lead">Считаем потенциал по трём вертикалям (автосервисы, стоматологии, бьютисфера): счётчики 2ГИС/Яндекс.Карт, отбор точек «пойдёт ли продукт», TAM/SAM/SOM и приоритеты продаж. Отчёт по вопросу №3 парка.</p>
+<div class="chips">
+<span class="chip"><span class="dot ok"></span>Готово · 29.09.2026</span>
+<span class="chip">обновлено 30.09.2026</span>
+<span class="chip">источник: <code>TAM_TYUMEN.md</code></span>
+</div>
+<div class="rule"></div>
+<nav class="toc-chips"><a href="#s1">1. Метод и источники</a><a href="#s2">2. Сырые числа (2ГИС, город Тюмень)</a><a href="#s3">3. Отбор: пойдёт ли точке наш продукт</a><a href="#s4">4. Рыночная модель (TAM / SAM / SOM)</a><a href="#s5">5. Выводы</a><a href="#s6">6. Ограничения</a></nav>
+</header>
+<p><strong>Назначение:</strong> ответ на вопрос OPEN_QUESTIONS №3 («сколько салонов/барбершопов и др.») перед ценообразованием сетей и планом продаж.</p>
+<h2 id="s1"><span class="num">1</span><span>Метод и источники</span></h2>
+<ul><li><strong>2ГИС Тюмень</strong> — основной источник чисел (счётчик «Места N» в выдаче категорий, снят 29.09.2026).</li><li><strong>Яндекс.Карты Тюмень</strong> — перекрёстная проверка состава и конкурентной среды (точные счётчики скрываются за JS, поэтому берём их из 2ГИС). На Яндекс.Картах подтверждены: онлайн-бронь у части точек (Яндекс.Запись — конкурент), награды «Хорошее место», активные подборки по всем трём вертикалям.</li><li>Отчёт собран Cline, выборки сплошные по категории (не выборочные).</li></ul>
+<h2 id="s2"><span class="num">2</span><span>Сырые числа (2ГИС, город Тюмень)</span></h2>
+<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Категория</th><th>Организаций в 2ГИС</th><th>Комментарий</th></tr></thead><tbody><tr><td>Салоны красоты</td><td><strong>3 275</strong></td><td>включает ногтевые студии, косметологию, SPA — сильный разброс размера</td></tr><tr><td>Автосервисы</td><td><strong>798</strong></td><td>легковые/коммерческий транспорт</td></tr><tr><td>Шиномонтаж</td><td><strong>707</strong></td><td>частично пересекается с автосервисами (одни организации в обеих категориях)</td></tr><tr><td>Стоматологии</td><td><strong>335</strong></td><td>частные клиники и сети</td></tr><tr><td>Барбершопы</td><td><strong>208</strong></td><td>отдельная категория, пересекается с «салонами»</td></tr><tr><td><strong>Итого сырых записей</strong></td><td><strong>≈5 323</strong></td><td>до вычитания пересечений и неподходящих</td></tr></tbody></table></div>
+<p>Примечание: в Яндекс.Картах в категориях присутствуют те же типы точек (напр., «Старт-Мастер», «Технатон», «Практик», «Ультра-Дент», «Mizu lab»), порядки чисел сопоставимы.</p>
+<h2 id="s3"><span class="num">3</span><span>Отбор: пойдёт ли точке наш продукт</span></h2>
+<p>Продукт: голосовой AI-администратор — закрывает пропущенные звонки и ведёт запись. Критерии применимости: <strong>(а)</strong> есть приём/запись клиентов; <strong>(б)</strong> пропущенный звонок = потерянный деньги; <strong>(в)</strong> есть кому принимать звонки (администратор или владелец) или их никто не принимает.</p>
+<div class="tbl-wrap"><table class="tbl wide"><thead><tr><th>Сегмент</th><th>Сырых</th><th>Критерий отбора</th><th>Проходит</th><th>Обоснование коэффициента</th></tr></thead><tbody><tr><td>Стоматологии</td><td>335</td><td>приём по записи, высокий чек</td><td><strong>≈300 (90%)</strong></td><td>почти все работают по записи; не проходят — только учрежденческие/узкоспециальные</td></tr><tr><td>Автосервисы (с шиномонтажом, без дублей)</td><td>≈1 100</td><td>работа «по записи»/приём-запись</td><td><strong>≈550 (50%)</strong></td><td>проходят сервисы с постами и приёмом; не проходят — мойки/шиномонтаж «без записи», мелкие гаражные</td></tr><tr><td>Салоны красоты + барбершопы</td><td>3 483</td><td>есть администратор или постоянный поток</td><td><strong>≈1 700 (≈49%)</strong></td><td>проходят салоны с мастерами и администратором/записью; не проходят — мастера-одиночки на дому, чисто по записи через Instagram-DM и т.п.</td></tr><tr><td><strong>Итого под продукт (SAMraw)</strong></td><td></td><td></td><td><strong>≈2 550 точек</strong></td><td></td></tr></tbody></table></div>
+<h2 id="s4"><span class="num">4</span><span>Рыночная модель (TAM / SAM / SOM)</span></h2>
+<ul><li><strong>TAM</strong> (весь подходящий рынок Тюмени): 2 550 точек × ARPU <strong>12 000 ₽/мес</strong> (среднее по тарифам B: 5 000 / 12 000 / 15 000) × 12 мес ≈ <strong>367 млн ₽/год</strong> (~30,6 млн ₽/мес).</li><li><strong>SAM</strong> (готовы купить в первый год: есть боль пропущенных звонков, ИТ-зрелость, контакт с владельцем): <strong>25–30%</strong> ≈ 640–770 точек ≈ <strong>92–111 млн ₽/год</strong>.</li><li><strong>SOM</strong> (реалистичная доля личных продаж за 12 мес, без рекламы): <strong>30–60 точек</strong> ≈ <strong>4,3–8,6 млн ₽/год</strong> (35–72 тыс. ₽/мес MRR).</li></ul>
+<h2 id="s5"><span class="num">5</span><span>Выводы</span></h2>
+<ol><li><strong>Рынка хватает с запасом:</strong> даже 1% подходящих точек (~25) — это уже пилотная когорта.</li><li><strong>Приоритет продаж по чеку/боли:</strong> стоматологии (дорогие пропущенные звонки, приём по записи) → автосервисы с записью → салоны/барбершопы с администратором.</li><li><strong>Конкурентная среда подтверждена:</strong> онлайн-бронь (Яндекс.Запись/2ГИС) уже есть у части точек — наш аргумент «живой голос24/7» против статичной формы записи.</li><li><strong>Пересечения категорий</strong> (авто∩шиномонтаж, салоны∩барбершопы) вычтены грубо — при планировании кампании уточнить сплошным списком адресов.</li></ol>
+<h2 id="s6"><span class="num">6</span><span>Ограничения</span></h2>
+<ul><li>Счётчики Яндекс.Карт недоступны без JS — числа взяты из 2ГИС; при расхождении порядков переснять.</li><li>Коэффициенты отбора — экспертные (на основе критериев §3), не выборочная валидация; уточнить на custdev (10–15 интервью).</li><li>Учтён только город Тюмень (без Тюменского района/агломерации — +10–15% точек).</li></ul>
+<footer class="src">Сгенерировано из <code>TAM_TYUMEN.md</code> · перегенерация: <code>python build_html_docs.py</code> · не редактируйте HTML вручную</footer>
+</article></main>
+<button id="top" title="Наверх">↑</button>
+<script>
+const top=document.getElementById('top');
+addEventListener('scroll',()=>top.classList.toggle('show',scrollY>400));
+top.addEventListener('click',()=>scrollTo({top:0,behavior:'smooth'}));
+</script>
+</body>
+</html>
