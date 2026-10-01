@@ -39,6 +39,19 @@ Branch: `main`, папка: `/ (root)` → `Save`. Через ~1 минуту и
 | Аудит проекта | [GAP_ANALYSIS.html](GAP_ANALYSIS.html) | [GAP_ANALYSIS.md](GAP_ANALYSIS.md) | новый · 26.09.2026 |
 | TAM Тюмень | [TAM_TYUMEN.html](TAM_TYUMEN.html) | [TAM_TYUMEN.md](TAM_TYUMEN.md) | отчёт · 29.09.2026 |
 
+## Лендинг «Дежурный24» (прототип)
+
+Папка `landing/` — статический сайт-визитка (техника A, без зависимостей):
+
+```bash
+# локальный просмотр (или просто открыть landing/index.html в браузере)
+python -m http.server 8090 --directory landing
+```
+
+Файлы: `index.html` (все 4 концепции: демо-CTA, чат Анны, табы вертикалей, калькулятор),
+`styles.css`, `app.js`, `privacy.html` (заготовка Политики ПДн — на проверку юриста).
+Публикация: после покупки `dezhurny24.ru` — CNAME на GitHub Pages (папка `landing/`).
+
 ## Перегенерация
 
 ```bash

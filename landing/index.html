@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Дежурный24 — ИИ-администратор, который не пропускает звонки</title>
+<meta name="description" content="Голосовой и текстовый ИИ-администратор для автосервисов, стоматологий и салонов красоты в Тюмени. Отвечает 24/7, записывает клиентов, не пропускает звонки.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header>
+  <div class="wrap hd">
+    <a class="logo" href="#">Дежурный<b>24</b></a>
+    <span class="chip"><span class="dot"></span>на связи 24/7</span>
+    <a class="btn" href="#contact">Послушать демо</a>
+  </div>
+</header>
+
+<section class="hero wrap">
+  <h1>Не пропущу <span>ни одного звонка</span></h1>
+  <p class="lead">ИИ-администратор Дежурный24 отвечает вашим клиентам круглосуточно:
+  объясняет услуги, отвечает на вопросы и записывает на приём — голосом в телефоне и текстом в мессенджерах.</p>
+  <div class="cta">
+    <a class="btn big" href="#contact">📱 Послушать демо-звонок</a>
+    <a class="btn big ghost" href="#calc">Сколько я теряю?</a>
+  </div>
+
+  <div class="chat">
+    <div class="who">
+      <div class="avatar">А</div>
+      <div><b>Анна</b><small>ваш ИИ-администратор · на связи</small></div>
+    </div>
+    <div class="bub">Здравствуйте, автосервис «Правый поворот», Анна на связи. Чем помочь?</div>
+    <div class="bub me">Здравствуйте! Можно записаться на замену масла завтра?</div>
+    <div class="bub">Конечно. Завтра свободно в 11:00 и 15:30 у Сергея. Какое время удобно?</div>
+    <div class="bub me">В 15:30, пожалуйста.</div>
+    <div class="bub">Записала: завтра, 15:30, замена масла, Сергей. Ждём вас! 👋</div>
+  </div>
+</section>
+<section id="calc" class="wrap">
+  <div class="kicker">Калькулятор ущерба</div>
+  <h2>Сколько денег уходит с пропущенными звонками?</h2>
+  <p class="lead">Посчитайте за30 секунд — по нашим расчётам бизнес теряет 18–30% звонков вечером и в выходные.</p>
+
+  <div class="calc" style="margin-top:26px">
+    <h3>Ваши показатели</h3>
+    <div class="row"><span>Звонков в день</span><span id="callsV">20</span></div>
+    <input type="range" id="calls" min="5" max="100" value="20" step="5">
+    <div class="row"><span>Средний чек клиента</span><span id="checkV">2 500 ₽</span></div>
+    <input type="range" id="check" min="500" max="15000" value="2500" step="500">
+    <div class="row"><span>Пропущенных звонков</span><span id="missedV">30 %</span></div>
+    <input type="range" id="missed" min="10" max="60" value="30" step="5">
+    <div class="loss">
+      <small>Вы теряете примерно</small>
+      <b id="lossV">45 000 ₽/мес</b>
+      <div class="ret" id="retV">Дежурный24 вернёт около 36 000 ₽/мес (спасём ~80% звонков)</div>
+    </div>
+    <div class="cta" style="margin-top:18px">
+      <a class="btn big" href="#contact">Вернуть эти деньги</a>
+    </div>
+    <p class="note">Расчёт: звонки × 30 дней × доля пропущенных × средний чек. Оценка ознакомительная.</p>
+  </div>
+</section>
+<section class="wrap">
+  <div class="kicker">Как это работает</div>
+  <h2>Клиент звонит — вы не у телефон</h2>
+  <div class="grid3">
+    <div class="card"><div class="ico">📞</div><h3>1. Звонок поступает</h3>
+      <p>Клиент дозванивается даже ночью, в выходные или когда все линии заняты. Никаких гудков «занято».</p></div>
+    <div class="card"><div class="ico">🎙</div><h3>2. Анна отвечает</h3>
+      <p>Живой голос: отвечает на вопросы о ценах и услугах, узнаёт постоянного клиента по номеру, уточняет детали.</p></div>
+    <div class="card"><div class="ico">🗓</div><h3>3. Запись сделана</h3>
+      <p>Слот подтверждён в календаре (YCLIENTS/Altegio или наш), клиенту отправлено подтверждение. Вы видите запись в ЛК.</p></div>
+  </div>
+</section>
+
+<section class="wrap">
+  <div class="kicker">Для кого</div>
+  <h2>Три вертикали — одна система</h2>
+  <div class="tabs">
+    <button class="tab on" data-pane="p-auto">Автосервисы</button>
+    <button class="tab" data-pane="p-med">Стоматологии</button>
+    <button class="tab" data-pane="p-beauty">Салоны и барбершопы</button>
+  </div>
+
+  <div class="pane on" id="p-auto">
+    <div class="pain">
+      <h3>Автосервисы и шиномонтаж</h3>
+      <ul>
+        <li>Звонок «стоит пост» — пропущенный клиент уезжает к соседу</li>
+        <li>Запись идёт через администратора, который в момент ремонта занят</li>
+        <li>Сезон шиномонтажа: пиковые нагрузки, очередь, звонки не успевают брать</li>
+      </ul>
+      <p class="money">Пропущенный звонок = от 1 500 до 30 000 ₽ упущенной выручки</p>
+    </div>
+  </div>
+  <div class="pane" id="p-med">
+    <div class="pain">
+      <h3>Стоматологии и клиники</h3>
+      <ul>
+        <li>Высокий чек: один неотвеченный звонок — минус десятки тысяч рублей</li>
+        <li>Пациенты звонят в рабочее время, когда линии заняты приёмом</li>
+        <li>Напоминания о визите снижают неявки</li>
+      </ul>
+      <p class="money">Пропущенный звонок = от 5 000 до 80 000 ₽ упущенной выручки</p>
+    </div>
+  </div>
+  <div class="pane" id="p-beauty">
+    <div class="pain">
+      <h3>Салоны красоты и барбершопы</h3>
+      <ul>
+        <li>60% звонков приходится на вечер и выходные — как раз когда никто не берёт трубку</li>
+        <li>Мастер за работой не отвечает; администратор в одиночку на весь зал</li>
+        <li>Неявки без напоминания — пустые окна в расписании</li>
+      </ul>
+      <p class="money">Каждый пропущенный звонок — 1–3 записи у конкурента</p>
+    </div>
+  </div>
+</section>
+<section class="wrap">
+  <div class="kicker">Кто отвечает вместо вас</div>
+  <h2>Анна — администратор, который никогда не уходит домой</h2>
+  <p class="lead">Она не больная, не в отпуске и не отвлекается на зал. Представляется администратором,
+  знает ваш прайс, расписание мастеров и историю клиентов.</p>
+  <div class="grid3">
+    <div class="card"><div class="ico">🗣</div><h3>Живой голос</h3>
+      <p>Естественная речь без машинной интонации. На прямой вопрос «вы робот?» — честный ответ.</p></div>
+    <div class="card"><div class="ico">🧠</div><h3>Знает клиентов</h3>
+      <p>Узнаёт номер: имя, любимый мастер, прошлые визиты, скидки — из вашей CRM.</p></div>
+    <div class="card"><div class="ico">🔒</div><h3>Безопасно</h3>
+      <p>Данные клиентов хранятся в РФ, разговор записывается с уведомлением (152-ФЗ).</p></div>
+  </div>
+</section>
+
+<section class="wrap">
+  <div class="kicker">Цены</div>
+  <h2>Три тарифа — без сюрпризов</h2>
+  <p class="lead">7 дней бесплатно на любом тарифе. Тариф можно поменять в любой момент с перерасчётом.</p>
+  <div class="tiers">
+    <div class="tier">
+      <h3>Текст</h3>
+      <div class="price">5 000 ₽<small>/мес</small></div>
+      <ul><li>Telegram и WhatsApp</li><li>500 диалогов в месяц</li><li>Setup 10 000 ₽</li></ul>
+      <a class="btn ghost" href="#contact" style="width:100%;text-align:center">Попробовать</a>
+    </div>
+    <div class="tier hot">
+      <span class="badge">Популярный</span>
+      <h3>Голос</h3>
+      <div class="price">12 000 ₽<small>/мес</small></div>
+      <ul><li>Входящие звонки 24/7</li><li>500 минут разговоров</li><li>Setup 15 000 ₽</li></ul>
+      <a class="btn" href="#contact" style="width:100%;text-align:center">Попробовать</a>
+    </div>
+    <div class="tier">
+      <h3>Полный</h3>
+      <div class="price">15 000 ₽<small>/мес</small></div>
+      <ul><li>Звонки + мессенджеры</li><li>500 мин + 500 диалогов</li><li>Setup 20 000 ₽</li></ul>
+      <a class="btn ghost" href="#contact" style="width:100%;text-align:center">Попробовать</a>
+    </div>
+  </div>
+  <p class="note">Сверх пакета: голос 8 ₽/мин, диалог 3 ₽. Цены предварительные — уточняются при подключении.</p>
+</section>
+<section class="wrap">
+  <div class="kicker">Почему нам доверяют</div>
+  <h2>Без рисков при подключении</h2>
+  <div class="trust">
+    <div class="tr"><b>7 дней бесплатно</b><span>Полный функционал любого тарифа. Карта не нужна.</span></div>
+    <div class="tr"><b>Пилот «нет эффекта — стоп»</b><span>Не сработало за первый платный месяц — останавливаем без претензий.</span></div>
+    <div class="tr"><b>Данные в России</b><span>Записи звонков и база клиентов хранятся в РФ (152-ФЗ), 90 дней и автоудаление.</span></div>
+    <div class="tr"><b>Отмена в любой момент</b><span>Без штрафов и штрафных условий. Тариф меняется с перерасчётом.</span></div>
+  </div>
+</section>
+
+<section class="wrap" id="contact">
+  <div class="contact">
+    <h2>Послушайте, как Дежурный24 отвечает за ваш бизнес</h2>
+    <p class="lead">Оставьте номер — устроим демо-звонок в течение дня. Или позвоните сами, когда удобно.</p>
+    <div class="cta">
+      <a class="btn big" href="tel:+70000000000">📱 Демо-номер: скоро</a>
+      <a class="btn big ghost" style="border-color:#fff;color:#fff" href="https://t.me/">Написать в Telegram</a>
+    </div>
+    <p class="note" style="color:#8b93ab">Демо-номер подключим после покупки сим-карты. Оставьте контакт — сообщим первым.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    Дежурный24 — ИИ-администратор для бизнеса · г. Тюмень · 2026<br>
+    <a href="privacy.html">Политика обработки персональных данных</a>
+    · <a href="#">Реквизиты</a> (самозанятый, будут указаны после регистрации бренда)
+  </div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
+</body>
+</html>
