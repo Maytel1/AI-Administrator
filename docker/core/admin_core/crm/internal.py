@@ -7,7 +7,8 @@ SlotTakenError). Каждый значимый шаг пишется в audit_lo
 
 import json
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import asyncpg
@@ -231,4 +232,133 @@ class InternalCRM(CRMProvider):
             "completed_visits": visits,
             "upcoming_iso": upcoming[0]["starts_at"].isoformat() if upcoming else None,
         }
+# ═══ ПРАВКИ ИЗ ПАНЕЛИ (фаза 4) ═══════════════════════════════════════════
+    # Владелец точки правит расписание, цены и статусы из личного кабинета.
+    # Каждое действие проверяет принадлежность салону (изоляция по tenant_id)
+    # и пишется в audit_log: по журналу потом разбирают споры (LIABILITY_OPTIONS).
 
+    BOOKING_STATUSES = ("booked", "confirmed", "completed", "cancelled", "no_show")
+
+    async def set_booking_status(
+        self, salon_id: str, booking_id: str, status: str, actor: str = "owner:panel"
+    ) -> dict:
+        """Смена статуса записи: подтвердить / выполнить / отменить / не пришёл.
+
+        Статусы 'booked'/'confirmed' держат слот в exclusion-констрейнте,
+        остальные его освобождают — поэтому отмена сразу открывает время
+        другим клиентам.
+        """
+        if status not in self.BOOKING_STATUSES:
+            return {"ok": False, "error": "bad_status"}
+        row = await self.pool.fetchrow(
+            "UPDATE bookings SET status = $3 "
+            "WHERE id = $1 AND salon_id = $2 RETURNING starts_at",
+            booking_id, salon_id, status,
+        )
+        if not row:
+            return {"ok": False, "error": "not_found"}
+        await self._audit(
+            salon_id, actor, "set_booking_status",
+            {"booking_id": str(booking_id), "status": status},
+        )
+        return {"ok": True, "status": status}
+
+    async def update_service(
+        self, salon_id: str, service_id: str, *, price: Any, duration_min: int,
+        is_active: bool, actor: str = "owner:panel",
+    ) -> dict:
+        """Правка услуги: цена, длительность, активность — то, что бот озвучивает."""
+        row = await self.pool.fetchrow(
+            "SELECT title FROM services WHERE id = $1 AND salon_id = $2", service_id, salon_id
+        )
+        if not row:
+            return {"ok": False, "error": "not_found"}
+        await self.pool.execute(
+            "UPDATE services SET price = $3, duration_min = $4, is_active = $5 "
+            "WHERE id = $1 AND salon_id = $2",
+            service_id, salon_id, price, duration_min, is_active,
+        )
+        await self._audit(
+            salon_id, actor, "update_service",
+            {"service": row["title"], "price": str(price), "duration_min": duration_min,
+             "is_active": is_active},
+        )
+        return {"ok": True, "title": row["title"]}
+
+    async def set_client_flags(
+        self, salon_id: str, client_id: str, *, requires_prepayment: bool | None = None,
+        notes: str | None = None, actor: str = "owner:panel",
+    ) -> dict:
+        """Флаг предоплаты и заметки клиента (аллергии, пожелания — идут в контекст бота)."""
+        row = await self.pool.fetchrow(
+            "SELECT phone FROM clients WHERE id = $1 AND salon_id = $2", client_id, salon_id
+        )
+        if not row:
+            return {"ok": False, "error": "not_found"}
+        sets: list[str] = []
+        args: list[Any] = [client_id, salon_id]
+        if requires_prepayment is not None:
+            args.append(requires_prepayment)
+            sets.append(f"requires_prepayment = ${len(args)}")
+        if notes is not None:
+            args.append(notes[:500])
+            sets.append(f"notes = ${len(args)}")
+        if not sets:
+            return {"ok": False, "error": "nothing_to_update"}
+        await self.pool.execute(
+            f"UPDATE clients SET {', '.join(sets)} WHERE id = $1 AND salon_id = $2", *args
+        )
+        await self._audit(
+            salon_id, actor, "set_client_flags",
+            {"phone": row["phone"], "requires_prepayment": requires_prepayment,
+             "notes": (notes or "")[:200]},
+        )
+        return {"ok": True, "phone": row["phone"]}
+
+    async def set_working_hours(
+        self, salon_id: str, master_id: str, weekday: int, *, start: time | None = None,
+        end: time | None = None, enabled: bool = True, actor: str = "owner:panel",
+    ) -> dict:
+        """Рабочий день мастера: график, из которого нарезаются слоты для записей."""
+        if not 0 <= weekday <= 6:
+            return {"ok": False, "error": "bad_weekday"}
+        row = await self.pool.fetchval(
+            "SELECT name FROM masters WHERE id = $1 AND salon_id = $2", master_id, salon_id
+        )
+        if not row:
+            return {"ok": False, "error": "not_found"}
+        if enabled and start and end:
+            await self.pool.execute(
+                "INSERT INTO working_hours (master_id, weekday, start_time, end_time) "
+                "VALUES ($1,$2,$3,$4) "
+                "ON CONFLICT (master_id, weekday) DO UPDATE SET start_time = $3, end_time = $4",
+                master_id, weekday, start, end,
+            )
+        else:
+            await self.pool.execute(
+                "DELETE FROM working_hours WHERE master_id = $1 AND weekday = $2",
+                master_id, weekday,
+            )
+        await self._audit(
+            salon_id, actor, "set_working_hours",
+            {"master": row, "weekday": weekday, "enabled": enabled,
+             "window": f"{start or '—'}–{end or '—'}"},
+        )
+        return {"ok": True, "master": row, "weekday": weekday}
+
+    async def count_bookings_outside_hours(
+        self, salon_id: str, master_id: str, weekday: int, start: time, end: time,
+        days_ahead: int = 14,
+    ) -> int:
+        """Сколько будущих записей мастера в этот день выпадут из нового окна."""
+        return await self.pool.fetchval(
+            """
+            SELECT count(*) FROM bookings b
+            WHERE b.salon_id = $1 AND b.master_id = $2
+              AND b.status IN ('booked','confirmed')
+              AND b.starts_at >= now() AND b.starts_at < now() + ($3 || ' days')::interval
+              AND EXTRACT(ISODOW FROM b.starts_at AT TIME ZONE 'Asia/Yekaterinburg')::int - 1 = $4
+              AND (b.starts_at::time < $5::time OR b.ends_at::time > $6::time)
+            """,
+            salon_id, master_id, str(days_ahead), weekday, start, end,
+        )

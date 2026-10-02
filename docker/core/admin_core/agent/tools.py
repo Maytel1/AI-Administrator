@@ -67,7 +67,17 @@ def build_dispatch(crm: CRMProvider, salon_id: str, client_id: str, created_by: 
                     ]
                 }
             if name == "get_free_slots":
-                return {"slots": await crm.get_free_slots(salon_id, args.get("service", ""))}
+                service = str(args.get("service", "")).strip()
+                if not service:
+                    # модель иногда зовёт инструмент без параметра: вместо пустого
+                    # ответа отдаём список услуг, чтобы она переспросила клиента
+                    titles = [s["title"] for s in await crm.get_services(salon_id)]
+                    return {
+                        "error": "service_required",
+                        "question": "На какую услугу показать слоты?",
+                        "services": titles,
+                    }
+                return {"slots": await crm.get_free_slots(salon_id, service)}
             if name == "create_booking":
                 return await crm.create_booking(
                     salon_id, client_id, args.get("service", ""),

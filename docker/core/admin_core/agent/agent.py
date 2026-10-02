@@ -10,6 +10,24 @@ from .tools import TOOL_SPECS, build_dispatch
 MAX_TOOL_ROUNDS = 6
 HISTORY_LIMIT = 16  # последних сообщений, уходим от бесконтрольного роста контекста
 
+FALLBACK_REPLY = "Извините, повторите, пожалуйста?"
+CLARIFY_REPLY = (
+    "Уточните, пожалуйста, на какую услугу записать — перечислю цены и свободное время."
+)
+# Некоторые модели вместо разбора tool_call отдают его текстом — клиенту
+# такое показывать нельзя, поэтому режем мусор и отвечаем по-человечески.
+_TECH_JUNK = ('{"', "{'", '"type": "function"', '"type":"function"')
+
+
+def clean_reply(text: str | None) -> str:
+    """Ответ клиенту: без пустот, без сырых вызовов инструментов."""
+    if not text or not text.strip():
+        return FALLBACK_REPLY
+    stripped = text.strip()
+    if stripped.startswith(_TECH_JUNK):
+        return "Уточните, пожалуйста, что именно вас интересует — помогу с записью."
+    return text
+
 
 class AgentSession:
     def __init__(self, crm, provider: LLMProvider, salon: dict, client: dict,
@@ -34,9 +52,15 @@ class AgentSession:
         self.history.append({"role": "user", "content": masked})
 
         reply = ""
+        seen_calls: set[str] = set()
         for _ in range(MAX_TOOL_ROUNDS):
             response = await self.provider.chat(self.history, tools=TOOL_SPECS)
             if response.tool_calls:
+                repeated = False
+                for tc in response.tool_calls:
+                    key = f"{tc.name}:{json.dumps(tc.arguments, sort_keys=True, ensure_ascii=False)}"
+                    repeated = repeated or key in seen_calls
+                    seen_calls.add(key)
                 self.history.append(
                     {
                         "role": "assistant",
@@ -56,8 +80,13 @@ class AgentSession:
                             "content": json.dumps(result, ensure_ascii=False),
                         }
                     )
+                if repeated:
+                    # модель повторяет один и тот же вызов: ходить по кругу бессмысленно,
+                    # спрашиваем клиента сами — так диалог не повисает
+                    reply = CLARIFY_REPLY
+                    break
                 continue
-            reply = response.text or "Извините, повторите, пожалуйста?"
+            reply = clean_reply(response.text)
             break
         else:
             reply = "Передаю вас старшему администратору, одну минуту."  # защита от зацикливания

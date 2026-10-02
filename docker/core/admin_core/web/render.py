@@ -69,6 +69,32 @@ def table(headers: Iterable[str], rows: list[list[str]], empty: str = "Пока 
     return f"<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
 
 
+def flash(message: str, error: bool = False) -> str:
+    """Результат правки: зелёный (сделано) или красный (не получилось)."""
+    if not message:
+        return ""
+    tone = "ok" if not error else "err"
+    return f'<div class="flash {tone}">{esc(message)}</div>'
+
+
+def csrf_field(csrf: str) -> str:
+    """Скрытое поле CSRF: без него чужая страница не сможет отправить форму."""
+    return f'<input type="hidden" name="csrf" value="{esc(csrf)}">'
+
+
+def action_form(
+    action: str, csrf: str, back: str, fields: str, label: str = "Сохранить"
+) -> str:
+    """Форма правки: действие + CSRF + поля + возврат на исходную страницу."""
+    return (
+        f'<form method="post" action="/actions" class="inline">'
+        f'<input type="hidden" name="action" value="{esc(action)}">'
+        f'<input type="hidden" name="back" value="{esc(back)}">'
+        f"{csrf_field(csrf)}{fields}"
+        f'<button type="submit">{esc(label)}</button></form>'
+    )
+
+
 def layout(
     title: str,
     active: str,

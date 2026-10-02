@@ -9,7 +9,20 @@ from __future__ import annotations
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from .render import badge, card, dt_local, esc, layout, money, table, tile
+from .render import (
+    action_form,
+    badge,
+    card,
+    dt_local,
+    esc,
+    layout,
+    money,
+    table,
+    tile,
+)
+from .render import (
+    flash as flash_html,
+)
 
 
 def _status_badge(status: str) -> str:
@@ -18,12 +31,34 @@ def _status_badge(status: str) -> str:
     return badge(STATUS_RU.get(status, status), STATUS_TONE.get(status, "gray"))
 
 
+def _status_buttons(booking_id: str, status: str, csrf: str, back: str) -> str:
+    """Кнопки смены статуса прямо в строке записи — рутина администратора в один клик."""
+    if not csrf or status in ("completed", "cancelled"):
+        return "—"
+    hidden = f'<input type="hidden" name="booking_id" value="{esc(booking_id)}">'
+    buttons = []
+    for code, label in (
+        ("confirmed", "Подтвердить"), ("completed", "Выполнена"), ("cancelled", "Отмена"),
+    ):
+        if code == status:
+            continue
+        buttons.append(
+            action_form("booking_status", csrf, back, hidden
+                        + f'<input type="hidden" name="status" value="{code}">',
+                        label)
+        )
+    return " ".join(buttons)
+
+
 def page_today(
     stats: dict[str, Any],
     schedule: list[dict[str, Any]],
     tz: ZoneInfo,
     salon: dict | None,
     salons: list[dict] | None,
+    csrf: str = "",
+    flash: str = "",
+    flash_error: bool = False,
 ) -> str:
     """Дашборд дня: плитки сверху, расписание снизу."""
     load_pct = round(
@@ -45,6 +80,7 @@ def page_today(
         f'<span>{stats["busy_masters"]} из {stats["masters_total"]}</span></div>'
         f'<div class="bar"><div style="width:{load_pct}%"></div></div>'
     )
+    sid = f"?salon={esc(salon['id'])}" if salon else ""
     rows = [
         [
             dt_local(b["starts_at"], tz),
@@ -54,6 +90,7 @@ def page_today(
             esc(b["master_name"]),
             money(b["price"]),
             _status_badge(b["status"]),
+            _status_buttons(str(b["id"]), b["status"], csrf, f"/today{sid}"),
         ]
         for b in schedule
     ]
@@ -62,12 +99,13 @@ def page_today(
         f'<p class="sub">{esc(salon["name"] if salon else "")} — '
         f'подтверждено {stats["confirmed"]}, выполнено {stats["completed"]}, '
         f'отменено {stats["cancelled"]}</p>'
-        f'<div class="tiles">{tiles}</div>'
+        + flash_html(flash, flash_error)
+        + f'<div class="tiles">{tiles}</div>'
         + card("Загрузка", load)
         + card(
             "Расписание на сегодня",
             table(
-                ["Время", "Клиент", "Телефон", "Услуга", "Мастер", "Цена", "Статус"],
+                ["Время", "Клиент", "Телефон", "Услуга", "Мастер", "Цена", "Статус", "Действия"],
                 rows,
                 "На сегодня записей нет. Бот продолжает принимать заявки.",
             ),
@@ -82,18 +120,23 @@ def page_bookings(
     status: str,
     salon: dict | None,
     salons: list[dict] | None,
+    csrf: str = "",
+    flash: str = "",
+    flash_error: bool = False,
 ) -> str:
     """Лента записей за ±30 дней с фильтром по статусу (ссылками, без формы)."""
     from .queries import SOURCE_RU, STATUS_RU
 
     sid = salon["id"] if salon else ""
+    back = f"/bookings?salon={esc(sid)}" + (f"&status={esc(status)}" if status else "")
     statuses = ["", *STATUS_RU]
-    links = ['<a class="btn" style="margin-right:6px" href="/bookings?salon=' + esc(sid) + '">Все</a>']
+    links = [
+        '<a class="btn" style="margin-right:6px" href="/bookings?salon=' + esc(sid) + '">Все</a>'
+    ]
     for code in statuses[1:]:
-        cls = "btn" if code != status else ""
         style = ' style="background:var(--accent-bg);color:var(--text)"' if code == status else ""
         links.append(
-            f'<a class="{cls}"{style} style="margin-right:6px" '
+            f'<a class="btn"{style} style="margin-right:6px" '
             f'href="/bookings?salon={esc(sid)}&status={esc(code)}">{esc(STATUS_RU[code])}</a>'
         )
     table_rows = [
@@ -106,17 +149,20 @@ def page_bookings(
             money(b["price"]),
             esc(SOURCE_RU.get(b["source"], b["source"])),
             _status_badge(b["status"]),
+            _status_buttons(str(b["id"]), b["status"], csrf, back),
         ]
         for b in rows
     ]
     content = (
         "<h1>Записи</h1>"
         '<p class="sub">Период: 30 дней назад и 30 дней вперёд</p>'
-        f'<div class="row" style="margin-bottom:14px">{"".join(links)}</div>'
+        + flash_html(flash, flash_error)
+        + f'<div class="row" style="margin-bottom:14px">{"".join(links)}</div>'
         + card(
             f"Найдено: {len(rows)}",
             table(
-                ["Когда", "Клиент", "Телефон", "Услуга", "Мастер", "Цена", "Источник", "Статус"],
+                ["Когда", "Клиент", "Телефон", "Услуга", "Мастер", "Цена", "Источник",
+                 "Статус", "Действия"],
                 table_rows,
                 "Под выбранный фильтр записей нет.",
             ),

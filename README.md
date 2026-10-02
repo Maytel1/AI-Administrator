@@ -73,7 +73,7 @@ ruff check docker                                  # стиль/импорты/�
 python -m mypy docker/core/admin_core --ignore-missing-imports
 
 # тесты (нужен запущенный postgres из docker/):
-cd docker && docker compose run --rm cli python -m pytest -q   # 44 теста
+cd docker && docker compose run --rm cli python -m pytest -q   # 63 теста
 ```
 
 CI — `.github/workflows/ci.yml`, на каждый push/PR: **lint** (ruff + mypy + compileall) →
@@ -86,5 +86,7 @@ CI — `.github/workflows/ci.yml`, на каждый push/PR: **lint** (ruff + m
 
 Веб-панель (фаза 4, MVP): `docker compose up -d web` → http://localhost:8082/today,
 вход по `WEB_PANEL_PASSWORD`; `/health` и `/metrics` — на 8083. Разделы: Сегодня, Записи,
-Клиенты, Прайс, Мастера, Диалоги, Аудит, Настройки. Логика — `docker/core/admin_core/web`,
-разбор референса и дорожная карта — `ADMIN_PANEL.md`.
+Клиенты, Прайс, Мастера, Диалоги, Аудит, Настройки. **Правки работают**: цены и длительность
+услуг, рабочие дни мастера, статус записи, предоплата и заметки клиента — каждая правка
+в `audit_log`. Логика — `docker/core/admin_core/web`, разбор референса и дорожная карта —
+`ADMIN_PANEL.md`.

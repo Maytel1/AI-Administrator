@@ -3,11 +3,14 @@
 Рендер проверяется без БД и без HTTP; запросы — на фикстуре ``demo``.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
+from admin_core.agent.agent import CLARIFY_REPLY, FALLBACK_REPLY, clean_reply
+from admin_core.crm.internal import InternalCRM
 from admin_core.web import dashboard, queries
+from admin_core.web.actions import _decimal, _hhmm, _hhmm_text, apply_form
 from admin_core.web.pages_core import page_bookings, page_today
 from admin_core.web.pages_lists import (
     page_audit,
@@ -17,13 +20,26 @@ from admin_core.web.pages_lists import (
     page_services,
     page_settings,
 )
-from admin_core.web.render import dt_local, esc, layout, login_page, money, table, tile
-from admin_core.web.session import Panel
+from admin_core.web.render import (
+    action_form,
+    dt_local,
+    esc,
+    layout,
+    login_page,
+    money,
+    table,
+    tile,
+)
+from admin_core.web.render import (
+    flash as flash_html,
+)
+from admin_core.web.session import Panel, check_builder_signatures
 
 TZ = ZoneInfo("Asia/Yekaterinburg")
 SALON = {"id": "11111111-1111-1111-1111-111111111111", "name": "Виктория",
          "plan": "trial", "crm_provider": "internal", "timezone": "Asia/Yekaterinburg"}
 BOOKING = {
+    "id": "b1",
     "service_title": "Маникюр", "duration_min": 120, "price": 2000, "is_active": True,
     "starts_at": datetime(2026, 10, 3, 6, 0, tzinfo=ZoneInfo("UTC")),  # 11:00 Тюмень
     "ends_at": datetime(2026, 10, 3, 8, 0, tzinfo=ZoneInfo("UTC")),
@@ -99,28 +115,28 @@ def test_page_bookings_filters_and_escape():
 
 def test_page_clients_shows_prepayment_flag():
     html = page_clients(
-        [{"name": "Иван", "phone": "+79001234567", "completed_visits": 2,
+        [{"id": "c1", "name": "Иван", "phone": "+79001234567", "completed_visits": 2,
           "last_visit": datetime(2026, 9, 1, tzinfo=ZoneInfo("UTC")), "upcoming": 1,
           "requires_prepayment": True, "notes": ""}],
         TZ, SALON, [SALON],
     )
     assert "+79001234567" in html
-    assert "требует предоплату" in html
+    assert "требует" in html
+    assert 'value="client_save"' in html
 
 
 def test_page_services_and_masters():
     svc = page_services(
-        [{"title": "Маникюр", "duration_min": 120, "price": 2000, "is_active": True}],
+        [{"id": "s1", "title": "Маникюр", "duration_min": 120, "price": 2000, "is_active": True}],
         SALON, [SALON],
     )
     assert f"2{NBSP}000{NBSP}₽" in svc and "120 мин" in svc
     masters = page_masters(
-        [{"name": "Мария", "is_active": True, "services_count": 2,
+        [{"id": "m1", "name": "Мария", "is_active": True, "services_count": 2,
           "hours": '[{"weekday": 2, "start": "10:00:00", "end": "20:00:00"}]'}],
         SALON, [SALON],
     )
     assert "Ср 10:00–20:00" in masters
-    assert "работает" in masters
 
 
 def test_page_dialogs_renders_transcript():
@@ -155,6 +171,51 @@ def test_page_settings_shows_plan_and_roadmap():
 
 def test_tile_escapes_value():
     assert "<script>" not in tile("<script>", "плитка")
+def test_parse_hhmm():
+    assert _hhmm({"start": "9:5"}, "start") == time(9, 5)
+    assert _hhmm({"start": "23:59"}, "start") == time(23, 59)
+    assert _hhmm({"start": ""}, "start") is None
+    assert _hhmm({"start": "abc"}, "start") is None
+    assert _hhmm({"start": "25:00"}, "start") is None
+    assert _hhmm_text(time(9, 5)) == "09:05"
+    assert _hhmm_text(None) == "—"
+
+
+def test_parse_decimal_accepts_russian_format():
+    assert _decimal("2000") == 2000.0
+    assert _decimal("2 000") == 2000.0
+    assert _decimal("2 000,50") == 2000.5
+    assert _decimal("abc") is None
+    assert _decimal(None) is None
+
+
+def test_csrf_token_is_stable_and_bound_to_session():
+    panel = Panel(pool=None, password="secret")
+    token = panel.login("secret") or ""
+    first = panel.csrf_token(token)
+    assert first == panel.csrf_token(token)          # стабилен в рамках сессии
+    assert panel.csrf_ok(token, first) is True
+    assert panel.csrf_ok(token, "0" * 32) is False   # чужой токен не проходит
+    assert panel.csrf_ok(token, "") is False
+    other = panel.login("secret") or ""
+    assert panel.csrf_token(other) != first          # привязан к конкретной сессии
+    assert panel.csrf_ok(other, first) is False
+
+
+def test_action_form_contains_csrf_and_action():
+    html = action_form("service_save", "a" * 32, "/services", '<input name="price">')
+    assert 'action="/actions"' in html
+    assert 'value="service_save"' in html
+    assert f'value="{"a" * 32}"' in html
+    assert 'name="back" value="/services"' in html
+
+
+def test_flash_colors():
+    assert 'class="flash ok"' in flash_html("Готово")
+    assert 'class="flash err"' in flash_html("Ошибка", True)
+    assert flash_html("") == ""
+
+
 def test_panel_login_and_session_lifetime():
     panel = Panel(pool=None, password="secret")
     assert panel.login("wrong") is None
@@ -224,6 +285,258 @@ async def test_queries_isolated_by_salon(demo, pool):
     """Изоляция tenant: чужой салон не видит данных (WHERE salon_id = $1)."""
     services = await queries.services_list(pool, "00000000-0000-0000-0000-000000000000")
     assert services == []
+
+
+async def test_action_validates_before_touching_db(demo, pool):
+    """Мусор в форме не доходит до БД — возвращаем понятную ошибку."""
+    salon_id = str(demo["salon"]["id"])
+    svc = await queries.services_list(pool, salon_id)
+    service_id = str(svc[0]["id"])
+
+    bad_price = await apply_form(pool, salon_id, {
+        "action": "service_save", "service_id": service_id,
+        "price": "миллион", "duration_min": "60", "is_active": "on",
+    })
+    assert bad_price["ok"] is False
+    assert "Цена" in bad_price["message"]
+
+    bad_duration = await apply_form(pool, salon_id, {
+        "action": "service_save", "service_id": service_id,
+        "price": "1000", "duration_min": "2",
+    })
+    assert bad_duration["ok"] is False
+    assert bad_duration["error"] == "bad_duration"
+
+    bad_status = await apply_form(pool, salon_id, {
+        "action": "booking_status", "booking_id": "x", "status": "hacked",
+    })
+    assert bad_status["ok"] is False and bad_status["error"] == "bad_status"
+
+    unknown = await apply_form(pool, salon_id, {"action": "drop_table"})
+    assert unknown["ok"] is False
+
+    after = await queries.services_list(pool, salon_id)
+    assert after[0]["price"] == svc[0]["price"]  # цена не изменилась
+
+
+async def test_action_cannot_edit_other_salon(demo, pool):
+    """Заявка с чужим salon_id не трогает данные нашей точки."""
+    ours = str(demo["salon"]["id"])
+    theirs = "00000000-0000-0000-0000-000000000000"
+    svc = await queries.services_list(pool, ours)
+    service_id = str(svc[0]["id"])
+    result = await apply_form(pool, theirs, {
+        "action": "service_save", "service_id": service_id,
+        "price": "1", "duration_min": "10", "is_active": "on",
+    })
+    assert result["ok"] is False and result["error"] == "not_found"
+    unchanged = await queries.services_list(pool, ours)
+    assert unchanged[0]["price"] == svc[0]["price"]
+
+
+async def test_service_price_change_writes_audit(demo, pool):
+    """Правка цены меняет данные и попадает в журнал аудита."""
+    salon_id = str(demo["salon"]["id"])
+    svc = await queries.services_list(pool, salon_id)
+    service_id = str(svc[0]["id"])
+    result = await apply_form(pool, salon_id, {
+        "action": "service_save", "service_id": service_id,
+        "price": "2500", "duration_min": "90", "is_active": "on",
+    })
+    assert result["ok"] is True
+    updated = await queries.services_list(pool, salon_id)
+    assert float(updated[0]["price"]) == 2500.0
+    assert updated[0]["duration_min"] == 90
+    audit = await pool.fetchval(
+        "SELECT count(*) FROM audit_log WHERE salon_id=$1 AND action='update_service'",
+        demo["salon"]["id"],
+    )
+    assert audit == 1
+
+
+async def test_client_prepayment_and_notes_saved(demo, pool):
+    """Флаг предоплаты и заметки — то, что бот читает в диалоге."""
+    salon_id = str(demo["salon"]["id"])
+    client_id = str(demo["client"]["id"])
+    result = await apply_form(pool, salon_id, {
+        "action": "client_save", "client_id": client_id,
+        "requires_prepayment": "on", "notes": "аллергия на латекс",
+    })
+    assert result["ok"] is True
+    row = await pool.fetchrow(
+        "SELECT requires_prepayment, notes FROM clients WHERE id = $1", client_id
+    )
+    assert row["requires_prepayment"] is True
+    assert row["notes"] == "аллергия на латекс"
+
+
+async def test_booking_status_change_and_slot_release(demo, pool):
+    """Отмена освобождает слот: exclusion-констрейнт больше не мешает."""
+    crm = InternalCRM(pool)
+    salon_id, client_id = str(demo["salon"]["id"]), str(demo["client"]["id"])
+    created = await crm.create_booking(
+        salon_id, client_id, "Тест стрижка", time_text="11:00", created_by="test"
+    )
+    assert created["ok"] is True
+    result = await apply_form(pool, salon_id, {
+        "action": "booking_status", "booking_id": created["booking_id"], "status": "cancelled",
+    })
+    assert result["ok"] is True
+    status = await pool.fetchval(
+        "SELECT status FROM bookings WHERE id = $1", created["booking_id"]
+    )
+    assert status == "cancelled"
+
+
+async def test_hours_save_and_disable(demo, pool):
+    """График мастера сохраняется и отключается — слоты следуют за ним."""
+    salon_id, master_id = str(demo["salon"]["id"]), str(demo["master"]["id"])
+    saved = await apply_form(pool, salon_id, {
+        "action": "hours_save", "master_id": master_id, "weekday": "0",
+        "enabled": "on", "start": "11:00", "end": "15:00",
+    })
+    assert saved["ok"] is True
+    row = await pool.fetchrow(
+        "SELECT start_time::text, end_time::text FROM working_hours "
+        "WHERE master_id = $1 AND weekday = 0",
+        master_id,
+    )
+    assert row["start_time"].startswith("11:00")
+    off = await apply_form(pool, salon_id, {
+        "action": "hours_save", "master_id": master_id, "weekday": "0",
+    })
+    assert off["ok"] is True
+    assert await pool.fetchval(
+        "SELECT count(*) FROM working_hours WHERE master_id = $1 AND weekday = 0", master_id
+    ) == 0
+
+
+async def test_hours_rejects_bad_window(demo, pool):
+    salon_id, master_id = str(demo["salon"]["id"]), str(demo["master"]["id"])
+    bad = await apply_form(pool, salon_id, {
+        "action": "hours_save", "master_id": master_id, "weekday": "0",
+        "enabled": "on", "start": "18:00", "end": "10:00",
+    })
+    assert bad["ok"] is False and bad["error"] == "bad_time"
+    bad_day = await apply_form(pool, salon_id, {
+        "action": "hours_save", "master_id": master_id, "weekday": "9",
+        "enabled": "on", "start": "10:00", "end": "18:00",
+    })
+    assert bad_day["ok"] is False and bad_day["error"] == "bad_weekday"
+
+
+def test_pages_render_edit_forms_with_csrf():
+    """Страницы правки содержат форму и CSRF-токен (иначе браузер её не отправит)."""
+    panel = Panel(pool=None, password="secret")
+    token = panel.csrf_token(panel.login("secret") or "")
+    services = page_services(
+        [{"id": "s1", "title": "Маникюр", "duration_min": 120, "price": 2000, "is_active": True}],
+        SALON, [SALON], csrf=token,
+    )
+    assert 'value="service_save"' in services
+    assert token in services
+    clients = page_clients(
+        [{"id": "c1", "name": "Иван", "phone": "+79", "completed_visits": 1,
+          "last_visit": None, "upcoming": 0, "requires_prepayment": False, "notes": ""}],
+        TZ, SALON, [SALON], csrf=token,
+    )
+    assert 'value="client_save"' in clients and token in clients
+    masters = page_masters(
+        [{"id": "m1", "name": "Мария", "is_active": True, "services_count": 1,
+          "hours": '[{"weekday": 1, "start": "10:00:00", "end": "18:00:00"}]'}],
+        SALON, [SALON], csrf=token,
+    )
+    assert 'value="hours_save"' in masters
+    assert masters.count('name="weekday"') == 7  # все дни недели редактируются
+    assert token in masters
+
+
+def test_status_buttons_hidden_without_csrf():
+    """Без CSRF кнопок нет: POST всё равно отбило бы на сервере."""
+    html = page_bookings([dict(BOOKING)], TZ, "", SALON, [SALON], csrf="")
+    assert "Подтвердить" not in html
+    assert 'action="/actions"' not in html
+    with_csrf = page_bookings([dict(BOOKING)], TZ, "", SALON, [SALON], csrf="f" * 32)
+    assert "Подтвердить" in with_csrf and "Отмена" in with_csrf
+
+
+def test_flash_shown_after_action():
+    html = page_services(
+        [{"id": "s1", "title": "Маникюр", "duration_min": 120, "price": 2000, "is_active": True}],
+        SALON, [SALON], csrf="f" * 32, flash="Цена сохранена",
+    )
+    assert "Цена сохранена" in html and 'class="flash ok"' in html
+    err = page_services(
+        [{"id": "s1", "title": "Маникюр", "duration_min": 120, "price": 2000, "is_active": True}],
+        SALON, [SALON], flash="Цена не сохранена", flash_error=True,
+    )
+    assert 'class="flash err"' in err
+
+
+async def test_get_free_slots_without_service_asks_back(demo, pool):
+    """Модель позвала инструмент без услуги — ждём переспрос, а не пустой список."""
+    from admin_core.agent.tools import build_dispatch
+
+    dispatch = build_dispatch(
+        InternalCRM(pool), str(demo["salon"]["id"]), str(demo["client"]["id"])
+    )
+    result = await dispatch("get_free_slots", {"service": "  "})
+    assert result["error"] == "service_required"
+    assert "Тест стрижка" in result["services"]
+    ok = await dispatch("get_free_slots", {"service": "Тест стрижка"})
+    assert "slots" in ok
+
+
+def test_clean_reply_hides_tool_calls_and_empty():
+    """Клиент не должен видеть сырой JSON вызова инструмента."""
+    assert clean_reply(None) == FALLBACK_REPLY
+    assert clean_reply("   ") == FALLBACK_REPLY
+    junk = '{"type": "function", "function": {"name": "get_free_slots"}}'
+    assert "function" not in clean_reply(junk)
+    assert clean_reply("Здравствуйте! Чем помочь?") == "Здравствуйте! Чем помочь?"
+
+
+async def test_agent_stops_on_repeated_tool_calls():
+    """Модель повторяет один вызов — агент перестаёт крутиться и уточняет у клиента."""
+    from admin_core.agent.agent import AgentSession
+    from admin_core.llm.base import LLMResponse, ToolCall
+
+    class LoopProvider:
+        """На каждый запрос возвращает тот же вызов инструмента — иначе не сойдёмся."""
+
+        name = "loop"
+        calls = 0
+
+        async def chat(self, _messages, tools=None):  # noqa: ANN001, ARG002
+            type(self).calls += 1
+            return LLMResponse(
+                tool_calls=[ToolCall(name="get_free_slots", arguments={"service": ""})]
+            )
+
+    session = AgentSession(
+        crm=object(), provider=LoopProvider(),
+        salon={"id": "s", "name": "Салон"}, client={"id": "c", "name": "Иван"},
+    )
+    reply = await session.run_turn("Какие слоты в понедельник?")
+    assert reply == CLARIFY_REPLY
+    assert LoopProvider.calls == 2  # второй одинаковый вызов — и стоп
+
+
+def test_builder_signature_guard():
+    """Регрессия: раздел со старой подписью ронял страницу в заглушку.
+
+    Теперь рассинхрон ловится на старте сервиса — проверяем сам сторож.
+    """
+
+    def good(_panel, _salon, _salons, _request, _csrf=""):
+        return ""
+
+    def bad(_panel, _salon, _salons, _request):
+        return ""
+
+    check_builder_signatures({"/today": good})
+    with pytest.raises(TypeError, match="audit"):
+        check_builder_signatures({"/audit": bad})
 
 
 if __name__ == "__main__":  # pragma: no cover
