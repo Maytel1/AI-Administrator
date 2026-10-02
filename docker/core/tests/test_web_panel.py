@@ -34,7 +34,7 @@ from admin_core.web.render import (
     flash as flash_html,
 )
 from admin_core.web.roles import can_action
-from admin_core.web.session import PageCtx, Panel, check_builder_signatures
+from admin_core.web.session import PageCtx, Panel, Session, check_builder_signatures
 
 TZ = ZoneInfo("Asia/Yekaterinburg")
 SALON = {"id": "11111111-1111-1111-1111-111111111111", "name": "Виктория",
@@ -199,15 +199,25 @@ def test_parse_decimal_accepts_russian_format():
     assert _decimal(None) is None
 
 
+def _session(panel: Panel, role: str = "owner", login: str = "boss@test.ru") -> str:
+    """Тестовая сессия напрямую: аварийный вход по env закрыт по коду."""
+    token = "test-token-" + login
+    panel.sessions[token] = Session(
+        user={"login": login, "role": role}, role=role, login=login, salon_id=None,
+        until=datetime.now(ZoneInfo("UTC")) + timedelta(hours=1),
+    )
+    return token
+
+
 def test_csrf_token_is_stable_and_bound_to_session():
-    panel = Panel(pool=None, password="secret")
-    token = panel.login("secret") or ""
+    panel = Panel(pool=None, password="")
+    token = _session(panel)
     first = panel.csrf_token(token)
     assert first == panel.csrf_token(token)          # стабилен в рамках сессии
     assert panel.csrf_ok(token, first) is True
     assert panel.csrf_ok(token, "0" * 32) is False   # чужой токен не проходит
     assert panel.csrf_ok(token, "") is False
-    other = panel.login("secret") or ""
+    other = _session(panel, login="second@test.ru")
     assert panel.csrf_token(other) != first          # привязан к конкретной сессии
     assert panel.csrf_ok(other, first) is False
 
@@ -227,10 +237,11 @@ def test_flash_colors():
 
 
 def test_panel_login_and_session_lifetime():
-    panel = Panel(pool=None, password="secret")
+    panel = Panel(pool=None, password="")
     assert panel.login("wrong") is None
-    token = panel.login("secret")
-    assert token and panel.authorized(token)
+    assert panel.login("env-password") is None  # без БД аварийный вход закрыт
+    token = _session(panel)
+    assert panel.authorized(token)
     assert not panel.authorized("чужая-сессия")
     assert not panel.authorized("")
     panel.logout(token)
@@ -238,8 +249,8 @@ def test_panel_login_and_session_lifetime():
 
 
 def test_panel_expired_session_is_dropped():
-    panel = Panel(pool=None, password="secret")
-    token = panel.login("secret") or ""
+    panel = Panel(pool=None, password="")
+    token = _session(panel)
     session = panel.sessions[token]
     session.until = datetime.now(ZoneInfo("UTC")) - timedelta(seconds=1)
     assert not panel.authorized(token)
@@ -319,7 +330,9 @@ async def test_action_validates_before_touching_db(demo, pool):
     assert bad_duration["error"] == "bad_duration"
 
     bad_status = await apply_form(pool, salon_id, {
-        "action": "booking_status", "booking_id": "x", "status": "hacked",
+        "action": "booking_status",
+        "booking_id": "00000000-0000-0000-0000-000000000000",
+        "status": "hacked",
     })
     assert bad_status["ok"] is False and bad_status["error"] == "bad_status"
 
@@ -438,8 +451,8 @@ async def test_hours_rejects_bad_window(demo, pool):
 
 def test_pages_carry_csrf_token_into_forms():
     """Формы правки несут CSRF-токен сессии — иначе браузер их не отправит."""
-    panel = Panel(pool=None, password="secret")
-    token = panel.csrf_token(panel.login("secret") or "")
+    panel = Panel(pool=None, password="")
+    token = panel.csrf_token(_session(panel))
     ctx = PageCtx(csrf=token, role="owner", login="boss@test.ru")
     services = page_services(
         [{"id": "s1", "title": "Маникюр", "duration_min": 120, "price": 2000, "is_active": True}],
@@ -592,18 +605,18 @@ def test_settings_page_shows_one_time_secret_once():
 
 def test_once_secrets_are_not_in_url():
     """Пароль не должен попадать в адресную строку (история браузера, логи)."""
-    panel = Panel(pool=None, password="secret")
-    token = panel.login("secret") or ""
+    panel = Panel(pool=None, password="")
+    token = _session(panel)
     panel.push_once(token, {"password": "Sekret123"})
     assert panel.take_once(token)[0]["password"] == "Sekret123"
     assert panel.take_once(token) == []  # второй раз пусто
-    other = panel.login("secret") or ""
+    other = _session(panel, login="other@test.ru")
     assert panel.take_once(other) == []  # чужая сессия не видит чужих секретов
 
 
 def test_once_secrets_expire():
-    panel = Panel(pool=None, password="secret")
-    token = panel.login("secret") or ""
+    panel = Panel(pool=None, password="")
+    token = _session(panel)
     panel.push_once(token, {"password": "Old"})
     panel.once[token][0]["at"] = datetime.now(ZoneInfo("UTC")) - timedelta(minutes=11)
     panel.purge_expired_once()

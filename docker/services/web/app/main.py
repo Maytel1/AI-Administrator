@@ -34,6 +34,7 @@ from admin_core.web.security import (
     cookie_secure_flag,
     https_redirect_target,
     is_secure_request,
+    safe_redirect,
     security_headers,
 )
 from admin_core.web.session import (
@@ -234,8 +235,8 @@ def build_app(panel: Panel, *, tls_enabled: bool = False, trust_proxy: bool = Fa
         if once:
             # пароль и секрет 2FA не идут в URL — покажем на следующей странице
             panel.push_once(session_token, once)
-        back = str(form.get("back", "/today")) or "/today"
-        if back.startswith("/") and "salon=" not in back:
+        back = safe_redirect(str(form.get("back", "")), default="/today")
+        if "salon=" not in back:
             back = back + ("&" if "?" in back else "?") + f"salon={salon['id']}"
         params = {"msg": result["message"]}
         if not result["ok"]:
@@ -252,11 +253,25 @@ def build_app(panel: Panel, *, tls_enabled: bool = False, trust_proxy: bool = Fa
 
     async def login_post(request: Any) -> Any:
         form = await request.post()
-        login = str(form.get("login", "")).strip()
-        password = str(form.get("password", ""))
-        code = str(form.get("code", ""))
+        login = str(form.get("login", "")).strip()[:200]
+        password = str(form.get("password", ""))[:200]
+        code = str(form.get("code", ""))[:10]
+        ip = request.remote or "unknown"
+        if panel.login_blocked(login, ip):
+            panel.metrics.errors.labels("login_throttled").inc()
+            return web.Response(
+                text=login_page(
+                    "Слишком много попыток входа. Попробуйте через 15 минут.",
+                    login=login,
+                ),
+                content_type="text/html",
+                status=429,
+            )
         token, error = await panel.login_user(login, password, code)
         if error == "need_totp":
+            # неверный код 2FA тоже считаем попыткой: иначе перебирают миллион кодов
+            if code:
+                panel.note_login_failure(login, ip)
             return web.Response(
                 text=login_page(
                     "Введите код из приложения-аутентификатора",
@@ -265,10 +280,12 @@ def build_app(panel: Panel, *, tls_enabled: bool = False, trust_proxy: bool = Fa
                 content_type="text/html",
             )
         if not token:
+            panel.note_login_failure(login, ip)
             return web.Response(
                 text=login_page("Неверный логин или пароль", login=login),
                 content_type="text/html",
             )
+        panel.note_login_success(login, ip)
         resp = web.HTTPFound("/today")
         secure_cookie = cookie_secure_flag(
             secure=is_secure_request(request, tls_enabled=tls_enabled, trust_proxy=trust_proxy)

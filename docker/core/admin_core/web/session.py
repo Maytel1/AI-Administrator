@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import secrets
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
@@ -41,6 +42,42 @@ class PageCtx:
         return can(self.role, permission)
 
 
+class Throttle:
+    """Счётчик неудачных попыток: логин, IP, код 2FA.
+
+    Без него перебор пароля и шестизначного кода TOTP реалистичен: у кода
+    всего миллион комбинаций на 30-секундное окно.
+    """
+
+    def __init__(self, limit: int, window: float, *, clock=time.monotonic) -> None:
+        self.limit = limit
+        self.window = window
+        self._clock = clock
+        self._fails: dict[str, list[float]] = {}
+
+    def allowed(self, key: str) -> bool:
+        """Можно пробовать дальше (окно скользящее)."""
+        return len(self._fresh(key)) < self.limit
+
+    def fail(self, key: str) -> None:
+        self._fails[key] = self._fresh(key) + [self._clock()]
+
+    def reset(self, key: str) -> None:
+        self._fails.pop(key, None)
+
+    def remaining(self, key: str) -> int:
+        return max(0, self.limit - len(self._fresh(key)))
+
+    def _fresh(self, key: str) -> list[float]:
+        now = self._clock()
+        hits = [t for t in self._fails.get(key, ()) if now - t < self.window]
+        if hits:
+            self._fails[key] = hits
+        else:
+            self._fails.pop(key, None)
+        return hits
+
+
 @dataclass
 class Session:
     """Одна сессия панели: кто вошёл, с какой ролью и до какого момента."""
@@ -70,8 +107,27 @@ class Panel:
         self.metrics = metrics or ServiceMetrics("web-service")
         self.sessions: dict[str, Session] = {}
         self.once: dict[str, list[dict[str, Any]]] = {}
+        # перебор пароля и кода 2FA: отдельно по логину и по IP-адресу
+        self.login_throttle = Throttle(limit=5, window=900.0)
+        self.ip_throttle = Throttle(limit=20, window=900.0)
         # серверный секрет для CSRF: токен привязан к сессии, подделать его нельзя
         self.secret = secrets.token_bytes(32)
+
+    def login_blocked(self, login: str, ip: str) -> bool:
+        """Заблокирован ли вход: слишком много неудач по этому логину или по IP."""
+        return not (
+            self.login_throttle.allowed(f"login:{login.lower()}")
+            and self.ip_throttle.allowed(f"ip:{ip}")
+        )
+
+    def note_login_failure(self, login: str, ip: str) -> None:
+        self.login_throttle.fail(f"login:{login.lower()}")
+        self.ip_throttle.fail(f"ip:{ip}")
+        self.metrics.errors.labels("login_failed").inc()
+
+    def note_login_success(self, login: str, ip: str) -> None:
+        self.login_throttle.reset(f"login:{login.lower()}")
+        self.ip_throttle.reset(f"ip:{ip}")
 
     def csrf_token(self, session_token: str) -> str:
         """CSRF-токен формы: HMAC от секрета сервера и токена сессии."""
@@ -101,13 +157,29 @@ class Panel:
         return token, ""
 
     def login(self, password: str) -> str | None:
-        """Аварийный вход по общему паролю из env — только когда учёток нет."""
+        """Аварийный вход по общему паролю из env.
+
+        ОСТОРОЖНО: этот путь даёт роль ``team`` — доступ ко всем точкам. Он нужен
+        только чтобы зайти в панель до создания первой учётной записи, поэтому
+        требует и пароль из env, и пустую таблицу ``panel_users``.
+        Как только появилась хоть одна учётка — путь закрывается.
+        """
         if not self.password or not hmac.compare_digest(password, self.password):
             self.metrics.errors.labels("login").inc()
             return None
+        if self.pool is None:
+            return None
+        try:
+            users_count = self.pool.fetchval("SELECT count(*) FROM panel_users")
+        except Exception:  # noqa: BLE001 — таблицы может ещё не быть
+            users_count = 0
+        # fetchval здесь синхронный вызов: если он выполнился и учётки есть — отказ
+        if isinstance(users_count, int) and users_count > 0:
+            self.metrics.errors.labels("bootstrap_closed").inc()
+            return None
         token = secrets.token_urlsafe(24)
         self.sessions[token] = Session(
-            user=None, role="team", login="env",
+            user=None, role="team", login="bootstrap",
             salon_id=None, until=datetime.now(ZoneInfo("UTC")) + SESSION_TTL,
         )
         return token

@@ -1,4 +1,4 @@
-"""Правки из панели: разбор формы → вызов CRM → понятный результат.
+﻿"""Правки из панели: разбор формы → вызов CRM → понятный результат.
 
 Здесь только HTTP-забота (валидация ввода, коды ошибок, тексты для человека);
 бизнес-правила и аудит — в ``admin_core.crm.internal.InternalCRM``.
@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import time
 from typing import Any
 
@@ -20,6 +21,7 @@ MAX_DURATION = 600
 ERRORS = {
     "not_found": "Запись не найдена в этой точке (возможно, она уже удалена)",
     "bad_status": "Такого статуса не существует",
+    "bad_id": "Некорректный идентификатор записи",
     "bad_weekday": "Нет такого дня недели",
     "bad_price": f"Цена должна быть от {MIN_PRICE} до {MAX_PRICE:,.0f} ₽".replace(",", " "),
     "bad_duration": f"Длительность — от {MIN_DURATION} до {MAX_DURATION} минут",
@@ -87,10 +89,10 @@ async def apply_form(
     action = str(form.get("action", ""))
 
     if action == "booking_status":
-        booking_id = str(form.get("booking_id", ""))
+        booking_id = _uuid(form.get("booking_id"))
         status = str(form.get("status", ""))
         if not booking_id:
-            return fail("not_found")
+            return fail("bad_id")
         result = await crm.set_booking_status(salon_id, booking_id, status, actor=actor)
         if not result["ok"]:
             return fail(result.get("error", "save_failed"))
@@ -104,7 +106,9 @@ async def apply_form(
         return ok(label)
 
     if action == "service_save":
-        service_id = str(form.get("service_id", ""))
+        service_id = _uuid(form.get("service_id"))
+        if not service_id:
+            return fail("bad_id", "Некорректный идентификатор услуги")
         price = _decimal(form.get("price"))
         duration = _int(form, "duration_min", 0)
         active = "is_active" in form
@@ -122,7 +126,9 @@ async def apply_form(
         return ok(f"«{result['title']}» сохранена: {_money(price)}, {duration} мин, {state}")
 
     if action == "client_save":
-        client_id = str(form.get("client_id", ""))
+        client_id = _uuid(form.get("client_id"))
+        if not client_id:
+            return fail("bad_id", "Некорректный идентификатор клиента")
         notes = str(form.get("notes", "")).strip()
         prepay = "requires_prepayment" in form
         result = await crm.set_client_flags(
@@ -134,7 +140,9 @@ async def apply_form(
         return ok(f"Клиент {result['phone']}: {prepay_word}, заметки сохранены")
 
     if action == "hours_save":
-        master_id = str(form.get("master_id", ""))
+        master_id = _uuid(form.get("master_id"))
+        if not master_id:
+            return fail("bad_id", "Некорректный идентификатор мастера")
         weekday = _int(form, "weekday", -1)
         enabled = "enabled" in form
         start, end = _hhmm(form, "start"), _hhmm(form, "end")
@@ -172,9 +180,10 @@ async def apply_form(
     if action == "user_disable":
         from .users import disable_user  # noqa: PLC0415 — только для этого действия
 
-        result = await disable_user(
-            pool, user_id=str(form.get("user_id", "")), actor=actor, salon_id=salon_id
-        )
+        user_id = _uuid(form.get("user_id"))
+        if not user_id:
+            return fail("bad_id", "Некорректный идентификатор пользователя")
+        result = await disable_user(pool, user_id=user_id, actor=actor, salon_id=salon_id)
         if not result["ok"]:
             if result["error"] == "last_owner":
                 return fail("last_owner", result["message"])
@@ -245,6 +254,20 @@ def _decimal(raw: Any) -> float | None:
         return float(text)
     except ValueError:
         return None
+
+
+def _uuid(raw: Any) -> str:
+    """Проверяем UUID до похода в БД.
+
+    Без этой проверки мусорный ``service_id=«'; DROP TABLE …»`` доводит asyncpg до
+    ``DataError`` и роняет обработчик POST в 500: это отказ в обслуживании по
+    одному клику, а не защита от инъекции.
+    """
+    text = str(raw or "").strip()
+    try:
+        return str(uuid.UUID(text))
+    except (ValueError, AttributeError):
+        return ""
 
 
 def _money(value: float) -> str:

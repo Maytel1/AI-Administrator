@@ -56,6 +56,32 @@ def cookie_secure_flag(*, secure: bool) -> bool:
     return secure
 
 
+# Куда можно возвращать браузер после POST. Проверка против open redirect:
+# "//evil.example" тоже начинается со «/», поэтому одного startswith мало.
+SAFE_REDIRECT_PREFIXES = ("/today", "/bookings", "/clients", "/services", "/masters",
+                          "/dialogs", "/audit", "/settings")
+
+
+def safe_redirect(target: str | None, default: str = "/today") -> str:
+    """Внутренний адрес для редиректа или ``default``.
+
+    Отсекаем: абсолютные URL (``http://…``), протокол-относительные (``//evil.host``),
+    обратные слэши, управляющие символы и всё, что не начинается с ``/``.
+    Иначе злоумышленник подсовывает ``back=//evil.example`` и уводит
+    администратора панели на фишинг с настоящего домена.
+    """
+    candidate = (target or "").strip()
+    if not candidate or len(candidate) > 200:
+        return default
+    if not candidate.startswith("/") or candidate.startswith("//"):
+        return default
+    if "\\" in candidate or any(ch in candidate for ch in "\r\n\t"):
+        return default
+    if not candidate.startswith(SAFE_REDIRECT_PREFIXES):
+        return default
+    return candidate
+
+
 def https_redirect_target(request: Any, *, tls_enabled: bool) -> str | None:
     """Куда перенаправить HTTP-запрос на HTTPS (None — перенаправлять не нужно)."""
     if not tls_enabled or request.secure:

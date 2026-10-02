@@ -73,7 +73,7 @@ ruff check docker                                  # стиль/импорты/�
 python -m mypy docker/core/admin_core --ignore-missing-imports
 
 # тесты (нужен запущенный postgres из docker/):
-cd docker && docker compose run --rm cli python -m pytest -q   # 99 тестов
+cd docker && docker compose run --rm cli python -m pytest -q   # 115 тестов
 ```
 
 CI — `.github/workflows/ci.yml`, на каждый push/PR: **lint** (ruff + mypy + compileall) →
