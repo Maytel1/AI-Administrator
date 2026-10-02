@@ -27,13 +27,20 @@ P_CLIENT_FLAGS = "client_flags"      # предоплата и заметки к
 P_SCHEDULE = "schedule"              # рабочие дни мастера
 P_USERS = "users"                    # учётные записи точки
 P_ALL_SALONS = "all_salons"          # видеть и переключать все точки
+P_CATALOG = "catalog"                # создание и архивация услуг и мастеров
+P_CLIENT_CREATE = "client_create"    # ручной ввод клиента (пришёл в салон)
+P_REPORTS = "reports"                # отчёты: выручка, загрузка, конверсия
 
 ROLE_PERMISSIONS: dict[str, set[str]] = {
-    "owner": {P_READ, P_BOOKING_STATUS, P_PRICING, P_CLIENT_FLAGS, P_SCHEDULE, P_USERS},
-    "staff": {P_READ, P_BOOKING_STATUS, P_CLIENT_FLAGS},
+    "owner": {
+        P_READ, P_BOOKING_STATUS, P_PRICING, P_CATALOG, P_CLIENT_FLAGS,
+        P_CLIENT_CREATE, P_SCHEDULE, P_USERS,
+    },
+    # администратор ведёт рутину на фронте: статусы, карточки клиентов, отчёты
+    "staff": {P_READ, P_BOOKING_STATUS, P_CLIENT_FLAGS, P_CLIENT_CREATE, P_REPORTS},
     "team": {
-        P_READ, P_BOOKING_STATUS, P_PRICING, P_CLIENT_FLAGS, P_SCHEDULE,
-        P_USERS, P_ALL_SALONS,
+        P_READ, P_BOOKING_STATUS, P_PRICING, P_CATALOG, P_CLIENT_FLAGS,
+        P_CLIENT_CREATE, P_SCHEDULE, P_USERS, P_ALL_SALONS, P_REPORTS,
     },
 }
 
@@ -41,6 +48,11 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
 ACTION_PERMISSION = {
     "booking_status": P_BOOKING_STATUS,
     "service_save": P_PRICING,
+    "service_create": P_CATALOG,
+    "service_archive": P_CATALOG,
+    "master_create": P_CATALOG,
+    "master_archive": P_CATALOG,
+    "client_create": P_CLIENT_CREATE,
     "client_save": P_CLIENT_FLAGS,
     "hours_save": P_SCHEDULE,
     "user_create": P_USERS,

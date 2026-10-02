@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -17,6 +18,7 @@ from .render import (
     layout,
     money,
     table,
+    tile,
 )
 from .render import (
     flash as flash_html,
@@ -34,6 +36,7 @@ def page_clients(
 ) -> str:
     """Клиенты точки: предоплата и заметки правятся прямо здесь — бот читает их в диалоге."""
     csrf, may_edit = _ctx_parts(ctx, "client_flags")
+    _, may_add = _ctx_parts(ctx, "client_create")
     sid = esc(salon["id"]) if salon else ""
     back = f"/clients?salon={sid}"
     cards = []
@@ -68,11 +71,28 @@ def page_clients(
     body = "".join(cards) or (
         '<div class="empty">Клиентов пока нет — они появятся после первых заявок.</div>'
     )
+    add_form = ""
+    if may_add:
+        add_form = (
+            '<form method="post" action="/actions" class="stack" style="margin-top:14px">'
+            '<input type="hidden" name="action" value="client_create">'
+            f'<input type="hidden" name="back" value="{back}">'
+            f"{csrf_field(csrf)}"
+            '<div class="cell"><span>Телефон</span>'
+            '<input type="tel" name="phone" placeholder="+79001234567" required></div>'
+            '<div class="cell"><span>Имя</span>'
+            '<input type="text" name="name" placeholder="Как обращаться"></div>'
+            '<div class="cell"><span>Заметки</span>'
+            '<input type="text" name="notes" placeholder="аллергии, пожелания"></div>'
+            '<div class="cell"><span>&nbsp;</span>'
+            '<button type="submit">Добавить</button></div>'
+            "</form>"
+        )
     content = (
         f"<h1>Клиенты</h1>"
         f'<p class="sub">Карточек: {len(rows)}. Опознание «своих» — по номеру телефона</p>'
         + flash_html(flash, flash_error)
-        + card("Карточки клиентов", body)
+        + card("Карточки клиентов", body + add_form)
     )
     return layout("Клиенты", "/clients", content, salon=salon, salons=salons)
 
@@ -87,6 +107,7 @@ def page_services(
 ) -> str:
     """Прайс с правкой цены/длительности/активности — бот читает эти данные в диалоге."""
     csrf, may_edit = _ctx_parts(ctx, "pricing")
+    _, may_add = _ctx_parts(ctx, "catalog")
     sid = esc(salon["id"]) if salon else ""
     back = f"/services?salon={sid}"
     cards = []
@@ -94,12 +115,20 @@ def page_services(
         head = (
             f'<div class="item"><b>{esc(s["title"])}</b>'
             f'<span class="meta">{s["duration_min"]} мин · {money(s["price"])} · '
-            f'{"активна" if s["is_active"] else "выключена"}</span>'
+            f'{"активна" if s["is_active"] else "в архиве"}</span>'
         )
         if not may_edit:
             cards.append(head + "</div>")
             continue
         active_checked = " checked" if s["is_active"] else ""
+        toggle = None
+        if may_add:
+            toggle = action_form(
+                "service_archive", csrf, back,
+                f'<input type="hidden" name="service_id" value="{esc(s["id"])}">'
+                f'<input type="hidden" name="active" value="{"0" if s["is_active"] else "1"}">',
+                "Вернуть в прайс" if not s["is_active"] else "В архив",
+            )
         fields = (
             f'<input type="hidden" name="service_id" value="{esc(s["id"])}">'
             '<div class="cell"><span>Цена, ₽</span>'
@@ -120,17 +149,38 @@ def page_services(
             '<div class="cell"><span>&nbsp;</span><button type="submit">Сохранить</button></div>'
             "</form>"
         )
-        cards.append(head + form + "</div>")
+        cards.append(head + form + (toggle or "") + "</div>")
     body = "".join(cards) or (
         '<div class="empty">Прайс не загружен: docker compose run --rm cli python cli.py --seed</div>'
     )
+    add_form = ""
+    if may_add:
+        add_form = (
+            '<form method="post" action="/actions" class="stack" style="margin-top:14px">'
+            '<input type="hidden" name="action" value="service_create">'
+            f'<input type="hidden" name="back" value="{back}">'
+            f"{csrf_field(csrf)}"
+            '<div class="cell"><span>Новая услуга</span>'
+            '<input type="text" name="title" placeholder="название" required></div>'
+            '<div class="cell"><span>Цена, ₽</span>'
+            '<input type="number" name="price" min="0" step="50" required></div>'
+            '<div class="cell"><span>Минут</span>'
+            '<input type="number" name="duration_min" value="60" min="5" max="600" '
+            'step="5" required></div>'
+            '<div class="cell"><span>&nbsp;</span>'
+            '<button type="submit">Добавить</button></div>'
+            "</form>"
+        )
     revenue = sum(float(s["price"] or 0) for s in rows)
     content = (
         "<h1>Прайс</h1>"
         f'<p class="sub">Услуг: {len(rows)}, сумма позиций: {money(revenue)}. '
         "Изменения сразу слышит бот в разговоре с клиентом</p>"
         + flash_html(flash, flash_error)
-        + card("Услуги", f'<div class="grid-cards">{body}</div>' if cards else body)
+        + card(
+            "Услуги",
+            (f'<div class="grid-cards">{body}</div>' if cards else body) + add_form,
+        )
     )
     return layout("Прайс", "/services", content, salon=salon, salons=salons)
 
@@ -147,6 +197,7 @@ def page_masters(
     from .queries import WEEKDAY_RU
 
     csrf, may_edit = _ctx_parts(ctx, "schedule")
+    _, may_add = _ctx_parts(ctx, "catalog")
     sid = esc(salon["id"]) if salon else ""
     back = f"/masters?salon={sid}"
     cards = []
@@ -190,11 +241,24 @@ def page_masters(
             f'<div style="display:grid;gap:8px">{"".join(days)}</div></div>'
         )
     body = "".join(cards) or '<div class="empty">Мастера не заведены.</div>'
+    add_form = ""
+    if may_add:
+        add_form = (
+            '<form method="post" action="/actions" class="stack" style="margin-top:14px">'
+            '<input type="hidden" name="action" value="master_create">'
+            f'<input type="hidden" name="back" value="{back}">'
+            f"{csrf_field(csrf)}"
+            '<div class="cell"><span>Новый мастер</span>'
+            '<input type="text" name="name" placeholder="Имя" required></div>'
+            '<div class="cell"><span>&nbsp;</span>'
+            '<button type="submit">Добавить</button></div>'
+            "</form>"
+        )
     content = (
         "<h1>Мастера</h1>"
         '<p class="sub">График — источник слотов: сузили окно, время исчезло у клиентов</p>'
         + flash_html(flash, flash_error)
-        + card("Команда и график", body)
+        + card("Команда и график", body + add_form)
     )
     return layout("Мастера", "/masters", content, salon=salon, salons=salons)
 def page_dialogs(
@@ -391,3 +455,72 @@ def page_settings(
         + note
     )
     return layout("Настройки", "/settings", content, salon=salon, salons=salons)
+def _bar_chart(rows: list[dict[str, Any]], tz: ZoneInfo) -> str:
+    """Столбики выручки по дням — без JS и внешних библиотек.
+
+    Высота считается от максимума периода, поэтому дни сравнимы между собой.
+    """
+    if not rows:
+        return '<div class="empty">За период записей не было</div>'
+    peak = max(float(r["revenue"] or 0) for r in rows) or 1.0
+    bars = []
+    for row in rows:
+        height = max(2, int(100 * float(row["revenue"] or 0) / peak))
+        day = row["day"]
+        label = day.strftime("%d.%m") if isinstance(day, datetime) else str(day)[-5:]
+        bars.append(
+            f'<div class="bar-col" title="{esc(label)}: {esc(money(row["revenue"]))}">'
+            f'<div class="bar-fill" style="height:{height}%"></div>'
+            f'<span>{esc(label)}</span></div>'
+        )
+    return f'<div class="chart">{"".join(bars)}</div>'
+
+
+def page_reports(
+    data: dict[str, Any],
+    salon: dict | None,
+    salons: list[dict] | None,
+    flash: str = "",
+    flash_error: bool = False,
+    days: int = 30,
+) -> str:
+    """Отчёт за период: деньги, воронка бота, загрузка мастеров и потери."""
+    funnel_stats = data["funnel"]
+    tiles = "".join(
+        [
+            tile(money(funnel_stats["revenue"]), f"выручка за {days} дней", "green"),
+            tile(str(funnel_stats["bookings"]), "записей"),
+            tile(str(funnel_stats["dialogs"]), "диалогов с клиентами"),
+            tile(f'{funnel_stats["conversion"]}%', "конверсия диалогов в запись", "accent"),
+            tile(money(funnel_stats["avg_check"]), "средний чек"),
+            tile(f'{data["loss"]["lost_rate"]}%', "отмен и неявок", "yellow"),
+        ]
+    )
+    load_rows = [
+        [
+            esc(m["name"]),
+            str(m["bookings"]),
+            f'{float(m["busy_hours"]):.1f} ч',
+            money(m["revenue"]),
+        ]
+        for m in data["load"]
+    ]
+    loss_rows = [
+        ["Всего записей", str(data["loss"]["total"])],
+        ["Отменено клиентом", str(data["loss"]["cancelled"])],
+        ["Не пришёл", str(data["loss"]["no_show"])],
+        ["Новых клиентов", str(funnel_stats["new_clients"])],
+        ["Затраты на LLM", money(funnel_stats["llm_cost"])],
+    ]
+    content = (
+        "<h1>Отчёты</h1>"
+        f'<p class="sub">Период: последние {days} дней · по факту записей и диалогов</p>'
+        + flash_html(flash, flash_error)
+        + f'<div class="tiles">{tiles}</div>'
+        + card("Выручка по дням", _bar_chart(data["by_day"], ZoneInfo("UTC")))
+        + card("Загрузка мастеров", table(
+            ["Мастер", "Записей", "Занято", "Выручка"], load_rows, "Данных пока нет",
+        ))
+        + card("Потери и затраты", table(["Показатель", "Значение"], loss_rows))
+    )
+    return layout("Отчёты", "/reports", content, salon=salon, salons=salons)

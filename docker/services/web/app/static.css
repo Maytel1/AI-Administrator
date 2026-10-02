@@ -95,6 +95,11 @@ form.stack button{width:100%}
 .item .meta{color:var(--muted);font-size:12px;margin:3px 0 9px}
 .btn-mini{background:var(--surface-2);color:var(--muted);border:1px solid var(--border);padding:5px 10px;font-size:12px;font-weight:500}
 .btn-mini:hover{background:var(--hover);color:var(--text)}
+.chart{display:flex;align-items:flex-end;gap:3px;height:140px;padding-top:8px}
+.chart .bar-col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;min-width:6px}
+.chart .bar-fill{width:100%;background:var(--accent);border-radius:3px 3px 0 0;min-height:2px}
+.chart .bar-col span{color:var(--subtle);font-size:9px;margin-top:4px;white-space:nowrap}
+.chart .bar-col:hover .bar-fill{background:var(--accent-hover)}
 .login{display:flex;min-height:100vh;align-items:center;justify-content:center}
 .login form{
   background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg);

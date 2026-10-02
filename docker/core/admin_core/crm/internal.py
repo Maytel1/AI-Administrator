@@ -362,3 +362,115 @@ class InternalCRM(CRMProvider):
             """,
             salon_id, master_id, str(days_ahead), weekday, start, end,
         )
+# ═══ СПРАВОЧНИКИ ИЗ ПАНЕЛИ (фаза 4) ═══════════════════════════════════
+    # Владелец точки заводит услуги и мастеров прямо в панели; удалять нельзя —
+    # на них ссылаются прошлые записи, поэтому только архивация (is_active).
+
+    async def create_service(
+        self, salon_id: str, *, title: str, duration_min: int, price: float,
+        actor: str = "owner:panel",
+    ) -> dict:
+        """Новая услуга точки: сразу попадает в прайс, который слышит бот."""
+        title = (title or "").strip()
+        if not title:
+            return {"ok": False, "error": "bad_title",
+                    "message": "Введите название услуги"}
+        try:
+            row = await self.pool.fetchrow(
+                "INSERT INTO services (salon_id, title, duration_min, price) "
+                "VALUES ($1,$2,$3,$4) RETURNING id, title",
+                salon_id, title[:120], duration_min, price,
+            )
+        except Exception as exc:  # noqa: BLE001 — уникальность (salon_id, title)
+            if "unique" in str(exc).lower():
+                return {"ok": False, "error": "exists",
+                        "message": f"Услуга «{title}» уже есть"}
+            raise
+        await self._audit(
+            salon_id, actor, "create_service",
+            {"title": title, "duration_min": duration_min, "price": str(price)},
+        )
+        return {"ok": True, "id": str(row["id"]), "title": row["title"]}
+
+    async def set_service_active(
+        self, salon_id: str, service_id: str, *, active: bool, actor: str = "owner:panel"
+    ) -> dict:
+        """Архивация услуги: исчезает из прайса бота, но остаётся в истории записей."""
+        row = await self.pool.fetchrow(
+            "UPDATE services SET is_active = $3 WHERE id = $1 AND salon_id = $2 "
+            "RETURNING title",
+            service_id, salon_id, active,
+        )
+        if not row:
+            return {"ok": False, "error": "not_found"}
+        await self._audit(
+            salon_id, actor, "archive_service" if not active else "restore_service",
+            {"service": row["title"], "is_active": active},
+        )
+        return {"ok": True, "title": row["title"], "is_active": active}
+
+    async def create_master(
+        self, salon_id: str, *, name: str, actor: str = "owner:panel"
+    ) -> dict:
+        """Новый мастер точки; рабочие дни заполняются отдельно (set_working_hours)."""
+        name = (name or "").strip()
+        if not name:
+            return {"ok": False, "error": "bad_name", "message": "Введите имя мастера"}
+        try:
+            row = await self.pool.fetchrow(
+                "INSERT INTO masters (salon_id, name) VALUES ($1,$2) RETURNING id, name",
+                salon_id, name[:120],
+            )
+        except Exception as exc:  # noqa: BLE001 — уникальность (salon_id, name)
+            if "unique" in str(exc).lower():
+                return {"ok": False, "error": "exists",
+                        "message": f"Мастер «{name}» уже есть"}
+            raise
+        await self._audit(salon_id, actor, "create_master", {"master": name})
+        return {"ok": True, "id": str(row["id"]), "name": row["name"]}
+
+    async def set_master_active(
+        self, salon_id: str, master_id: str, *, active: bool, actor: str = "owner:panel"
+    ) -> dict:
+        """Архивация мастера. Сначала проверяем будущие записи — они останутся без мастера."""
+        if not active:
+            upcoming = await self.pool.fetchval(
+                "SELECT count(*) FROM bookings WHERE salon_id = $1 AND master_id = $2 "
+                "AND status IN ('booked','confirmed') AND starts_at >= now()",
+                salon_id, master_id,
+            )
+            if upcoming:
+                return {
+                    "ok": False, "error": "has_bookings",
+                    "message": f"У мастера {upcoming} будущих записей — сначала перенесите их",
+                }
+        row = await self.pool.fetchrow(
+            "UPDATE masters SET is_active = $3 WHERE id = $1 AND salon_id = $2 RETURNING name",
+            master_id, salon_id, active,
+        )
+        if not row:
+            return {"ok": False, "error": "not_found"}
+        await self._audit(
+            salon_id, actor, "archive_master" if not active else "restore_master",
+            {"master": row["name"], "is_active": active},
+        )
+        return {"ok": True, "name": row["name"], "is_active": active}
+
+    async def create_client_manual(
+        self, salon_id: str, *, phone: str, name: str | None = None,
+        notes: str | None = None, requires_prepayment: bool = False,
+        actor: str = "owner:panel",
+    ) -> dict:
+        """Ручной ввод клиента: пришёл в салон или позвонил, пока бота не было.
+
+        Тот же телефон, что у бота, — значит карточка одна: «свои» не заводятся дважды.
+        """
+        client = await self.ensure_client(salon_id, phone, name)
+        if notes or requires_prepayment:
+            await self.set_client_flags(
+                salon_id, str(client["id"]),
+                requires_prepayment=requires_prepayment or None,
+                notes=notes, actor=actor,
+            )
+        return {"ok": True, "id": str(client["id"]), "phone": client["phone"],
+                "name": client.get("name")}

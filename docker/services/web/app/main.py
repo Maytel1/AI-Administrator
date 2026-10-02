@@ -18,13 +18,14 @@ from zoneinfo import ZoneInfo
 
 from admin_core.db import get_pool, run_migrations
 from admin_core.health import ServiceMetrics, make_health_app, start_health_server
-from admin_core.web import actions, dashboard, queries, users
+from admin_core.web import actions, dashboard, queries, reports, users
 from admin_core.web.pages_core import page_bookings, page_today
 from admin_core.web.pages_lists import (
     page_audit,
     page_clients,
     page_dialogs,
     page_masters,
+    page_reports,
     page_services,
     page_settings,
 )
@@ -124,6 +125,24 @@ async def _audit(
     rows = await queries.audit_list(panel.pool, str(salon["id"]))
     msg, err = _flash_from(request)
     return page_audit(rows, tz, salon, salons)
+
+
+async def _reports(
+    panel: Panel, salon: dict, salons: list[dict], request: Any, ctx: PageCtx | None = None
+) -> str:
+    """Отчёт за 30 дней: выручка, воронка бота, загрузка и потери."""
+    tz = await queries.salon_tz(panel.pool, str(salon["id"]))
+    now = datetime.now(tz)
+    end = (now + timedelta(days=1)).astimezone(ZoneInfo("UTC"))
+    start = (now - timedelta(days=30)).astimezone(ZoneInfo("UTC"))
+    data = {
+        "by_day": await reports.revenue_by_day(panel.pool, str(salon["id"]), start, end),
+        "load": await reports.load_by_master(panel.pool, str(salon["id"]), start, end),
+        "funnel": await reports.funnel(panel.pool, str(salon["id"]), start, end),
+        "loss": await reports.cancellations(panel.pool, str(salon["id"]), start, end),
+    }
+    msg, err = _flash_from(request)
+    return page_reports(data, salon, salons, msg, err)
 
 
 async def _settings(
@@ -320,7 +339,7 @@ def build_app(panel: Panel, *, tls_enabled: bool = False, trust_proxy: bool = Fa
     sections = {
         "/today": _today, "/bookings": _bookings, "/clients": _clients,
         "/services": _services, "/masters": _masters, "/dialogs": _dialogs,
-        "/audit": _audit, "/settings": _settings,
+        "/audit": _audit, "/settings": _settings, "/reports": _reports,
     }
     check_builder_signatures(sections)  # падаем на старте, а не в HTTP
     app = web.Application(middlewares=[security])

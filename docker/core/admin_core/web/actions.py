@@ -170,6 +170,46 @@ async def apply_form(
             text += f". Внимание: {outside} записей выпадут из окна"
         return ok(text)
 
+    if action == "service_create":
+        return await _service_create(pool, salon_id, form, actor=actor)
+
+    if action == "service_archive":
+        service_id = _uuid(form.get("service_id"))
+        if not service_id:
+            return fail("bad_id", "Некорректный идентификатор услуги")
+        active = str(form.get("active", "")) == "1"
+        result = await crm.set_service_active(
+            salon_id, service_id, active=active, actor=actor
+        )
+        if not result["ok"]:
+            return fail(result["error"])
+        state = "вернулась в прайс" if active else "убрана из прайса"
+        return ok(f"«{result['title']}» {state}")
+
+    if action == "master_create":
+        result = await crm.create_master(
+            salon_id, name=str(form.get("name", "")), actor=actor
+        )
+        if not result["ok"]:
+            return fail(result["error"], result["message"])
+        return ok(f"Мастер {result['name']} добавлен — задайте рабочие дни")
+
+    if action == "master_archive":
+        master_id = _uuid(form.get("master_id"))
+        if not master_id:
+            return fail("bad_id", "Некорректный идентификатор мастера")
+        active = str(form.get("active", "")) == "1"
+        result = await crm.set_master_active(
+            salon_id, master_id, active=active, actor=actor
+        )
+        if not result["ok"]:
+            return fail(result["error"], result["message"])
+        state = "вернулся в работу" if active else "отключён"
+        return ok(f"Мастер {result['name']} {state}")
+
+    if action == "client_create":
+        return await _client_create(pool, salon_id, form, actor=actor)
+
     if action == "user_create":
         # пароль не приходит из браузера: генерируем и показываем один раз
         return await _user_create(pool, salon_id, form, actor=actor)
@@ -191,6 +231,43 @@ async def apply_form(
         return ok("Доступ отключён")
 
     return fail("save_failed", "Неизвестное действие формы")
+
+
+async def _service_create(
+    pool: Any, salon_id: str, form: dict[str, Any], *, actor: str
+) -> dict[str, Any]:
+    """Новая услуга из панели: название, длительность, цена."""
+    crm = InternalCRM(pool)
+    price = _decimal(form.get("price"))
+    duration = _int(form, "duration_min", 0)
+    if price is None or not MIN_PRICE <= price <= MAX_PRICE:
+        return fail("bad_price")
+    if not MIN_DURATION <= duration <= MAX_DURATION:
+        return fail("bad_duration")
+    result = await crm.create_service(
+        salon_id, title=str(form.get("title", "")), duration_min=duration,
+        price=price, actor=actor,
+    )
+    if not result["ok"]:
+        return fail(result["error"], result["message"])
+    return ok(f"Услуга «{result['title']}» добавлена: {_money(price)}, {duration} мин")
+
+
+async def _client_create(
+    pool: Any, salon_id: str, form: dict[str, Any], *, actor: str
+) -> dict[str, Any]:
+    """Ручной ввод клиента: телефон обязателен, он же ключ «своего» клиента."""
+    crm = InternalCRM(pool)
+    phone = str(form.get("phone", "")).strip()
+    digits = "".join(ch for ch in phone if ch.isdigit())
+    if len(digits) < 10:
+        return fail("bad_phone", "Телефон нужен полностью — например +79001234567")
+    result = await crm.create_client_manual(
+        salon_id, phone=phone, name=str(form.get("name", "")).strip() or None,
+        notes=str(form.get("notes", "")).strip() or None,
+        requires_prepayment="requires_prepayment" in form, actor=actor,
+    )
+    return ok(f"Клиент {result['phone']} сохранён — бот узнает его по номеру")
 
 
 async def _user_create(
