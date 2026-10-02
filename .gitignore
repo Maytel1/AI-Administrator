@@ -14,6 +14,9 @@ hh_app_auth.txt
 # локальный архив проекта - не храним в git
 project.rar
 
+# локальный TLS-сертификат панели (закрытый ключ в git не попадает)
+docker/certs/
+
 # временные логи сборки docker
 docker/b_log.txt
 docker/b_err.txt

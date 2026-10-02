@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 
 from .pages_core import _ctx_parts
 from .render import (
+    action_form,
     badge,
     card,
     csrf_field,
@@ -278,14 +279,21 @@ def page_settings(
     env: dict[str, str],
     session: dict[str, Any] | None = None,
     team: list[dict[str, Any]] | None = None,
+    ctx: Any | None = None,
+    once: list[dict[str, Any]] | None = None,
 ) -> str:
-    """Настройки точки: тариф, CRM, таймзона + кто вошёл и команда точки."""
+    """Настройки точки: тариф, CRM, кто вошёл, команда и одноразовые секреты."""
+    from .pages_core import _ctx_parts
     from .queries import PLAN_RU
-    from .roles import permissions_of, role_label
+    from .roles import ROLE_RU, SELF_ISSUE_ROLES, permissions_of, role_label
 
     info = salon or {}
     me = session or {}
     role = str(me.get("role", "guest"))
+    may_users = bool(team is not None)
+    csrf, may_edit = _ctx_parts(ctx, "users")
+    sid = esc(salon["id"]) if salon else ""
+    back = f"/settings?salon={sid}"
     body = [
         ["Кто вошёл", f"{me.get('login', '—')} · {role_label(role)}"],
         ["Права роли", ", ".join(permissions_of(role)) or "только просмотр"],
@@ -295,34 +303,89 @@ def page_settings(
         ["Таймзона", esc(info.get("timezone", "—"))],
         ["Режим бота", "Telegram long polling"],
         ["LLM", esc(env.get("LLM_PROVIDER", "—"))],
-        ["Версия панели", "MVP 0.2 (роли и 2FA)"],
+        ["Версия панели", "MVP 0.3 (HTTPS, роли, 2FA, команда)"],
     ]
+
+    secrets_block = ""
+    if once:
+        parts = []
+        for item in once:
+            fields = "".join(
+                f'<div class="meta">{esc(k)}: <b>{esc(str(v))}</b></div>'
+                for k, v in item.items()
+                if k != "note" and v
+            )
+            parts.append(
+                f'<div class="item">{fields}'
+                f'<div class="meta">{esc(item.get("note", ""))}</div></div>'
+            )
+        secrets_block = card(
+            "Показываем один раз — запишите или передайте сотруднику сейчас",
+            "".join(parts),
+        )
+
     people = ""
-    if team:
-        rows = [
-            [
-                esc(u["login"]),
-                esc(u["name"] or "—"),
-                role_label(str(u["role"])),
-                badge("2FA включена", "green")
-                if u["totp_enabled"] else badge("без 2FA", "yellow"),
-                esc(dt_local(u["last_login_at"], ZoneInfo("UTC"), "%d.%m.%Y %H:%M")),
-            ]
-            for u in team
-        ]
+    if may_users:
+        rows = []
+        for u in team or []:
+            if not may_edit:
+                rows.append(
+                    [esc(u["login"]), esc(u["name"] or "—"), role_label(str(u["role"])),
+                     badge("2FA включена", "green") if u["totp_enabled"]
+                     else badge("без 2FA", "yellow"),
+                     esc(dt_local(u["last_login_at"], ZoneInfo("UTC"), "%d.%m.%Y %H:%M"))]
+                )
+                continue
+            hidden = f'<input type="hidden" name="login" value="{esc(u["login"])}">'
+            hidden_id = f'<input type="hidden" name="user_id" value="{esc(u["id"])}">'
+            buttons = action_form(
+                "user_totp", csrf, back, hidden, "Включить 2FA"
+            ) + " " + action_form("user_disable", csrf, back, hidden_id, "Отключить")
+            rows.append(
+                [esc(u["login"]), esc(u["name"] or "—"), role_label(str(u["role"])),
+                 badge("2FA включена", "green") if u["totp_enabled"]
+                 else badge("без 2FA", "yellow"),
+                 esc(dt_local(u["last_login_at"], ZoneInfo("UTC"), "%d.%m.%Y %H:%M")),
+                 buttons]
+            )
+        options = "".join(
+            f'<option value="{esc(r)}">{esc(ROLE_RU[r])}</option>' for r in SELF_ISSUE_ROLES
+        )
+        add_form = ""
+        if may_edit:
+            add_form = (
+                '<form method="post" action="/actions" class="stack" '
+                'style="margin-top:12px">'
+                '<input type="hidden" name="action" value="user_create">'
+                f'<input type="hidden" name="back" value="{back}">'
+                f"{csrf_field(csrf)}"
+                '<div class="cell"><span>Логин (e-mail)</span>'
+                '<input type="email" name="login" placeholder="recept@salon.ru" required></div>'
+                '<div class="cell"><span>Имя</span>'
+                '<input type="text" name="name" placeholder="Как обращаться"></div>'
+                f'<div class="cell"><span>Роль</span><select name="role">{options}</select></div>'
+                '<div class="cell"><span>&nbsp;</span>'
+                "<button type=\"submit\">Создать</button></div>"
+                "</form>"
+            )
         people = card(
             "Команда точки",
-            table(["Логин", "Имя", "Роль", "Второй фактор", "Был(а)"], rows, "Пока никого"),
+            table(
+                ["Логин", "Имя", "Роль", "Второй фактор", "Был(а)", "Действия"],
+                rows, "Пока никого",
+            ) + add_form,
         )
+
     note = (
         '<div class="card"><h2>Что дальше</h2><p class="sub" style="margin:0">'
-        "Создание учётных записей из панели, HTTPS+HSTS, отчёты и биллинг — "
-        "по плану фазы 4 (DEVELOPMENT_PLAN.md §8.2)."
+        "Смена своего пароля, отчёты и биллинг — по плану фазы 4 "
+        "(DEVELOPMENT_PLAN.md §8.2)."
         "</p></div>"
     )
     content = (
         "<h1>Настройки</h1>"
         '<p class="sub">Параметры точки и доступ в панель</p>'
+        + secrets_block
         + card("Точка и доступ", table(["Параметр", "Значение"], body))
         + people
         + note

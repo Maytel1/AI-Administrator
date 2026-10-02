@@ -73,7 +73,7 @@ ruff check docker                                  # стиль/импорты/�
 python -m mypy docker/core/admin_core --ignore-missing-imports
 
 # тесты (нужен запущенный postgres из docker/):
-cd docker && docker compose run --rm cli python -m pytest -q   # 84 теста
+cd docker && docker compose run --rm cli python -m pytest -q   # 99 тестов
 ```
 
 CI — `.github/workflows/ci.yml`, на каждый push/PR: **lint** (ruff + mypy + compileall) →
@@ -90,11 +90,14 @@ CI — `.github/workflows/ci.yml`, на каждый push/PR: **lint** (ruff + m
 Диалоги, Аудит, Настройки. **Правки работают**: цены и длительность услуг, рабочие
 дни мастера, статус записи, предоплата и заметки клиента — каждая правка в `audit_log`
 с указанием роли и логина. Роли: владелец точки, администратор, наша команда.
-Логика — `docker/core/admin_core/web`, разбор референса и дорожная карта —
-`ADMIN_PANEL.md`.
 
-Учётные записи создаются из CLI (пароль и секрет 2FA печатаются один раз):
+**Защита**: HTTPS + HSTS (год), CSP, nosniff, X-Frame-Options, no-store; cookie с
+флагом `Secure` под HTTPS; `WEB_TRUST_PROXY=1` — только если панель за обратным
+прокси. Локальный сертификат для проверки TLS: `powershell -File docker/scripts/make_dev_cert.ps1`.
+
+**Сотрудники точки** создаются из панели (владельцем) или из CLI:
 ```
 docker compose run --rm cli python cli.py --user boss@example.com --role owner \
-    --password "пароль-не-короче-8" --salon "Виктория" [--totp]
+    --password ПАРОЛЬ_8+ --salon "Виктория" [--totp]
 ```
+Пароль и TOTP-секрет показываются один раз. Роль `team` создаётся только из CLI.

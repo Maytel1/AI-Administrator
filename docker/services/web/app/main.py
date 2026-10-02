@@ -30,6 +30,12 @@ from admin_core.web.pages_lists import (
 )
 from admin_core.web.render import layout, login_page
 from admin_core.web.roles import audit_actor, can, can_action, role_label
+from admin_core.web.security import (
+    cookie_secure_flag,
+    https_redirect_target,
+    is_secure_request,
+    security_headers,
+)
 from admin_core.web.session import (
     SESSION_COOKIE,
     PageCtx,
@@ -128,15 +134,31 @@ async def _settings(
     if session is None:
         raise RuntimeError("сессия потеряна между проверкой и обработкой")
     who = {"login": session.login, "role": session.role}
-    team = None
+    people = None
     if can(session.role, "users"):
-        team = await users.list_users(panel.pool, str(salon["id"]))
-    return page_settings(salon, salons, env, who, team)
+        people = await users.list_users(panel.pool, str(salon["id"]))
+    once = panel.take_once(request.cookies.get(SESSION_COOKIE, ""))
+    return page_settings(salon, salons, env, who, people, ctx, once)
 
 
-def build_app(panel: Panel) -> Any:
+def build_app(panel: Panel, *, tls_enabled: bool = False, trust_proxy: bool = False) -> Any:
     """Приложение aiohttp: статика, логин, разделы панели."""
     from aiohttp import web  # noqa: PLC0415 — в cli-контейнере aiohttp нет
+
+    @web.middleware
+    async def security(request: Any, handler: Any) -> Any:
+        """Заголовки безопасности на каждый ответ и редирект HTTP → HTTPS."""
+        target = https_redirect_target(request, tls_enabled=tls_enabled)
+        if target:
+            resp: Any = web.HTTPFound(target, status=301)
+        else:
+            resp = await handler(request)
+        secure = is_secure_request(
+            request, tls_enabled=tls_enabled, trust_proxy=trust_proxy
+        )
+        for name, value in security_headers(secure=secure).items():
+            resp.headers[name] = value
+        return resp
 
     async def page(request: Any, builder: Any) -> Any:
         """Общая обвязка раздела: проверка доступа, выбор салона, HTML-ответ."""
@@ -208,6 +230,10 @@ def build_app(panel: Panel) -> Any:
         result = await actions.apply_form(
             panel.pool, str(salon["id"]), form, actor=actor
         )
+        once = result.get("once")
+        if once:
+            # пароль и секрет 2FA не идут в URL — покажем на следующей странице
+            panel.push_once(session_token, once)
         back = str(form.get("back", "/today")) or "/today"
         if back.startswith("/") and "salon=" not in back:
             back = back + ("&" if "?" in back else "?") + f"salon={salon['id']}"
@@ -244,7 +270,13 @@ def build_app(panel: Panel) -> Any:
                 content_type="text/html",
             )
         resp = web.HTTPFound("/today")
-        resp.set_cookie(SESSION_COOKIE, token, httponly=True, samesite="Lax", path="/")
+        secure_cookie = cookie_secure_flag(
+            secure=is_secure_request(request, tls_enabled=tls_enabled, trust_proxy=trust_proxy)
+        )
+        resp.set_cookie(
+            SESSION_COOKIE, token, httponly=True, samesite="Lax", path="/",
+            secure=secure_cookie,
+        )
         return resp
 
     async def logout(request: Any) -> Any:
@@ -274,7 +306,7 @@ def build_app(panel: Panel) -> Any:
         "/audit": _audit, "/settings": _settings,
     }
     check_builder_signatures(sections)  # падаем на старте, а не в HTTP
-    app = web.Application()
+    app = web.Application(middlewares=[security])
     app.router.add_get("/", index)
     app.router.add_get("/login", login_get)
     app.router.add_post("/login", login_post)
@@ -306,16 +338,34 @@ async def main() -> None:
     await run_migrations(pool)
     panel = Panel(pool, os.getenv("WEB_PANEL_PASSWORD", ""), metrics=ServiceMetrics("web-service"))
     if not panel.password:
-        print("[web] ВНИМАНИЕ: WEB_PANEL_PASSWORD не задан — вход будет невозможен", flush=True)
+        print("[web] ВНИМАНИЕ: WEB_PANEL_PASSWORD не задан — вход закрыт", flush=True)
+
+    tls_cert, tls_key = os.getenv("WEB_TLS_CERT"), os.getenv("WEB_TLS_KEY")
+    tls_enabled = bool(tls_cert and tls_key)
+    trust_proxy = os.getenv("WEB_TRUST_PROXY", "") == "1"
+    if not trust_proxy:
+        print("[web] WEB_TRUST_PROXY выключен: X-Forwarded-Proto игнорируется", flush=True)
+
     port = int(os.getenv("WEB_HTTP_PORT", "8080"))
-    runner = web.AppRunner(build_app(panel))
+    ssl_ctx = None
+    if tls_enabled:
+        import ssl  # noqa: PLC0415 — только когда реально включён TLS
+
+        ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        ssl_ctx.load_cert_chain(tls_cert or "", tls_key or "")
+        print(f"[web] TLS включён, сертификат: {tls_cert}", flush=True)
+
+    runner = web.AppRunner(
+        build_app(panel, tls_enabled=tls_enabled, trust_proxy=trust_proxy)
+    )
     await runner.setup()
-    await web.TCPSite(runner, "0.0.0.0", port).start()
+    await web.TCPSite(runner, "0.0.0.0", port, ssl_context=ssl_ctx).start()
     health = await start_health_server(
         make_health_app(panel.metrics, pool=pool, provider="panel"), port=port + 1
     )
+    scheme = "https" if tls_enabled else "http"
     print(
-        f"[web] панель: http://localhost:{port}/today | health: :{port + 1}/health",
+        f"[web] панель: {scheme}://localhost:{port}/today | health: :{port + 1}/health",
         flush=True,
     )
     try:

@@ -31,6 +31,13 @@ ERRORS = {
 WEEKDAY_RU = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
 
 
+def role_label(role: str) -> str:
+    """Человеческое название роли (импорт внутри — чтобы не тянуть цикл)."""
+    from .roles import role_label as _label  # noqa: PLC0415 — локальный реэкспорт
+
+    return _label(role)
+
+
 def _int(form: dict[str, Any], key: str, default: int = 0) -> int:
     try:
         return int(str(form.get(key, default)).strip() or default)
@@ -155,7 +162,80 @@ async def apply_form(
             text += f". Внимание: {outside} записей выпадут из окна"
         return ok(text)
 
+    if action == "user_create":
+        # пароль не приходит из браузера: генерируем и показываем один раз
+        return await _user_create(pool, salon_id, form, actor=actor)
+
+    if action == "user_totp":
+        return await _user_totp(pool, form, actor=actor)
+
+    if action == "user_disable":
+        from .users import disable_user  # noqa: PLC0415 — только для этого действия
+
+        result = await disable_user(
+            pool, user_id=str(form.get("user_id", "")), actor=actor, salon_id=salon_id
+        )
+        if not result["ok"]:
+            if result["error"] == "last_owner":
+                return fail("last_owner", result["message"])
+            return fail("not_found")
+        return ok("Доступ отключён")
+
     return fail("save_failed", "Неизвестное действие формы")
+
+
+async def _user_create(
+    pool: Any, salon_id: str, form: dict[str, Any], *, actor: str
+) -> dict[str, Any]:
+    """Новый сотрудник точки: e-mail, роль, временный пароль (показываем один раз)."""
+    from .auth import random_password  # noqa: PLC0415
+    from .roles import SELF_ISSUE_ROLES  # noqa: PLC0415
+    from .users import create_user  # noqa: PLC0415
+
+    role = str(form.get("role", "staff"))
+    if role not in SELF_ISSUE_ROLES:
+        return fail("bad_role", "Из панели можно выдать только роли «владелец» и «администратор»")
+    password = random_password()
+    result = await create_user(
+        pool, login=str(form.get("login", "")), password=password, role=role,
+        salon_id=salon_id, name=str(form.get("name", "")).strip() or None, actor=actor,
+    )
+    if not result["ok"]:
+        return fail(result["error"], result["message"])
+    return {
+        "ok": True,
+        "message": f"{result['login']} создан(а), роль {role_label(role)}",
+        "once": {
+            "login": result["login"],
+            "password": password,
+            "note": "Пароль показывается один раз — передайте сотруднику лично",
+        },
+    }
+
+
+async def _user_totp(pool: Any, form: dict[str, Any], *, actor: str) -> dict[str, Any]:
+    """Включение 2FA: выдаём секрет и ссылку для приложения — один раз."""
+    from .auth import generate_totp_secret, provisioning_uri  # noqa: PLC0415
+    from .users import set_totp  # noqa: PLC0415
+
+    login = str(form.get("login", ""))
+    row = await pool.fetchrow(
+        "SELECT id, login FROM panel_users WHERE login = $1 AND is_active", login
+    )
+    if not row:
+        return fail("not_found", "Такого пользователя нет")
+    secret = generate_totp_secret()
+    await set_totp(pool, str(row["id"]), secret=secret, enabled=True, actor=actor)
+    return {
+        "ok": True,
+        "message": f"2FA включена для {login}",
+        "once": {
+            "login": login,
+            "secret": secret,
+            "uri": provisioning_uri(secret, login),
+            "note": "Секрет показывается один раз. Отсканируйте QR в приложении-аутентификаторе",
+        },
+    }
 
 
 def _decimal(raw: Any) -> float | None:

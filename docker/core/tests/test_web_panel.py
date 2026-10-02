@@ -166,16 +166,17 @@ def test_page_settings_shows_plan_and_roadmap():
     html = page_settings(
         SALON, [SALON], {"LLM_PROVIDER": "yandexgpt"},
         session={"login": "boss@test.ru", "role": "owner"},
-        team=[{"login": "boss@test.ru", "name": "Иван", "role": "owner",
+        team=[{"id": "u1", "login": "boss@test.ru", "name": "Иван", "role": "owner",
                "totp_enabled": True, "last_login_at": None}],
+        ctx=PageCtx(csrf="f" * 32, role="owner"),
     )
     assert "Пробный" in html
     assert "yandexgpt" in html
-    assert "Владелец точки" in html          # кто вошёл и его роль
-    assert "цены и услуги" in html           # права роли показаны
-    assert "Команда точки" in html           # список команды
+    assert "Владелец точки" in html  # кто вошёл и его роль
+    assert "цены и услуги" in html  # права роли показаны
+    assert "Команда точки" in html  # список команды
     assert "2FA включена" in html
-    assert "MVP 0.2" in html
+    assert "MVP 0.3" in html
 
 
 def test_tile_escapes_value():
@@ -460,6 +461,153 @@ def test_pages_carry_csrf_token_into_forms():
     assert 'value="hours_save"' in masters
     assert masters.count('name="weekday"') == 7  # все дни недели редактируются
     assert token in masters
+
+
+async def test_owner_can_create_staff_from_panel(demo, pool):
+    """Владелец создаёт сотрудника прямо в панели и получает пароль один раз."""
+    from admin_core.web import users
+
+    salon_id = str(demo["salon"]["id"])
+    result = await apply_form(
+        pool, salon_id,
+        {"action": "user_create", "login": "novichok@test.ru", "name": "Пётр", "role": "staff"},
+        actor="owner:boss@test.ru",
+    )
+    assert result["ok"] is True
+    assert "novichok@test.ru" in result["message"]
+    once = result["once"]
+    assert len(once["password"]) == 16  # временный пароль сгенерирован
+    # и этот сотрудник реально может войти с выданным паролем
+    check = await users.authenticate(pool, "novichok@test.ru", once["password"])
+    assert check["ok"] is True and check["user"]["role"] == "staff"
+
+
+async def test_panel_cannot_issue_team_role(demo, pool):
+    """Роль team из панели не выдаётся — иначе владелец получил бы все точки."""
+    result = await apply_form(
+        pool, str(demo["salon"]["id"]),
+        {"action": "user_create", "login": "sneaky@test.ru", "role": "team"},
+        actor="owner:boss@test.ru",
+    )
+    assert result["ok"] is False
+    assert result["error"] == "bad_role"
+    assert await pool.fetchval(
+        "SELECT count(*) FROM panel_users WHERE login = 'sneaky@test.ru'"
+    ) == 0
+
+
+async def test_user_totp_returns_secret_once(demo, pool):
+    """Включение 2FA возвращает секрет и otpauth-ссылку — ровно один раз."""
+    from admin_core.web.auth import totp_code, verify_totp
+
+    salon_id = str(demo["salon"]["id"])
+    await apply_form(
+        pool, salon_id,
+        {"action": "user_create", "login": "code@test.ru", "role": "staff"},
+        actor="owner:boss@test.ru",
+    )
+    result = await apply_form(
+        pool, salon_id, {"action": "user_totp", "login": "code@test.ru"},
+        actor="owner:boss@test.ru",
+    )
+    assert result["ok"] is True
+    secret = result["once"]["secret"]
+    assert result["once"]["uri"].startswith("otpauth://totp/")
+    assert await pool.fetchval(
+        "SELECT totp_enabled FROM panel_users WHERE login = 'code@test.ru'"
+    ) is True
+    assert verify_totp(secret, totp_code(secret)) is True
+
+
+async def test_cannot_disable_last_owner(demo, pool):
+    """Последнего владельца точки отключить нельзя — иначе точка останется без доступа."""
+    from admin_core.web import users
+
+    salon_id = str(demo["salon"]["id"])
+    created = await users.create_user(
+        pool, login="last@test.ru", password="parol-12345", role="owner", salon_id=salon_id
+    )
+    blocked = await users.disable_user(
+        pool, user_id=created["id"], actor="owner:x@test.ru", salon_id=salon_id
+    )
+    assert blocked["ok"] is False and blocked["error"] == "last_owner"
+    assert await pool.fetchval(
+        "SELECT is_active FROM panel_users WHERE id = $1", created["id"]
+    ) is True
+
+
+async def test_disable_second_owner_works(demo, pool):
+    from admin_core.web import users
+
+    salon_id = str(demo["salon"]["id"])
+    first = await users.create_user(
+        pool, login="first@test.ru", password="parol-12345", role="owner", salon_id=salon_id
+    )
+    await users.create_user(
+        pool, login="second@test.ru", password="parol-12345", role="owner", salon_id=salon_id
+    )
+    result = await users.disable_user(
+        pool, user_id=first["id"], actor="owner:x@test.ru", salon_id=salon_id
+    )
+    assert result["ok"] is True
+    assert await pool.fetchval(
+        "SELECT is_active FROM panel_users WHERE id = $1", first["id"]
+    ) is False
+
+
+def test_settings_page_shows_team_management():
+    """Владелец видит форму создания и кнопки 2FA/отключения, администратор — нет."""
+    team = [{"id": "u1", "login": "staff@test.ru", "name": "Пётр", "role": "staff",
+             "totp_enabled": False, "last_login_at": None}]
+    owner_html = page_settings(
+        SALON, [SALON], {}, session={"login": "boss@test.ru", "role": "owner"},
+        team=team, ctx=OWNER_CTX,
+    )
+    assert 'value="user_create"' in owner_html
+    assert 'value="user_totp"' in owner_html
+    assert 'value="user_disable"' in owner_html
+    staff_html = page_settings(
+        SALON, [SALON], {}, session={"login": "p@test.ru", "role": "staff"},
+        team=team, ctx=STAFF_CTX,
+    )
+    assert 'value="user_create"' not in staff_html  # администратор команду не ведёт
+    assert "Пётр" in staff_html  # но состав команды видит
+
+
+def test_settings_page_shows_one_time_secret_once():
+    html = page_settings(
+        SALON, [SALON], {}, session={"login": "boss@test.ru", "role": "owner"},
+        team=[], ctx=OWNER_CTX,
+        once=[{"login": "novichok@test.ru", "password": "Xk39dPq7mZa4LbT2",
+               "note": "Пароль показывается один раз"}],
+    )
+    assert "Xk39dPq7mZa4LbT2" in html
+    assert "один раз" in html
+    without = page_settings(
+        SALON, [SALON], {}, session={"login": "boss@test.ru", "role": "owner"},
+        team=[], ctx=OWNER_CTX, once=[],
+    )
+    assert "Xk39dPq7mZa4LbT2" not in without  # второй раз не показываем
+
+
+def test_once_secrets_are_not_in_url():
+    """Пароль не должен попадать в адресную строку (история браузера, логи)."""
+    panel = Panel(pool=None, password="secret")
+    token = panel.login("secret") or ""
+    panel.push_once(token, {"password": "Sekret123"})
+    assert panel.take_once(token)[0]["password"] == "Sekret123"
+    assert panel.take_once(token) == []  # второй раз пусто
+    other = panel.login("secret") or ""
+    assert panel.take_once(other) == []  # чужая сессия не видит чужих секретов
+
+
+def test_once_secrets_expire():
+    panel = Panel(pool=None, password="secret")
+    token = panel.login("secret") or ""
+    panel.push_once(token, {"password": "Old"})
+    panel.once[token][0]["at"] = datetime.now(ZoneInfo("UTC")) - timedelta(minutes=11)
+    panel.purge_expired_once()
+    assert panel.take_once(token) == []
 
 
 OWNER_CTX = PageCtx(csrf="f" * 32, role="owner", login="boss@test.ru")

@@ -51,9 +51,16 @@ services:
       SERVICE_NAME: web
       WEB_HTTP_PORT: 8080
       MIGRATIONS_DIR: /app/migrations
+      # TLS: сертификаты кладём через docker/certs (в git не попадают).
+      # Без них панель работает по http — только для локальной отладки.
+      WEB_TLS_CERT: ${WEB_TLS_CERT:-}
+      WEB_TLS_KEY: ${WEB_TLS_KEY:-}
+      WEB_TRUST_PROXY: ${WEB_TRUST_PROXY:-0}
     env_file:
       - path: .env
         required: false
+    volumes:
+      - ./certs:/app/certs:ro
     ports:
       - "${WEB_HTTP_PORT:-8082}:8080"      # панель: http://localhost:8082/today
       - "${WEB_HEALTH_PORT:-8083}:8081"   # /health и /metrics соседним портом

@@ -43,7 +43,14 @@ ACTION_PERMISSION = {
     "service_save": P_PRICING,
     "client_save": P_CLIENT_FLAGS,
     "hours_save": P_SCHEDULE,
+    "user_create": P_USERS,
+    "user_totp": P_USERS,
+    "user_disable": P_USERS,
 }
+
+# Роли, которые владелец точки может выдать из панели. Роль `team` — наша
+# внутренняя, её создают из CLI: иначе любой владелец выдал бы себе все точки.
+SELF_ISSUE_ROLES = ("owner", "staff")
 
 
 def can(role: str, permission: str) -> bool:

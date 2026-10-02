@@ -98,7 +98,7 @@ async def authenticate(
 async def list_users(pool: Any, salon_id: str) -> list[dict[str, Any]]:
     """Команда точки: логины, роли, включён ли 2FA, когда последний вход."""
     rows = await pool.fetch(
-        "SELECT login, name, role, totp_enabled, last_login_at, created_at "
+        "SELECT id, login, name, role, totp_enabled, last_login_at, created_at "
         "FROM panel_users WHERE salon_id = $1 AND is_active ORDER BY role, login",
         salon_id,
     )
@@ -119,6 +119,30 @@ async def set_totp(
         actor, f'{{"user_id": "{user_id}", "enabled": {str(enabled).lower()}}}',
     )
     return {"ok": True, "enabled": enabled}
+
+
+async def disable_user(
+    pool: Any, *, user_id: str, actor: str, salon_id: str | None = None
+) -> dict[str, Any]:
+    """Отключение доступа. Нельзя отключить себя и последнего владельца точки."""
+    if await pool.fetchval("SELECT count(*) FROM panel_users WHERE id = $1", user_id) == 0:
+        return {"ok": False, "error": "not_found"}
+    if await pool.fetchval(
+        "SELECT count(*) FROM panel_users WHERE role = 'owner' AND is_active "
+        "AND ($1::uuid IS NULL OR salon_id = $1::uuid)",
+        salon_id,
+    ) <= 1:
+        return {
+            "ok": False, "error": "last_owner",
+            "message": "Это последний владелец точки — отключить нельзя",
+        }
+    await pool.execute("UPDATE panel_users SET is_active = false WHERE id = $1", user_id)
+    await pool.execute(
+        "INSERT INTO audit_log (salon_id, actor, action, details) "
+        "VALUES ($1, $2, 'disable_panel_user', $3)",
+        salon_id, actor, f'{{"user_id": "{user_id}"}}',
+    )
+    return {"ok": True}
 
 
 async def grant_temporary_password(

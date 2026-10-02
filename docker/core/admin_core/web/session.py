@@ -69,6 +69,7 @@ class Panel:
         self.password = password  # запасной вход для демо, если нет учёток
         self.metrics = metrics or ServiceMetrics("web-service")
         self.sessions: dict[str, Session] = {}
+        self.once: dict[str, list[dict[str, Any]]] = {}
         # серверный секрет для CSRF: токен привязан к сессии, подделать его нельзя
         self.secret = secrets.token_bytes(32)
 
@@ -123,6 +124,32 @@ class Panel:
 
     def session_of(self, token: str) -> Session | None:
         return self.sessions.get(token or "")
+
+    def push_once(self, token: str, payload: dict[str, Any]) -> None:
+        """Кладём одноразовые данные (пароль, секрет 2FA) в память сессии.
+
+        В URL их класть нельзя: адрес попадает в историю браузера и логи
+        прокси. Держим 10 минут и отдаём при следующем показе настроек.
+        """
+        self.once.setdefault(token, []).append(
+            {"at": datetime.now(ZoneInfo("UTC")), "data": payload}
+        )
+
+    def take_once(self, token: str) -> list[dict[str, Any]]:
+        """Забрать и сразу забыть: второй раз эти данные не показываются."""
+        items = self.once.get(token or "", [])
+        self.once[token] = []
+        return [i["data"] for i in items]
+
+    def purge_expired_once(self) -> None:
+        """Подчищаем протухшие одноразовые данные (таймер в фоне)."""
+        now = datetime.now(ZoneInfo("UTC"))
+        for token, items in list(self.once.items()):
+            fresh = [i for i in items if now - i["at"] < timedelta(minutes=10)]
+            if fresh:
+                self.once[token] = fresh
+            else:
+                self.once.pop(token, None)
 
     def role_of(self, token: str) -> str:
         """Роль текущей сессии; без сессии — гость (ни одного права)."""
