@@ -1,8 +1,9 @@
-"""Временный стресс-чек (запускается вручную, в git не попадает).
+"""Стресс-чек (запускается вручную, см. README: монтирование файла в контейнер cli).
 
 1. RACE: 5 параллельных create_booking на один слот — ровно 1 успех, 4 SlotTaken.
 2. Повторная бронь занятого слота — SlotTakenError.
-3. SEED-IDEMPOTENT: двойной запуск сидера не дублирует данные.
+3. SEED-IDEMPOTENT: двойной запуск сидера не дублирует данные
+   (проверяются только сидерные клиенты — у живого салона могут быть клиенты от бота/CLI).
 """
 
 import asyncio
@@ -85,8 +86,9 @@ async def main() -> None:
         "SELECT count(*) FROM services WHERE salon_id = (SELECT id FROM salons WHERE name='Виктория')"
     )
     n_clients = await pool.fetchval(
-        "SELECT count(*) FROM clients WHERE salon_id = (SELECT id FROM salons WHERE name='Виктория')"
-    )
+        "SELECT count(*) FROM clients WHERE salon_id = (SELECT id FROM salons WHERE name='Виктория') "
+        "AND phone IN ('+79001234567', '+79001112233')"  # только сидерные клиенты: у живого
+    )                                                     # салона есть клиенты от бота/CLI
     print(f"SEED-IDEMPOTENT: services={n_services} (норма 4), clients={n_clients} (норма 2)")
     assert n_services == 4 and n_clients == 2, "сидер задублировал данные!"
 
