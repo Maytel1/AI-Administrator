@@ -2,3 +2,5 @@
 asyncpg>=0.30,<0.31
 # Фаза 4–5 (напоминания, рободо-звон, outbox-очередь): раскомментировать по мере
 # появления задач; кандидаты: APScheduler, valkey/redis-клиент (Managed Valkey — фаза 5)
+prometheus-client>=0.20,<2   # /health и /metrics через admin_core.health
+aiohttp>=3.9,<4            # отправка сообщений Telegram

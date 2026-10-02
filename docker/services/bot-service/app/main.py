@@ -157,6 +157,46 @@ async def main() -> None:
         await state.log(message.chat.id, "assistant", reply)
         await message.answer(reply)
 
+    @dp.callback_query(F.data.startswith("remind:"))
+    async def reminder_button(callback) -> None:
+        """Клиент нажал «Подтверждаю / Перенести / Отменить» в напоминании.
+
+        Ответ пишем прямо в запись: подтверждение снимает вопрос «дойдёт ли»,
+        отмена сразу освобождает слот и запускает лист ожидания.
+        """
+        from admin_core.crm.internal import InternalCRM  # noqa: PLC0415
+
+        action = (callback.data or "").split(":", 1)[-1]
+        answer = {
+            "ok": "Записали: вы придёте. Ждём вас!",
+            "move": "Понял. Позвоните в салон, и мы подберём другое время.",
+            "cancel": "Жаль. Запись отменена — слот освободили для других.",
+        }.get(action, "Не понял нажатие — позвоните в салон, и мы поправим.")
+        booking = None
+        chat_id = callback.message.chat.id if callback.message else 0
+        client_id = await state.pool.fetchval(
+            "SELECT client_id FROM dialogs WHERE chat_id = $1 ORDER BY id DESC LIMIT 1",
+            chat_id,
+        )
+        if client_id:
+            booking = await state.pool.fetchrow(
+                "SELECT b.id, b.salon_id FROM bookings b "
+                "WHERE b.client_id = $1 AND b.status IN ('booked','confirmed') "
+                "ORDER BY b.starts_at LIMIT 1",
+                client_id,
+            )
+        if booking and action in ("ok", "cancel"):
+            crm = InternalCRM(state.pool)
+            new_status = "confirmed" if action == "ok" else "cancelled"
+            await crm.set_booking_status(
+                str(booking["salon_id"]), str(booking["id"]), new_status,
+                actor="bot:reminder",
+            )
+            await state.log(chat_id, "user", f"нажата кнопка: {action}")
+        await callback.answer(answer[:200], show_alert=False)
+        if callback.message:
+            await callback.message.answer(answer)
+
     me = await bot.get_me()
     print(f"[bot] polling as @{me.username} (LLM: {state.provider.name})", flush=True)
     http_port = int(os.getenv("BOT_HTTP_PORT", "8080"))

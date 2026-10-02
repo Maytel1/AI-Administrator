@@ -236,22 +236,22 @@ def test_flash_colors():
     assert flash_html("") == ""
 
 
-def test_panel_login_and_session_lifetime():
+async def test_panel_login_and_session_lifetime():
     panel = Panel(pool=None, password="")
     token = _session(panel)
-    assert panel.authorized(token)
-    assert not panel.authorized("чужая-сессия")
-    assert not panel.authorized("")
-    panel.logout(token)
-    assert not panel.authorized(token)
+    assert await panel.authorized(token)
+    assert not await panel.authorized("чужая-сессия")
+    assert not await panel.authorized("")
+    await panel.logout(token)
+    assert not await panel.authorized(token)
 
 
-def test_panel_expired_session_is_dropped():
+async def test_panel_expired_session_is_dropped():
     panel = Panel(pool=None, password="")
     token = _session(panel)
     session = panel.sessions[token]
     session.until = datetime.now(ZoneInfo("UTC")) - timedelta(seconds=1)
-    assert not panel.authorized(token)
+    assert not await panel.authorized(token)
     assert token not in panel.sessions
 
 

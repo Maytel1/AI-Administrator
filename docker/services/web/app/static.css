@@ -128,3 +128,4 @@ button:hover,.btn:hover{background:var(--accent-hover)}
   .shell{grid-template-columns:1fr} aside{position:static;height:auto}
   .grid2{grid-template-columns:1fr} main{padding:16px}
 }
+.row-end{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 2px;justify-content:flex-end}

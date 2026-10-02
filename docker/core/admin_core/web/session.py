@@ -173,6 +173,7 @@ class Panel:
             if result["error"] == "need_totp":
                 return "", "need_totp"
             self.metrics.errors.labels("login").inc()
+            await self._log_login(login, ok=False, reason=result["error"])
             return "", "invalid"
         user = result["user"]
         token = secrets.token_urlsafe(24)
@@ -180,21 +181,115 @@ class Panel:
             user=user, role=user["role"], login=user["login"],
             salon_id=user["salon_id"], until=datetime.now(ZoneInfo("UTC")) + SESSION_TTL,
         )
+        # Дублируем в БД: иначе при двух инстансах веб-сервиса вход, сделанный
+        # на одном, не работает на другом — и выглядит как «панель выкидывает».
+        await self._save_session(token, self.sessions[token])
         self.metrics.messages.labels("login").inc()
         return token, ""
 
-    def authorized(self, token: str) -> bool:
-        """Проверка cookie; просроченные и чужие токены попутно вычищаем."""
+    async def _save_session(self, token: str, session: Session) -> None:
+        if self.pool is None:
+            return
+        try:
+            await self.pool.execute(
+                "INSERT INTO panel_sessions (token, user_id, login, role, salon_id, "
+                "expires_at) VALUES ($1, $2::uuid, $3, $4, $5::uuid, $6) "
+                "ON CONFLICT (token) DO NOTHING",
+                token, (session.user or {}).get("id"), session.login, session.role,
+                session.salon_id, session.until,
+            )
+        except Exception:  # noqa: BLE001 — сессия уже в памяти, БД не критичен
+            self.metrics.errors.labels("session_store").inc()
+
+    async def _load_session(self, token: str) -> Session | None:
+        """Поднять сессию из БД, если её нет в памяти текущего инстанса."""
+        if self.pool is None or not token:
+            return None
+        try:
+            row = await self.pool.fetchrow(
+                "SELECT user_id, login, role, salon_id, expires_at FROM panel_sessions "
+                "WHERE token = $1",
+                token,
+            )
+        except Exception:  # noqa: BLE001 — таблицы может не быть (первый запуск)
+            return None
+        if not row or datetime.now(ZoneInfo("UTC")) > row["expires_at"]:
+            return None
+        self.sessions[token] = Session(
+            user={"id": str(row["user_id"]) if row["user_id"] else None},
+            role=row["role"], login=row["login"] or "",
+            salon_id=str(row["salon_id"]) if row["salon_id"] else None,
+            until=row["expires_at"],
+        )
+        return self.sessions[token]
+
+    async def _drop_session(self, token: str) -> None:
+        if self.pool is None or not token:
+            return
+        try:
+            await self.pool.execute(
+                "DELETE FROM panel_sessions WHERE token = $1", token
+            )
+        except Exception:  # noqa: BLE001 — выход из системы не должен падать
+            self.metrics.errors.labels("session_store").inc()
+
+    async def _log_login(
+        self, login: str, *, ok: bool, reason: str = "", ip: str = "", agent: str = ""
+    ) -> None:
+        """Журнал входов в БД: переживает рестарт, нужен для разбора инцидента."""
+        if self.pool is None:
+            return
+        from ..monitoring import log_login  # noqa: PLC0415 — ленивый импорт
+
+        try:
+            await log_login(self.pool, login=login, ip=ip, ok=ok, reason=reason,
+                            user_agent=agent)
+        except Exception as exc:  # noqa: BLE001 — журнал не должен ломать вход
+            # Ошибку печатаем явно: иначе «журнала нет» тихо выглядит как
+            # «никто не входил» — а это разные вещи при разборе инцидента.
+            self.metrics.errors.labels("login_log").inc()
+            print(f"[web] журнал входов не записан: {type(exc).__name__}: {exc}",
+                  flush=True)
+
+    async def authorized(self, token: str) -> bool:
+        """Проверка cookie; просроченные и чужие токены попутно вычищаем.
+
+        Сессия может прийти из БД: при нескольких инстансах веб-сервиса вход,
+        сделанный на одном, обязан работать на другом.
+        """
         session = self.sessions.get(token or "")
+        if session is None:
+            session = await self._load_session(token)
         if session is None:
             return False
         if datetime.now(ZoneInfo("UTC")) > session.until:
             self.sessions.pop(token, None)
+            await self._drop_session(token)
+            return False
+        # Сессию могли завершить на другом инстансе: без сверки с БД «выход»
+        # действовал бы только в том процессе, где его нажали.
+        if await self._revoked(token):
+            self.sessions.pop(token, None)
             return False
         return True
 
-    def session_of(self, token: str) -> Session | None:
-        return self.sessions.get(token or "")
+    async def _revoked(self, token: str) -> bool:
+        """Есть ли токен в БД. Несовпадение = сессии больше нет."""
+        if self.pool is None:
+            return False
+        try:
+            row = await self.pool.fetchrow(
+                "SELECT 1 FROM panel_sessions WHERE token = $1", token
+            )
+        except Exception:  # noqa: BLE001 — таблицы может не быть
+            return False
+        return row is None
+
+    async def session_of(self, token: str) -> Session | None:
+        session = self.sessions.get(token)
+        if session is None:
+            session = await self._load_session(token)
+        return session
 
     def push_once(self, token: str, payload: dict[str, Any]) -> None:
         """Кладём одноразовые данные (пароль, секрет 2FA) в память сессии.
@@ -228,21 +323,43 @@ class Panel:
         Без этого словари растут всю жизнь процесса: сессия попадает в память
         на каждый вход, а ключи троттла — на каждую неудачную попытку.
         """
+        self._purge_expired_once()
+        self.login_throttle.prune()
+        self.ip_throttle.prune()
+        return len(self.sessions)
+
+    async def purge_expired_sessions_db(self) -> int:
+        """Вычистить протухшие сессии в БД — для нескольких инстансов веба.
+
+        Вызывается из фонового таймера сервиса, где await доступен.
+        """
+        self._purge_expired_once()
+        if self.pool is not None:
+            try:
+                await self.pool.execute(
+                    "DELETE FROM panel_sessions WHERE expires_at < now()"
+                )
+            except Exception:  # noqa: BLE001 — чистка не должна ломать сервис
+                self.metrics.errors.labels("session_store").inc()
+        self.login_throttle.prune()
+        self.ip_throttle.prune()
+        return len(self.sessions)
+
+    def _purge_expired_once(self) -> None:
+        """Только память процесса — вызывается из синхронного таймера."""
         now = datetime.now(ZoneInfo("UTC"))
         for token, session in list(self.sessions.items()):
             if now > session.until:
                 self.sessions.pop(token, None)
-        self.login_throttle.prune()
-        self.ip_throttle.prune()
-        return len(self.sessions)
 
     def role_of(self, token: str) -> str:
         """Роль текущей сессии; без сессии — гость (ни одного права)."""
         session = self.sessions.get(token or "")
         return session.role if session else "guest"
 
-    def logout(self, token: str) -> None:
+    async def logout(self, token: str) -> None:
         self.sessions.pop(token or "", None)
+        await self._drop_session(token)  # иначе «выход» не работает на другом инстансе
 
     async def salons(self) -> list[dict[str, Any]]:
         return await queries.list_salons(self.pool)

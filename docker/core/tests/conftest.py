@@ -7,6 +7,7 @@ import asyncpg
 import pytest
 from admin_core.config import get_settings
 from admin_core.crm.internal import InternalCRM
+from admin_core.db import run_migrations
 
 
 @pytest.fixture()
@@ -17,6 +18,10 @@ async def pool():
         )
     except Exception as exc:  # noqa: BLE001
         pytest.skip(f"БД недоступна ({type(exc).__name__}) — запустите docker compose up")
+    # Миграции накатываем здесь: тесты проверяют код, который зависит от схемы.
+    # Без этого «забытая» миграция выглядит как падение в тестах, а не как
+    # расхождение кода и БД.
+    await run_migrations(pool)
     yield pool
     await pool.close()
 

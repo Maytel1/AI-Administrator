@@ -252,7 +252,8 @@ class InternalCRM(CRMProvider):
             return {"ok": False, "error": "bad_status"}
         row = await self.pool.fetchrow(
             "UPDATE bookings SET status = $3 "
-            "WHERE id = $1 AND salon_id = $2 RETURNING starts_at",
+            "WHERE id = $1 AND salon_id = $2 "
+            "RETURNING id, starts_at, service_id, client_id, salon_id",
             booking_id, salon_id, status,
         )
         if not row:
@@ -261,7 +262,26 @@ class InternalCRM(CRMProvider):
             salon_id, actor, "set_booking_status",
             {"booking_id": str(booking_id), "status": status},
         )
-        return {"ok": True, "status": status}
+        result: dict[str, Any] = {"ok": True, "status": status}
+        if status in ("cancelled", "no_show"):
+            # Слот освободился — отдаём его клиенту из листа ожидания.
+            # Если желающих нет, поле просто остаётся не заполненным: клиент сам
+            # увидит время в слотах при следующем обращении к боту.
+            from ..waitlist import take_waitlist_offer  # noqa: PLC0415
+
+            tz_name = await self.pool.fetchval(
+                "SELECT timezone FROM salons WHERE id = $1", salon_id
+            )
+            from zoneinfo import ZoneInfo  # noqa: PLC0415
+
+            offer = await take_waitlist_offer(
+                self.pool, dict(row), tz=ZoneInfo(tz_name or "Asia/Yekaterinburg"),
+                salon_name=await self.pool.fetchval(
+                    "SELECT name FROM salons WHERE id = $1", salon_id
+                ),
+            )
+            result["waitlist_offer"] = offer
+        return result
 
     async def update_service(
         self, salon_id: str, service_id: str, *, price: Any, duration_min: int,
@@ -375,6 +395,21 @@ class InternalCRM(CRMProvider):
         if not title:
             return {"ok": False, "error": "bad_title",
                     "message": "Введите название услуги"}
+        # Дубль проверяем раньше лимита тарифа: сообщение должно быть о настоящей
+        # причине, а не о первой попавшейся проверке.
+        if await self.pool.fetchval(
+            "SELECT 1 FROM services WHERE salon_id = $1 AND title = $2", salon_id, title
+        ):
+            return {"ok": False, "error": "exists",
+                    "message": f"Услуга «{title}» уже есть"}
+        from ..plans import check_limit  # noqa: PLC0415 — лимиты тарифа
+
+        salon = await self.pool.fetchrow(
+            "SELECT id, plan, timezone FROM salons WHERE id = $1", salon_id
+        )
+        limit = await check_limit(self.pool, dict(salon or {}), "services")
+        if not limit["ok"]:
+            return limit
         try:
             row = await self.pool.fetchrow(
                 "INSERT INTO services (salon_id, title, duration_min, price) "
@@ -416,6 +451,21 @@ class InternalCRM(CRMProvider):
         name = (name or "").strip()
         if not name:
             return {"ok": False, "error": "bad_name", "message": "Введите имя мастера"}
+        # Сначала дубль, потом лимит тарифа: иначе владелец триала получил бы
+        # «превышен лимит» вместо «такой мастер уже есть» — это вводит в заблуждение.
+        if await self.pool.fetchval(
+            "SELECT 1 FROM masters WHERE salon_id = $1 AND name = $2", salon_id, name
+        ):
+            return {"ok": False, "error": "exists",
+                    "message": f"Мастер «{name}» уже есть"}
+        from ..plans import check_limit  # noqa: PLC0415 — лимиты тарифа
+
+        salon = await self.pool.fetchrow(
+            "SELECT id, plan, timezone FROM salons WHERE id = $1", salon_id
+        )
+        limit = await check_limit(self.pool, dict(salon or {}), "masters")
+        if not limit["ok"]:
+            return limit
         try:
             row = await self.pool.fetchrow(
                 "INSERT INTO masters (salon_id, name) VALUES ($1,$2) RETURNING id, name",
@@ -465,6 +515,19 @@ class InternalCRM(CRMProvider):
 
         Тот же телефон, что у бота, — значит карточка одна: «свои» не заводятся дважды.
         """
+        from ..plans import check_limit  # noqa: PLC0415 — лимиты тарифа
+
+        existing = await self.pool.fetchval(
+            "SELECT 1 FROM clients WHERE salon_id = $1 AND phone = $2",
+            salon_id, phone,
+        )
+        if not existing:  # лимит считаем только для новых карточек
+            salon = await self.pool.fetchrow(
+                "SELECT id, plan, timezone FROM salons WHERE id = $1", salon_id
+            )
+            limit = await check_limit(self.pool, dict(salon or {}), "clients")
+            if not limit["ok"]:
+                return limit
         client = await self.ensure_client(salon_id, phone, name)
         if notes or requires_prepayment:
             await self.set_client_flags(

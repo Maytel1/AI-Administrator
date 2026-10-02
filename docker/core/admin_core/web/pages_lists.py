@@ -525,6 +525,12 @@ def page_reports(
         "<h1>Отчёты</h1>"
         + flash_html(flash, flash_error)
         + _period_tabs(data.get("periods") or [], data.get("period_key") or "30", salon)
+        + '<div class="row-end">'
+        + '<a class="tab" href="/export.csv?kind=daily&amp;period='
+        + f'{esc(data.get("period_key") or "30")}">CSV по дням</a> '
+        + '<a class="tab" href="/export.csv?kind=masters&amp;period='
+        + f'{esc(data.get("period_key") or "30")}">CSV по мастерам</a>'
+        + "</div>"
         + f'<p class="sub">{esc(label)} · сравнение с {esc(prev_label)}'
         + " · по факту записей и диалогов</p>"
         + f'<div class="tiles">{tiles}</div>'

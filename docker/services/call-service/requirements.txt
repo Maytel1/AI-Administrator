@@ -4,3 +4,5 @@ asyncpg>=0.30,<0.31
 # pipecat-ai[silero, daily]
 # websockets
 # boto3  # не нужен: аудио пишем в YC Object Storage по S3-API (см. план, фаза 3)
+prometheus-client>=0.20,<2   # /health и /metrics через admin_core.health
+aiohttp>=3.9,<4            # HTTP-контур звонков

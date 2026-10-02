@@ -196,9 +196,9 @@ def build_app(
     async def page(request: Any, builder: Any) -> Any:
         """Общая обвязка раздела: проверка доступа, выбор салона, HTML-ответ."""
         session_token = request.cookies.get(SESSION_COOKIE, "")
-        if not panel.authorized(session_token):
+        if not await panel.authorized(session_token):
             return web.Response(text=login_page(), content_type="text/html")
-        session = panel.session_of(session_token)
+        session = await panel.session_of(session_token)
         try:
             salon, salons = await panel.salon_for_session(request, session)
             if salon is None:
@@ -236,8 +236,8 @@ def build_app(
         Салон берётся из сессии, а не из формы: подменить нельзя.
         """
         session_token = request.cookies.get(SESSION_COOKIE, "")
-        session = panel.session_of(session_token)
-        if not panel.authorized(session_token):
+        session = await panel.session_of(session_token)
+        if not await panel.authorized(session_token):
             return web.HTTPFound("/login")
         form = await request.post()
         if not panel.csrf_ok(session_token, str(form.get("csrf", ""))):
@@ -330,7 +330,7 @@ def build_app(
         return resp
 
     async def logout(request: Any) -> Any:
-        panel.logout(request.cookies.get(SESSION_COOKIE, ""))
+        await panel.logout(request.cookies.get(SESSION_COOKIE, ""))
         resp = web.HTTPFound("/login")
         resp.del_cookie(SESSION_COOKIE, path="/")
         return resp
@@ -350,6 +350,48 @@ def build_app(
             content_type="text/css",
         )
 
+    async def export_csv(request: Any) -> Any:
+        """Выгрузка отчёта в CSV — то, что отдают бухгалтеру и в налоговую.
+
+        Права те же, что у отчёта: роли без ``reports`` получают 403, а не файл.
+        Файл содержит ПДн клиентов по косвенным признакам, поэтому отдаём его
+        с ``no-store`` и без кэша — как остальные страницы панели.
+        """
+        from admin_core.web import exports  # noqa: PLC0415
+
+        session_token = request.cookies.get(SESSION_COOKIE, "")
+        session = await panel.session_of(session_token)
+        if not await panel.authorized(session_token) or session is None:
+            return web.Response(status=302, headers={"Location": "/login"})
+        if not can(session.role, "reports"):
+            panel.metrics.errors.labels("forbidden").inc()
+            return web.Response(status=403, text="Недостаточно прав на выгрузку")
+        salon, _salons = await panel.salon_for_session(request, session)
+        if salon is None:
+            return web.Response(status=404, text="Нет подключённых точек")
+        tz = await queries.salon_tz(panel.pool, str(salon["id"]))
+        current, _previous = reports.resolve_period(request.query.get("period"), tz)
+        kind = request.query.get("kind") or "daily"
+        if kind == "masters":
+            payload = await exports.export_masters(
+                panel.pool, salon, current.start, current.end
+            )
+        else:
+            payload = await exports.export_daily(
+                panel.pool, salon, current.start, current.end
+            )
+        return web.Response(
+            body=payload,
+            content_type="text/csv; charset=utf-8",
+            headers={
+                "Content-Disposition": (
+                    f'attachment; filename="otchet-{kind}-'
+                    f'{datetime.now(tz).strftime("%Y%m%d")}.csv"'
+                ),
+                "Cache-Control": "no-store",
+            },
+        )
+
     sections = {
         "/today": _today, "/bookings": _bookings, "/clients": _clients,
         "/services": _services, "/masters": _masters, "/dialogs": _dialogs,
@@ -364,6 +406,7 @@ def build_app(
     app.router.add_get("/salon", set_salon)
     app.router.add_post("/actions", do_action)
     app.router.add_get("/static.css", static_css)
+    app.router.add_get("/export.csv", export_csv)
     for path, builder in sections.items():
         app.router.add_get(path, lambda r, b=builder: page(r, b))
     return app
@@ -434,7 +477,7 @@ async def main() -> None:
             await asyncio.sleep(3600)
             # Сессии и счётчики перебора живут в памяти процесса: без уборки
             # они растут всю жизнь сервиса (это и утечка памяти, и DoS).
-            panel.purge_expired_sessions()
+            await panel.purge_expired_sessions_db()
     finally:
         await health.cleanup()
         await runner.cleanup()
