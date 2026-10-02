@@ -40,6 +40,26 @@ def role_label(role: str) -> str:
     return _label(role)
 
 
+def _actor_role(actor: str) -> str:
+    """Роль из строки актора «префикс:логин» (её формирует audit_actor).
+
+    Внимание: ``audit_actor`` пишет роль ``team`` как ``admin`` (человек в
+    логах), а логин может содержать двоеточие. Поэтому разбираем строку
+    целиком: неизвестный префикс или лишние двоеточия → гость, без прав.
+    """
+    prefix, sep, login = (actor or "").partition(":")
+    if not sep or ":" in login:
+        return "guest"
+    return {"owner": "owner", "staff": "staff", "team": "team",
+            "admin": "team"}.get(prefix, "guest")
+
+
+def _actor_login(actor: str) -> str:
+    """Логин актора из «роль:логин» — источник сессии, не форма."""
+    _role, sep, login = (actor or "").partition(":")
+    return login if sep else ""
+
+
 def _int(form: dict[str, Any], key: str, default: int = 0) -> int:
     try:
         return int(str(form.get(key, default)).strip() or default)
@@ -76,17 +96,21 @@ def fail(code: str, message: str = "") -> dict[str, Any]:
 
 
 async def apply_form(
-    pool: Any, salon_id: str, form: dict[str, Any], *, actor: str = "owner:panel"
+    pool: Any, salon_id: str, form: dict[str, Any], *, actor: str = "owner:panel",
+    actor_role: str | None = None, actor_login: str = "",
 ) -> dict[str, Any]:
     """Единая точка входа для всех форм панели.
 
     ``form["action"]`` — что делаем; остальные поля зависят от действия.
     ``actor`` — кто именно правит: роль и логин попадают в ``audit_log``.
-    Наружу отдаём словарь с ``ok`` и понятным человеку ``message``.
-    Проверку роли делает вызывающий (HTTP-слой) — здесь только бизнес-правила.
+    ``actor_role`` / ``actor_login`` — из сессии; если их не передали, берёмся
+    из ``actor`` (тесты и CLI). Проверку роли делает вызывающий (HTTP-слой) —
+    здесь только бизнес-правила.
     """
     crm = InternalCRM(pool)
     action = str(form.get("action", ""))
+    role = actor_role or _actor_role(actor)
+    who = actor_login or _actor_login(actor)
 
     if action == "booking_status":
         booking_id = _uuid(form.get("booking_id"))
@@ -215,7 +239,7 @@ async def apply_form(
         return await _user_create(pool, salon_id, form, actor=actor)
 
     if action == "user_totp":
-        return await _user_totp(pool, form, actor=actor)
+        return await _user_totp(pool, salon_id, form, actor=actor, role=role)
 
     if action == "user_disable":
         from .users import disable_user  # noqa: PLC0415 — только для этого действия
@@ -223,10 +247,13 @@ async def apply_form(
         user_id = _uuid(form.get("user_id"))
         if not user_id:
             return fail("bad_id", "Некорректный идентификатор пользователя")
-        result = await disable_user(pool, user_id=user_id, actor=actor, salon_id=salon_id)
+        result = await disable_user(
+            pool, user_id=user_id, actor=actor, salon_id=salon_id,
+            actor_role=role, actor_login=who,
+        )
         if not result["ok"]:
-            if result["error"] == "last_owner":
-                return fail("last_owner", result["message"])
+            if result["error"] in ("last_owner", "self_disable"):
+                return fail(result["error"], result["message"])
             return fail("not_found")
         return ok("Доступ отключён")
 
@@ -299,19 +326,30 @@ async def _user_create(
     }
 
 
-async def _user_totp(pool: Any, form: dict[str, Any], *, actor: str) -> dict[str, Any]:
-    """Включение 2FA: выдаём секрет и ссылку для приложения — один раз."""
+async def _user_totp(
+    pool: Any, salon_id: str, form: dict[str, Any], *, actor: str,
+    role: str = "owner",
+) -> dict[str, Any]:
+    """Включение 2FA: выдаём секрет и ссылку для приложения — один раз.
+
+    Секрет показывается только тому, кто вправе управлять этой учёткой:
+    своей точки (или любой, если роль ``team``). Иначе владелец точки
+    получал бы чужой секрет 2FA и мог бы войти за другого сотрудника.
+    """
     from .auth import generate_totp_secret, provisioning_uri  # noqa: PLC0415
-    from .users import set_totp  # noqa: PLC0415
+    from .users import find_user_in_salon, set_totp  # noqa: PLC0415
 
     login = str(form.get("login", ""))
-    row = await pool.fetchrow(
-        "SELECT id, login FROM panel_users WHERE login = $1 AND is_active", login
-    )
+    row = await find_user_in_salon(pool, login, salon_id=salon_id, actor_role=role)
     if not row:
-        return fail("not_found", "Такого пользователя нет")
+        return fail("not_found", "Такого пользователя нет в вашей точке")
     secret = generate_totp_secret()
-    await set_totp(pool, str(row["id"]), secret=secret, enabled=True, actor=actor)
+    saved = await set_totp(
+        pool, str(row["id"]), secret=secret, enabled=True, actor=actor,
+        salon_id=salon_id, actor_role=role,
+    )
+    if not saved["ok"]:
+        return fail("not_found", "Такого пользователя нет в вашей точке")
     return {
         "ok": True,
         "message": f"2FA включена для {login}",

@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 HSTS_MAX_AGE = 31_536_000  # 1 год — рекомендация OWASP для административных панелей
@@ -59,7 +60,12 @@ def cookie_secure_flag(*, secure: bool) -> bool:
 # Куда можно возвращать браузер после POST. Проверка против open redirect:
 # "//evil.example" тоже начинается со «/», поэтому одного startswith мало.
 SAFE_REDIRECT_PREFIXES = ("/today", "/bookings", "/clients", "/services", "/masters",
-                          "/dialogs", "/audit", "/settings")
+                          "/dialogs", "/reports", "/audit", "/settings")
+
+# Допустимые символы имени хоста. Всё остальное (пробелы, «@», «/», обратные
+# слэши, управляющие символы) означает подделку Host — такой редирект уводит
+# браузер администратора на фишинговый домен.
+_HOST_RE = re.compile(r"^[A-Za-z0-9.\-_]+(?::\d{1,5})?$")
 
 
 def safe_redirect(target: str | None, default: str = "/today") -> str:
@@ -82,10 +88,25 @@ def safe_redirect(target: str | None, default: str = "/today") -> str:
     return candidate
 
 
-def https_redirect_target(request: Any, *, tls_enabled: bool) -> str | None:
-    """Куда перенаправить HTTP-запрос на HTTPS (None — перенаправлять не нужно)."""
+def https_redirect_target(
+    request: Any, *, tls_enabled: bool, allowed_hosts: tuple[str, ...] = ()
+) -> str | None:
+    """Куда перенаправить HTTP-запрос на HTTPS (None — перенаправлять не нужно).
+
+    Host берётся из заголовка, а он подделывается одной строкой: без проверки
+    ``Host: evil.example`` превращает редирект в оружие фишинга. Поэтому:
+    1) синтаксически допустимые имена хостов (без «@», пробелов, «/»);
+    2) если задан WEB_PUBLIC_HOST — только домены из этого списка.
+    """
     if not tls_enabled or request.secure:
         return None
-    host = request.headers.get("Host") or getattr(request, "host", None) or "localhost"
+    raw_host = request.headers.get("Host") or getattr(request, "host", "") or "localhost"
+    host = str(raw_host).strip()
+    if not _HOST_RE.match(host):
+        return None  # подозрительный Host: лучше не редиректить, чем увести на фишинг
+    if allowed_hosts:
+        bare = host.split(":")[0].lower()
+        if not any(bare == h.split(":")[0].lower() for h in allowed_hosts):
+            host = allowed_hosts[0]
     path = request.raw_path or "/"
     return f"https://{host}{path}"

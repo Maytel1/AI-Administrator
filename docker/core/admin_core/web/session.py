@@ -47,7 +47,12 @@ class Throttle:
 
     Без него перебор пароля и шестизначного кода TOTP реалистичен: у кода
     всего миллион комбинаций на 30-секундное окно.
+
+    Ключи приходят извне, поэтому их число ограничено: иначе тысячи запросов
+    с разными «логинами» съедают память процесса (отказ в обслуживании).
     """
+
+    MAX_KEYS = 4096
 
     def __init__(self, limit: int, window: float, *, clock=time.monotonic) -> None:
         self.limit = limit
@@ -61,12 +66,31 @@ class Throttle:
 
     def fail(self, key: str) -> None:
         self._fails[key] = self._fresh(key) + [self._clock()]
+        if len(self._fails) > self.MAX_KEYS:
+            self._prune()
 
     def reset(self, key: str) -> None:
         self._fails.pop(key, None)
 
     def remaining(self, key: str) -> int:
         return max(0, self.limit - len(self._fresh(key)))
+
+    def prune(self) -> int:
+        """Вычистить протухшее; если свежего всё равно много — срезаем половину.
+
+        Возвращаем число удалённых ключей — это видно в метриках.
+        """
+        return self._prune()
+
+    def _prune(self) -> int:
+        before = len(self._fails)
+        for key in list(self._fails):
+            self._fresh(key)
+        overflow = len(self._fails) - self.MAX_KEYS
+        if overflow > 0:
+            for key in list(self._fails)[: overflow + self.MAX_KEYS // 2]:
+                self._fails.pop(key, None)
+        return before - len(self._fails)
 
     def _fresh(self, key: str) -> list[float]:
         now = self._clock()
@@ -103,7 +127,10 @@ class Panel:
 
     def __init__(self, pool: Any, password: str = "", *, metrics: ServiceMetrics | None = None) -> None:
         self.pool = pool
-        self.password = password  # запасной вход для демо, если нет учёток
+        # ``password`` оставлен для совместимости вызовов, но НЕ используется:
+        # общий пароль давал роль team (доступ ко всем точкам). Учётные записи —
+        # единственный способ входа, см. users.authenticate.
+        self.password = ""
         self.metrics = metrics or ServiceMetrics("web-service")
         self.sessions: dict[str, Session] = {}
         self.once: dict[str, list[dict[str, Any]]] = {}
@@ -156,34 +183,6 @@ class Panel:
         self.metrics.messages.labels("login").inc()
         return token, ""
 
-    def login(self, password: str) -> str | None:
-        """Аварийный вход по общему паролю из env.
-
-        ОСТОРОЖНО: этот путь даёт роль ``team`` — доступ ко всем точкам. Он нужен
-        только чтобы зайти в панель до создания первой учётной записи, поэтому
-        требует и пароль из env, и пустую таблицу ``panel_users``.
-        Как только появилась хоть одна учётка — путь закрывается.
-        """
-        if not self.password or not hmac.compare_digest(password, self.password):
-            self.metrics.errors.labels("login").inc()
-            return None
-        if self.pool is None:
-            return None
-        try:
-            users_count = self.pool.fetchval("SELECT count(*) FROM panel_users")
-        except Exception:  # noqa: BLE001 — таблицы может ещё не быть
-            users_count = 0
-        # fetchval здесь синхронный вызов: если он выполнился и учётки есть — отказ
-        if isinstance(users_count, int) and users_count > 0:
-            self.metrics.errors.labels("bootstrap_closed").inc()
-            return None
-        token = secrets.token_urlsafe(24)
-        self.sessions[token] = Session(
-            user=None, role="team", login="bootstrap",
-            salon_id=None, until=datetime.now(ZoneInfo("UTC")) + SESSION_TTL,
-        )
-        return token
-
     def authorized(self, token: str) -> bool:
         """Проверка cookie; просроченные и чужие токены попутно вычищаем."""
         session = self.sessions.get(token or "")
@@ -222,6 +221,20 @@ class Panel:
                 self.once[token] = fresh
             else:
                 self.once.pop(token, None)
+
+    def purge_expired_sessions(self) -> int:
+        """Вычистить истёкшие сессии и счётчики перебора.
+
+        Без этого словари растут всю жизнь процесса: сессия попадает в память
+        на каждый вход, а ключи троттла — на каждую неудачную попытку.
+        """
+        now = datetime.now(ZoneInfo("UTC"))
+        for token, session in list(self.sessions.items()):
+            if now > session.until:
+                self.sessions.pop(token, None)
+        self.login_throttle.prune()
+        self.ip_throttle.prune()
+        return len(self.sessions)
 
     def role_of(self, token: str) -> str:
         """Роль текущей сессии; без сессии — гость (ни одного права)."""

@@ -1,4 +1,4 @@
-﻿"""web-service — HTTP-обвязка веб-панели «Дежурный24» (фаза 4).
+"""web-service — HTTP-обвязка веб-панели «Дежурный24» (фаза 4).
 
 Логика панели живёт в ``admin_core.web`` (запросы, страницы, сессии, роли),
 здесь только транспорт: логин, роуты разделов, статика и health/metrics.
@@ -161,14 +161,19 @@ async def _settings(
     return page_settings(salon, salons, env, who, people, ctx, once)
 
 
-def build_app(panel: Panel, *, tls_enabled: bool = False, trust_proxy: bool = False) -> Any:
+def build_app(
+    panel: Panel, *, tls_enabled: bool = False, trust_proxy: bool = False,
+    allowed_hosts: tuple[str, ...] = (),
+) -> Any:
     """Приложение aiohttp: статика, логин, разделы панели."""
     from aiohttp import web  # noqa: PLC0415 — в cli-контейнере aiohttp нет
 
     @web.middleware
     async def security(request: Any, handler: Any) -> Any:
         """Заголовки безопасности на каждый ответ и редирект HTTP → HTTPS."""
-        target = https_redirect_target(request, tls_enabled=tls_enabled)
+        target = https_redirect_target(
+            request, tls_enabled=tls_enabled, allowed_hosts=allowed_hosts
+        )
         if target:
             resp: Any = web.HTTPFound(target, status=301)
         else:
@@ -248,7 +253,8 @@ def build_app(panel: Panel, *, tls_enabled: bool = False, trust_proxy: bool = Fa
             return web.HTTPFound("/today?err=1&msg=" + quote("Нет подключённых точек", safe=""))
         actor = audit_actor(role, session.login)
         result = await actions.apply_form(
-            panel.pool, str(salon["id"]), form, actor=actor
+            panel.pool, str(salon["id"]), form, actor=actor,
+            actor_role=role, actor_login=session.login,
         )
         once = result.get("once")
         if once:
@@ -372,9 +378,17 @@ async def main() -> None:
         print("[web] PostgreSQL так и не поднялся — выход", flush=True)
         raise SystemExit(1)
     await run_migrations(pool)
-    panel = Panel(pool, os.getenv("WEB_PANEL_PASSWORD", ""), metrics=ServiceMetrics("web-service"))
-    if not panel.password:
-        print("[web] ВНИМАНИЕ: WEB_PANEL_PASSWORD не задан — вход закрыт", flush=True)
+    panel = Panel(pool, metrics=ServiceMetrics("web-service"))
+    allowed_hosts = tuple(
+        h.strip() for h in os.getenv("WEB_PUBLIC_HOST", "").split(",") if h.strip()
+    )
+    if allowed_hosts:
+        print(f"[web] разрешённые домены панели: {allowed_hosts}", flush=True)
+    else:
+        print(
+            "[web] ВНИМАНИЕ: WEB_PUBLIC_HOST не задан — Host-заголовок принимается как есть",
+            flush=True,
+        )
 
     tls_cert, tls_key = os.getenv("WEB_TLS_CERT"), os.getenv("WEB_TLS_KEY")
     tls_enabled = bool(tls_cert and tls_key)
@@ -392,7 +406,10 @@ async def main() -> None:
         print(f"[web] TLS включён, сертификат: {tls_cert}", flush=True)
 
     runner = web.AppRunner(
-        build_app(panel, tls_enabled=tls_enabled, trust_proxy=trust_proxy)
+        build_app(
+            panel, tls_enabled=tls_enabled, trust_proxy=trust_proxy,
+            allowed_hosts=allowed_hosts,
+        )
     )
     await runner.setup()
     await web.TCPSite(runner, "0.0.0.0", port, ssl_context=ssl_ctx).start()
@@ -407,6 +424,9 @@ async def main() -> None:
     try:
         while True:
             await asyncio.sleep(3600)
+            # Сессии и счётчики перебора живут в памяти процесса: без уборки
+            # они растут всю жизнь сервиса (это и утечка памяти, и DoS).
+            panel.purge_expired_sessions()
     finally:
         await health.cleanup()
         await runner.cleanup()

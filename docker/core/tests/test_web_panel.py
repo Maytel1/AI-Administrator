@@ -238,8 +238,6 @@ def test_flash_colors():
 
 def test_panel_login_and_session_lifetime():
     panel = Panel(pool=None, password="")
-    assert panel.login("wrong") is None
-    assert panel.login("env-password") is None  # без БД аварийный вход закрыт
     token = _session(panel)
     assert panel.authorized(token)
     assert not panel.authorized("чужая-сессия")
@@ -257,9 +255,14 @@ def test_panel_expired_session_is_dropped():
     assert token not in panel.sessions
 
 
-def test_panel_without_password_never_logs_in():
-    """Пустой пароль в env = вход закрыт, а не открыт для всех."""
-    assert Panel(pool=None, password="").login("любой") is None
+def test_emergency_password_login_is_gone():
+    """Аварийный вход по общему паролю удалён — он давал роль team (все точки).
+
+    Общий пароль из env не должен обходить учётные записи ни при каких условиях.
+    """
+    panel = Panel(pool=None, password="env-password")
+    assert not hasattr(panel, "login"), "метод Panel.login() должен быть удалён"
+    assert panel.password == "", "общий пароль не хранится и не используется"
 
 
 def test_day_bounds_is_exactly_24h_in_utc():
