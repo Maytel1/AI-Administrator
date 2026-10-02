@@ -1,4 +1,4 @@
-"""Страницы панели: «Сегодня» и «Записи».
+﻿"""Страницы панели: «Сегодня» и «Записи».
 
 «Сегодня» — главный экран владельца точки: записи, деньги, вклад бота,
 диалоги и загрузка мастеров. Дальше идёт «Записи» с фильтром по статусу.
@@ -25,15 +25,29 @@ from .render import (
 )
 
 
+def _ctx_parts(ctx: Any | None, permission: str) -> tuple[str, bool]:
+    """Достаём csrf и право на правку из PageCtx.
+
+    None (тест или гость) → ничего не рисуем: страница без мёртвых кнопок.
+    """
+    if ctx is None:
+        return "", False
+    may = getattr(ctx, "may", None)
+    allowed = bool(may(permission)) if callable(may) else False
+    return getattr(ctx, "csrf", "") or "", allowed
+
+
 def _status_badge(status: str) -> str:
     from .queries import STATUS_RU, STATUS_TONE
 
     return badge(STATUS_RU.get(status, status), STATUS_TONE.get(status, "gray"))
 
 
-def _status_buttons(booking_id: str, status: str, csrf: str, back: str) -> str:
-    """Кнопки смены статуса прямо в строке записи — рутина администратора в один клик."""
-    if not csrf or status in ("completed", "cancelled"):
+def _status_buttons(
+    booking_id: str, status: str, csrf: str, may_status: bool, back: str
+) -> str:
+    """Кнопки смены статуса: только если роль действительно может их нажать."""
+    if not csrf or not may_status or status in ("completed", "cancelled"):
         return "—"
     hidden = f'<input type="hidden" name="booking_id" value="{esc(booking_id)}">'
     buttons = []
@@ -56,11 +70,12 @@ def page_today(
     tz: ZoneInfo,
     salon: dict | None,
     salons: list[dict] | None,
-    csrf: str = "",
+    ctx: Any | None = None,
     flash: str = "",
     flash_error: bool = False,
 ) -> str:
     """Дашборд дня: плитки сверху, расписание снизу."""
+    csrf, may_status = _ctx_parts(ctx, "booking_status")
     load_pct = round(
         100 * stats["busy_masters"] / stats["masters_total"] if stats["masters_total"] else 0
     )
@@ -90,7 +105,7 @@ def page_today(
             esc(b["master_name"]),
             money(b["price"]),
             _status_badge(b["status"]),
-            _status_buttons(str(b["id"]), b["status"], csrf, f"/today{sid}"),
+            _status_buttons(str(b["id"]), b["status"], csrf, may_status, f"/today{sid}"),
         ]
         for b in schedule
     ]
@@ -120,13 +135,14 @@ def page_bookings(
     status: str,
     salon: dict | None,
     salons: list[dict] | None,
-    csrf: str = "",
+    ctx: Any | None = None,
     flash: str = "",
     flash_error: bool = False,
 ) -> str:
     """Лента записей за ±30 дней с фильтром по статусу (ссылками, без формы)."""
     from .queries import SOURCE_RU, STATUS_RU
 
+    csrf, may_status = _ctx_parts(ctx, "booking_status")
     sid = salon["id"] if salon else ""
     back = f"/bookings?salon={esc(sid)}" + (f"&status={esc(status)}" if status else "")
     statuses = ["", *STATUS_RU]
@@ -149,7 +165,7 @@ def page_bookings(
             money(b["price"]),
             esc(SOURCE_RU.get(b["source"], b["source"])),
             _status_badge(b["status"]),
-            _status_buttons(str(b["id"]), b["status"], csrf, back),
+            _status_buttons(str(b["id"]), b["status"], csrf, may_status, back),
         ]
         for b in rows
     ]

@@ -1,4 +1,4 @@
-"""Тесты веб-панели admin_core.web: рендер, форматирование, сессии, запросы.
+﻿"""Тесты веб-панели admin_core.web: рендер, форматирование, сессии, запросы.
 
 Рендер проверяется без БД и без HTTP; запросы — на фикстуре ``demo``.
 """
@@ -33,7 +33,8 @@ from admin_core.web.render import (
 from admin_core.web.render import (
     flash as flash_html,
 )
-from admin_core.web.session import Panel, check_builder_signatures
+from admin_core.web.roles import can_action
+from admin_core.web.session import PageCtx, Panel, check_builder_signatures
 
 TZ = ZoneInfo("Asia/Yekaterinburg")
 SALON = {"id": "11111111-1111-1111-1111-111111111111", "name": "Виктория",
@@ -118,11 +119,10 @@ def test_page_clients_shows_prepayment_flag():
         [{"id": "c1", "name": "Иван", "phone": "+79001234567", "completed_visits": 2,
           "last_visit": datetime(2026, 9, 1, tzinfo=ZoneInfo("UTC")), "upcoming": 1,
           "requires_prepayment": True, "notes": ""}],
-        TZ, SALON, [SALON],
+        TZ, SALON, [SALON], PageCtx(csrf="f" * 32, role="owner"),
     )
     assert "+79001234567" in html
-    assert "требует" in html
-    assert 'value="client_save"' in html
+    assert "требует" in html  # чекбокс предоплаты виден владельцу
 
 
 def test_page_services_and_masters():
@@ -163,10 +163,19 @@ def test_page_audit_renders_json_details():
 
 
 def test_page_settings_shows_plan_and_roadmap():
-    html = page_settings(SALON, [SALON], {"LLM_PROVIDER": "yandexgpt"})
+    html = page_settings(
+        SALON, [SALON], {"LLM_PROVIDER": "yandexgpt"},
+        session={"login": "boss@test.ru", "role": "owner"},
+        team=[{"login": "boss@test.ru", "name": "Иван", "role": "owner",
+               "totp_enabled": True, "last_login_at": None}],
+    )
     assert "Пробный" in html
     assert "yandexgpt" in html
-    assert "только читает данные" in html
+    assert "Владелец точки" in html          # кто вошёл и его роль
+    assert "цены и услуги" in html           # права роли показаны
+    assert "Команда точки" in html           # список команды
+    assert "2FA включена" in html
+    assert "MVP 0.2" in html
 
 
 def test_tile_escapes_value():
@@ -229,8 +238,9 @@ def test_panel_login_and_session_lifetime():
 
 def test_panel_expired_session_is_dropped():
     panel = Panel(pool=None, password="secret")
-    token = panel.login("secret")
-    panel.sessions[token] = datetime.now(ZoneInfo("UTC")) - timedelta(seconds=1)
+    token = panel.login("secret") or ""
+    session = panel.sessions[token]
+    session.until = datetime.now(ZoneInfo("UTC")) - timedelta(seconds=1)
     assert not panel.authorized(token)
     assert token not in panel.sessions
 
@@ -425,45 +435,75 @@ async def test_hours_rejects_bad_window(demo, pool):
     assert bad_day["ok"] is False and bad_day["error"] == "bad_weekday"
 
 
-def test_pages_render_edit_forms_with_csrf():
-    """Страницы правки содержат форму и CSRF-токен (иначе браузер её не отправит)."""
+def test_pages_carry_csrf_token_into_forms():
+    """Формы правки несут CSRF-токен сессии — иначе браузер их не отправит."""
     panel = Panel(pool=None, password="secret")
     token = panel.csrf_token(panel.login("secret") or "")
+    ctx = PageCtx(csrf=token, role="owner", login="boss@test.ru")
     services = page_services(
         [{"id": "s1", "title": "Маникюр", "duration_min": 120, "price": 2000, "is_active": True}],
-        SALON, [SALON], csrf=token,
+        SALON, [SALON], ctx,
     )
     assert 'value="service_save"' in services
     assert token in services
     clients = page_clients(
         [{"id": "c1", "name": "Иван", "phone": "+79", "completed_visits": 1,
           "last_visit": None, "upcoming": 0, "requires_prepayment": False, "notes": ""}],
-        TZ, SALON, [SALON], csrf=token,
+        TZ, SALON, [SALON], ctx,
     )
     assert 'value="client_save"' in clients and token in clients
     masters = page_masters(
         [{"id": "m1", "name": "Мария", "is_active": True, "services_count": 1,
           "hours": '[{"weekday": 1, "start": "10:00:00", "end": "18:00:00"}]'}],
-        SALON, [SALON], csrf=token,
+        SALON, [SALON], ctx,
     )
     assert 'value="hours_save"' in masters
     assert masters.count('name="weekday"') == 7  # все дни недели редактируются
     assert token in masters
 
 
-def test_status_buttons_hidden_without_csrf():
-    """Без CSRF кнопок нет: POST всё равно отбило бы на сервере."""
-    html = page_bookings([dict(BOOKING)], TZ, "", SALON, [SALON], csrf="")
-    assert "Подтвердить" not in html
-    assert 'action="/actions"' not in html
-    with_csrf = page_bookings([dict(BOOKING)], TZ, "", SALON, [SALON], csrf="f" * 32)
-    assert "Подтвердить" in with_csrf and "Отмена" in with_csrf
+OWNER_CTX = PageCtx(csrf="f" * 32, role="owner", login="boss@test.ru")
+STAFF_CTX = PageCtx(csrf="s" * 32, role="staff", login="recep@test.ru")
+
+
+def test_pages_render_edit_forms_only_with_permission():
+    """Права видно и в интерфейсе: у роли без права кнопок правки нет."""
+    services = [
+        {"id": "s1", "title": "Маникюр", "duration_min": 120, "price": 2000, "is_active": True}
+    ]
+    assert 'value="service_save"' in page_services(services, SALON, [SALON], OWNER_CTX)
+    assert 'value="service_save"' not in page_services(services, SALON, [SALON], STAFF_CTX)
+    clients = [
+        {"id": "c1", "name": "Иван", "phone": "+79", "completed_visits": 1,
+         "last_visit": None, "upcoming": 0, "requires_prepayment": False, "notes": ""},
+    ]
+    assert 'value="client_save"' in page_clients(clients, TZ, SALON, [SALON], OWNER_CTX)
+    masters = [
+        {"id": "m1", "name": "Мария", "is_active": True, "services_count": 1,
+         "hours": '[{"weekday": 1, "start": "10:00:00", "end": "18:00:00"}]'},
+    ]
+    owner_masters = page_masters(masters, SALON, [SALON], OWNER_CTX)
+    assert owner_masters.count('name="weekday"') == 7  # 7 дней редактируются
+    staff_masters = page_masters(masters, SALON, [SALON], STAFF_CTX)
+    assert 'name="weekday"' not in staff_masters  # расписание администратор не правит
+    assert "Вт 10:00–18:00" in staff_masters  # но график видит (weekday 1 = вторник)
+
+
+def test_status_buttons_hidden_without_permission():
+    """Кнопок статуса нет ни без csrf, ни у роли без права."""
+    assert "Подтвердить" not in page_bookings([dict(BOOKING)], TZ, "", SALON, [SALON], None)
+    guest = PageCtx(csrf="g" * 32, role="guest")
+    assert "Подтвердить" not in page_bookings([dict(BOOKING)], TZ, "", SALON, [SALON], guest)
+    owner_html = page_bookings([dict(BOOKING)], TZ, "", SALON, [SALON], OWNER_CTX)
+    assert "Подтвердить" in owner_html and "Отмена" in owner_html
+    staff_html = page_bookings([dict(BOOKING)], TZ, "", SALON, [SALON], STAFF_CTX)
+    assert "Подтвердить" in staff_html  # у администратора это как раз его рутина
 
 
 def test_flash_shown_after_action():
     html = page_services(
         [{"id": "s1", "title": "Маникюр", "duration_min": 120, "price": 2000, "is_active": True}],
-        SALON, [SALON], csrf="f" * 32, flash="Цена сохранена",
+        SALON, [SALON], OWNER_CTX, flash="Цена сохранена",
     )
     assert "Цена сохранена" in html and 'class="flash ok"' in html
     err = page_services(
@@ -520,6 +560,153 @@ async def test_agent_stops_on_repeated_tool_calls():
     reply = await session.run_turn("Какие слоты в понедельник?")
     assert reply == CLARIFY_REPLY
     assert LoopProvider.calls == 2  # второй одинаковый вызов — и стоп
+
+
+async def test_authenticate_login_password_and_totp(demo, pool):
+    """Вход: верный пароль — ок; без кода 2FA — просим код; с кодом — ок."""
+    from admin_core.web import users
+    from admin_core.web.auth import generate_totp_secret, totp_code
+
+    secret = generate_totp_secret()
+    unique = str(demo["salon"]["id"])[:8]
+    created = await users.create_user(
+        pool, login=f"boss-{unique}@test.ru", password="parol-12345",
+        role="owner", salon_id=str(demo["salon"]["id"]), name="Иван",
+        totp_secret=secret, totp_enabled=True,
+    )
+    assert created["ok"] is True
+    login = created["login"]
+
+    wrong = await users.authenticate(pool, login, "неправильный")
+    assert wrong["ok"] is False and wrong["error"] == "invalid"
+
+    no_code = await users.authenticate(pool, login, "parol-12345")
+    assert no_code["ok"] is False and no_code["error"] == "need_totp"
+
+    bad_code = await users.authenticate(pool, login, "parol-12345", "000000")
+    assert bad_code["ok"] is False and bad_code["error"] == "need_totp"
+
+    ok = await users.authenticate(pool, login, "parol-12345", totp_code(secret))
+    assert ok["ok"] is True
+    assert ok["user"]["role"] == "owner"
+    assert ok["user"]["id"] == ok["user"]["id"]  # id — строка, а не UUID-объект
+    assert isinstance(ok["user"]["id"], str)
+    assert "password_hash" not in ok["user"] and "totp_secret" not in ok["user"]
+    last_login = await pool.fetchval(
+        "SELECT last_login_at FROM panel_users WHERE login = $1", login
+    )
+    assert last_login is not None
+
+
+async def test_authenticate_rejects_unknown_login_identically(demo, pool):
+    """Неизвестный логин и неверный пароль дают одну ошибку — нельзя перебором узнать, кто есть."""
+    from admin_core.web import users
+
+    unknown = await users.authenticate(pool, "nobody@test.ru", "любой-пароль")
+    assert unknown["error"] == "invalid"
+    assert unknown["message"] == "Неверный логин или пароль"
+
+
+async def test_create_user_validates_input(demo, pool):
+    from admin_core.web import users
+
+    salon_id = str(demo["salon"]["id"])
+    bad_role = await users.create_user(
+        pool, login="x@test.ru", password="parol-12345", role="root", salon_id=salon_id
+    )
+    assert bad_role["ok"] is False and bad_role["error"] == "bad_role"
+
+    bad_login = await users.create_user(
+        pool, login="просто-логин", password="parol-12345", role="owner", salon_id=salon_id
+    )
+    assert bad_login["ok"] is False and bad_login["error"] == "bad_login"
+
+    no_salon = await users.create_user(
+        pool, login="x@test.ru", password="parol-12345", role="owner"
+    )
+    assert no_salon["ok"] is False and no_salon["error"] == "no_salon"
+
+    first = await users.create_user(
+        pool, login="dup@test.ru", password="parol-12345", role="owner", salon_id=salon_id
+    )
+    assert first["ok"] is True
+    again = await users.create_user(
+        pool, login="dup@test.ru", password="parol-12345", role="owner", salon_id=salon_id
+    )
+    assert again["ok"] is False and again["error"] == "exists"
+
+
+async def test_panel_user_login_sets_role_in_session(demo, pool):
+    """Сессия хранит роль: права проверяются на каждом действии."""
+    from admin_core.web import users
+    from admin_core.web.session import Panel
+
+    salon_id = str(demo["salon"]["id"])
+    await users.create_user(
+        pool, login="staffer@test.ru", password="parol-12345", role="staff",
+        salon_id=salon_id,
+    )
+    panel = Panel(pool=pool, password="")
+    token, error = await panel.login_user("staffer@test.ru", "parol-12345")
+    assert token and error == ""
+    assert panel.role_of(token) == "staff"
+    assert can_action(panel.role_of(token), "service_save") is False
+    assert can_action(panel.role_of(token), "booking_status") is True
+
+    bad, error = await panel.login_user("staffer@test.ru", "неверный")
+    assert bad == "" and error == "invalid"
+
+
+async def test_salon_for_session_isolates_tenant(demo, pool):
+    """Владелец не может подменить чужой салон в ?salon= — вернётся его точка."""
+    from admin_core.web.session import Panel, Session
+
+    other = await pool.fetchrow(
+        "INSERT INTO salons (name, timezone) VALUES ('Другой салон', 'Asia/Yekaterinburg') "
+        "RETURNING id",
+    )
+    panel = Panel(pool=pool, password="")
+    session = Session(
+        user=None, role="owner", login="boss@test.ru",
+        salon_id=str(demo["salon"]["id"]),
+        until=datetime.now(ZoneInfo("UTC")) + timedelta(hours=1),
+    )
+
+    class _Req:
+        query = {"salon": str(other["id"])}
+        cookies: dict[str, str] = {}
+
+    salon, salons = await panel.salon_for_session(_Req(), session)
+    assert salon is not None
+    assert str(salon["id"]) == str(demo["salon"]["id"])  # не чужой!
+    assert len(salons) == 1
+
+
+async def test_team_session_sees_all_salons(demo, pool):
+    from admin_core.web.session import Panel, Session
+
+    panel = Panel(pool=pool, password="")
+    session = Session(
+        user=None, role="team", login="admin@test.ru", salon_id=None,
+        until=datetime.now(ZoneInfo("UTC")) + timedelta(hours=1),
+    )
+
+    class _Req:
+        query: dict[str, str] = {}
+        cookies: dict[str, str] = {}
+
+    salon, salons = await panel.salon_for_session(_Req(), session)
+    assert salon is not None and len(salons) > 1  # команда видит все точки
+
+
+def test_login_page_has_login_password_and_totp_fields():
+    base = login_page()
+    assert 'name="login"' in base and 'name="password"' in base
+    assert 'name="code"' not in base
+    with_totp = login_page("Введите код", login="boss@test.ru", need_totp=True)
+    assert 'name="code"' in with_totp
+    assert 'value="boss@test.ru"' in with_totp  # логин не теряем при вводе кода
+    assert "Введите код" in with_totp
 
 
 def test_builder_signature_guard():

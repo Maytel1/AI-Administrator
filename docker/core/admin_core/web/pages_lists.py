@@ -6,7 +6,9 @@ import json
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from .pages_core import _ctx_parts
 from .render import (
+    badge,
     card,
     csrf_field,
     dt_local,
@@ -25,15 +27,25 @@ def page_clients(
     tz: ZoneInfo,
     salon: dict | None,
     salons: list[dict] | None,
-    csrf: str = "",
+    ctx: Any | None = None,
     flash: str = "",
     flash_error: bool = False,
 ) -> str:
     """Клиенты точки: предоплата и заметки правятся прямо здесь — бот читает их в диалоге."""
+    csrf, may_edit = _ctx_parts(ctx, "client_flags")
     sid = esc(salon["id"]) if salon else ""
     back = f"/clients?salon={sid}"
     cards = []
     for c in rows:
+        head = (
+            f'<div class="item"><b>{esc(c["name"] or "Без имени")}</b> '
+            f'<span class="meta">{esc(c["phone"])} · визитов: {c["completed_visits"]} · '
+            f'в очереди: {c["upcoming"]} · был(а): '
+            f'{esc(dt_local(c["last_visit"], tz, "%d.%m.%Y"))}</span>'
+        )
+        if not may_edit:
+            cards.append(head + "</div>")
+            continue
         prepay_checked = ' checked' if c["requires_prepayment"] else ""
         form = (
             '<form method="post" action="/actions" class="stack">'
@@ -51,12 +63,7 @@ def page_clients(
             "<button type=\"submit\">Сохранить</button></div>"
             "</form>"
         )
-        cards.append(
-            f'<div class="item"><b>{esc(c["name"] or "Без имени")}</b> '
-            f'<span class="meta">{esc(c["phone"])} · визитов: {c["completed_visits"]} · '
-            f'в очереди: {c["upcoming"]} · был(а): '
-            f'{esc(dt_local(c["last_visit"], tz, "%d.%m.%Y"))}</span>{form}</div>'
-        )
+        cards.append(head + form + "</div>")
     body = "".join(cards) or (
         '<div class="empty">Клиентов пока нет — они появятся после первых заявок.</div>'
     )
@@ -73,15 +80,24 @@ def page_services(
     rows: list[dict[str, Any]],
     salon: dict | None,
     salons: list[dict] | None,
-    csrf: str = "",
+    ctx: Any | None = None,
     flash: str = "",
     flash_error: bool = False,
 ) -> str:
     """Прайс с правкой цены/длительности/активности — бот читает эти данные в диалоге."""
+    csrf, may_edit = _ctx_parts(ctx, "pricing")
     sid = esc(salon["id"]) if salon else ""
     back = f"/services?salon={sid}"
     cards = []
     for s in rows:
+        head = (
+            f'<div class="item"><b>{esc(s["title"])}</b>'
+            f'<span class="meta">{s["duration_min"]} мин · {money(s["price"])} · '
+            f'{"активна" if s["is_active"] else "выключена"}</span>'
+        )
+        if not may_edit:
+            cards.append(head + "</div>")
+            continue
         active_checked = " checked" if s["is_active"] else ""
         fields = (
             f'<input type="hidden" name="service_id" value="{esc(s["id"])}">'
@@ -103,11 +119,7 @@ def page_services(
             '<div class="cell"><span>&nbsp;</span><button type="submit">Сохранить</button></div>'
             "</form>"
         )
-        cards.append(
-            f'<div class="item"><b>{esc(s["title"])}</b>'
-            f'<span class="meta">{s["duration_min"]} мин · {money(s["price"])} · '
-            f'{"активна" if s["is_active"] else "выключена"}</span>{form}</div>'
-        )
+        cards.append(head + form + "</div>")
     body = "".join(cards) or (
         '<div class="empty">Прайс не загружен: docker compose run --rm cli python cli.py --seed</div>'
     )
@@ -126,13 +138,14 @@ def page_masters(
     rows: list[dict[str, Any]],
     salon: dict | None,
     salons: list[dict] | None,
-    csrf: str = "",
+    ctx: Any | None = None,
     flash: str = "",
     flash_error: bool = False,
 ) -> str:
     """Мастера и их график: слоты нарезаются из него — правка окна меняет доступное время."""
     from .queries import WEEKDAY_RU
 
+    csrf, may_edit = _ctx_parts(ctx, "schedule")
     sid = esc(salon["id"]) if salon else ""
     back = f"/masters?salon={sid}"
     cards = []
@@ -142,7 +155,7 @@ def page_masters(
             hours_raw = json.loads(hours_raw or "[]")
         by_day = {int(h["weekday"]): h for h in hours_raw}
         days = []
-        for wd in range(7):
+        for wd in range(7) if may_edit else ():
             h = by_day.get(wd)
             enabled = h is not None
             start = str((h or {}).get("start", "10:00:00"))[:5]
@@ -260,31 +273,58 @@ def page_audit(
 
 
 def page_settings(
-    salon: dict | None, salons: list[dict] | None, env: dict[str, str]
+    salon: dict | None,
+    salons: list[dict] | None,
+    env: dict[str, str],
+    session: dict[str, Any] | None = None,
+    team: list[dict[str, Any]] | None = None,
 ) -> str:
-    """Настройки точки: тариф, CRM, таймзона — плюс состояние контура."""
+    """Настройки точки: тариф, CRM, таймзона + кто вошёл и команда точки."""
     from .queries import PLAN_RU
+    from .roles import permissions_of, role_label
 
     info = salon or {}
+    me = session or {}
+    role = str(me.get("role", "guest"))
     body = [
+        ["Кто вошёл", f"{me.get('login', '—')} · {role_label(role)}"],
+        ["Права роли", ", ".join(permissions_of(role)) or "только просмотр"],
         ["Название", esc(info.get("name", "—"))],
         ["Тариф", esc(PLAN_RU.get(str(info.get("plan")), str(info.get("plan", "—"))))],
         ["CRM", esc(info.get("crm_provider", "none"))],
         ["Таймзона", esc(info.get("timezone", "—"))],
         ["Режим бота", "Telegram long polling"],
         ["LLM", esc(env.get("LLM_PROVIDER", "—"))],
-        ["Версия панели", "MVP 0.1 (read-only)"],
+        ["Версия панели", "MVP 0.2 (роли и 2FA)"],
     ]
+    people = ""
+    if team:
+        rows = [
+            [
+                esc(u["login"]),
+                esc(u["name"] or "—"),
+                role_label(str(u["role"])),
+                badge("2FA включена", "green")
+                if u["totp_enabled"] else badge("без 2FA", "yellow"),
+                esc(dt_local(u["last_login_at"], ZoneInfo("UTC"), "%d.%m.%Y %H:%M")),
+            ]
+            for u in team
+        ]
+        people = card(
+            "Команда точки",
+            table(["Логин", "Имя", "Роль", "Второй фактор", "Был(а)"], rows, "Пока никого"),
+        )
     note = (
         '<div class="card"><h2>Что дальше</h2><p class="sub" style="margin:0">'
-        "Редактирование расписания, услуг и FAQ, сотрудники и роли, биллинг — "
-        "по плану фазы 4 (DEVELOPMENT_PLAN.md §8.2). Сейчас панель только читает данные."
+        "Создание учётных записей из панели, HTTPS+HSTS, отчёты и биллинг — "
+        "по плану фазы 4 (DEVELOPMENT_PLAN.md §8.2)."
         "</p></div>"
     )
     content = (
         "<h1>Настройки</h1>"
-        '<p class="sub">Параметры подключённой точки</p>'
-        + card("Точка", table(["Параметр", "Значение"], body))
+        '<p class="sub">Параметры точки и доступ в панель</p>'
+        + card("Точка и доступ", table(["Параметр", "Значение"], body))
+        + people
         + note
     )
     return layout("Настройки", "/settings", content, salon=salon, salons=salons)

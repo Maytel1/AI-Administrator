@@ -1,10 +1,11 @@
-"""web-service — HTTP-обвязка веб-панели «Дежурный24» (фаза 4).
+﻿"""web-service — HTTP-обвязка веб-панели «Дежурный24» (фаза 4).
 
-Логика панели живёт в ``admin_core.web`` (запросы, страницы, сессии), здесь
-только транспорт: логин, роуты разделов, статика и health/metrics.
+Логика панели живёт в ``admin_core.web`` (запросы, страницы, сессии, роли),
+здесь только транспорт: логин, роуты разделов, статика и health/metrics.
 
-Доступ (DEVELOPMENT_PLAN.md §8.2): пароль ``WEB_PANEL_PASSWORD``, сессия в cookie
-с httponly, изоляция выборок по ``salon_id``. В проде — HTTPS + TOTP-2FA (TODO).
+Доступ (DEVELOPMENT_PLAN.md §8.2): учётные записи с ролями (owner/staff/team),
+опциональный TOTP, CSRF-токен на форме, изоляция выборок по ``salon_id``.
+Права проверяются дважды: недоступное прячется в UI и отбивается на сервере.
 """
 
 import os
@@ -17,7 +18,7 @@ from zoneinfo import ZoneInfo
 
 from admin_core.db import get_pool, run_migrations
 from admin_core.health import ServiceMetrics, make_health_app, start_health_server
-from admin_core.web import actions, dashboard, queries
+from admin_core.web import actions, dashboard, queries, users
 from admin_core.web.pages_core import page_bookings, page_today
 from admin_core.web.pages_lists import (
     page_audit,
@@ -28,12 +29,20 @@ from admin_core.web.pages_lists import (
     page_settings,
 )
 from admin_core.web.render import layout, login_page
-from admin_core.web.session import SESSION_COOKIE, Panel, check_builder_signatures
+from admin_core.web.roles import audit_actor, can, can_action, role_label
+from admin_core.web.session import (
+    SESSION_COOKIE,
+    PageCtx,
+    Panel,
+    check_builder_signatures,
+)
 
 STATIC_DIR = Path(__file__).parent
 
 
-async def _today(panel: Panel, salon: dict, salons: list[dict], request: Any, csrf: str = "") -> str:
+async def _today(
+    panel: Panel, salon: dict, salons: list[dict], request: Any, ctx: PageCtx | None = None
+) -> str:
     """Дашборд дня: сутки салона по его таймзоне."""
     tz = await queries.salon_tz(panel.pool, str(salon["id"]))
     start, end = queries.day_bounds(tz)
@@ -41,7 +50,7 @@ async def _today(panel: Panel, salon: dict, salons: list[dict], request: Any, cs
     schedule = await dashboard.schedule_for_day(panel.pool, str(salon["id"]), start, end)
     panel.metrics.messages.labels("page_view").inc()
     msg, err = _flash_from(request)
-    return page_today(stats, schedule, tz, salon, salons, csrf, msg, err)
+    return page_today(stats, schedule, tz, salon, salons, ctx, msg, err)
 
 
 def _flash_from(request: Any) -> tuple[str, bool]:
@@ -50,7 +59,7 @@ def _flash_from(request: Any) -> tuple[str, bool]:
 
 
 async def _bookings(
-    panel: Panel, salon: dict, salons: list[dict], request: Any, csrf: str = ""
+    panel: Panel, salon: dict, salons: list[dict], request: Any, ctx: PageCtx | None = None
 ) -> str:
     """Лента записей за ±30 дней вокруг «сейчас»; статус — из query."""
     tz = await queries.salon_tz(panel.pool, str(salon["id"]))
@@ -60,36 +69,36 @@ async def _bookings(
     status = request.query.get("status", "")
     rows = await queries.bookings_between(panel.pool, str(salon["id"]), start, end, status)
     msg, err = _flash_from(request)
-    return page_bookings(rows, tz, status, salon, salons, csrf, msg, err)
+    return page_bookings(rows, tz, status, salon, salons, ctx, msg, err)
 
 
 async def _clients(
-    panel: Panel, salon: dict, salons: list[dict], request: Any, csrf: str = ""
+    panel: Panel, salon: dict, salons: list[dict], request: Any, ctx: PageCtx | None = None
 ) -> str:
     tz = await queries.salon_tz(panel.pool, str(salon["id"]))
     rows = await queries.clients_list(panel.pool, str(salon["id"]))
     msg, err = _flash_from(request)
-    return page_clients(rows, tz, salon, salons, csrf, msg, err)
+    return page_clients(rows, tz, salon, salons, ctx, msg, err)
 
 
 async def _services(
-    panel: Panel, salon: dict, salons: list[dict], request: Any, csrf: str = ""
+    panel: Panel, salon: dict, salons: list[dict], request: Any, ctx: PageCtx | None = None
 ) -> str:
     rows = await queries.services_list(panel.pool, str(salon["id"]))
     msg, err = _flash_from(request)
-    return page_services(rows, salon, salons, csrf, msg, err)
+    return page_services(rows, salon, salons, ctx, msg, err)
 
 
 async def _masters(
-    panel: Panel, salon: dict, salons: list[dict], request: Any, csrf: str = ""
+    panel: Panel, salon: dict, salons: list[dict], request: Any, ctx: PageCtx | None = None
 ) -> str:
     rows = await queries.masters_list(panel.pool, str(salon["id"]))
     msg, err = _flash_from(request)
-    return page_masters(rows, salon, salons, csrf, msg, err)
+    return page_masters(rows, salon, salons, ctx, msg, err)
 
 
 async def _dialogs(
-    panel: Panel, salon: dict, salons: list[dict], request: Any, csrf: str = ""
+    panel: Panel, salon: dict, salons: list[dict], request: Any, ctx: PageCtx | None = None
 ) -> str:
     """Лента диалогов; ``?id=<dialog_id>`` — раскрыть переписку."""
     tz = await queries.salon_tz(panel.pool, str(salon["id"]))
@@ -102,7 +111,7 @@ async def _dialogs(
 
 
 async def _audit(
-    panel: Panel, salon: dict, salons: list[dict], request: Any, csrf: str = ""
+    panel: Panel, salon: dict, salons: list[dict], request: Any, ctx: PageCtx | None = None
 ) -> str:
     tz = await queries.salon_tz(panel.pool, str(salon["id"]))
     rows = await queries.audit_list(panel.pool, str(salon["id"]))
@@ -111,10 +120,18 @@ async def _audit(
 
 
 async def _settings(
-    panel: Panel, salon: dict, salons: list[dict], request: Any, csrf: str = ""
+    panel: Panel, salon: dict, salons: list[dict], request: Any, ctx: PageCtx | None = None
 ) -> str:
+    """Настройки: показываем, кто вошёл, его права и команду точки."""
     env = {"LLM_PROVIDER": os.getenv("LLM_PROVIDER", "—")}
-    return page_settings(salon, salons, env)
+    session = panel.session_of(request.cookies.get(SESSION_COOKIE, ""))
+    if session is None:
+        raise RuntimeError("сессия потеряна между проверкой и обработкой")
+    who = {"login": session.login, "role": session.role}
+    team = None
+    if can(session.role, "users"):
+        team = await users.list_users(panel.pool, str(salon["id"]))
+    return page_settings(salon, salons, env, who, team)
 
 
 def build_app(panel: Panel) -> Any:
@@ -123,11 +140,12 @@ def build_app(panel: Panel) -> Any:
 
     async def page(request: Any, builder: Any) -> Any:
         """Общая обвязка раздела: проверка доступа, выбор салона, HTML-ответ."""
-        session = request.cookies.get(SESSION_COOKIE, "")
-        if not panel.authorized(session):
+        session_token = request.cookies.get(SESSION_COOKIE, "")
+        if not panel.authorized(session_token):
             return web.Response(text=login_page(), content_type="text/html")
+        session = panel.session_of(session_token)
         try:
-            salon, salons = await panel.salon_or_first(request)
+            salon, salons = await panel.salon_for_session(request, session)
             if salon is None:
                 return web.Response(
                     text=layout(
@@ -139,7 +157,12 @@ def build_app(panel: Panel) -> Any:
                     content_type="text/html",
                 )
             html = await builder(
-                panel, salon, salons, request, panel.csrf_token(session)
+                panel, salon, salons, request,
+                PageCtx(
+                    csrf=panel.csrf_token(session_token),
+                    role=session.role if session else "guest",
+                    login=session.login if session else "",
+                ),
             )
         except Exception:  # noqa: BLE001 — панель показывает заглушку, а не падает
             panel.metrics.errors.labels("page").inc()
@@ -154,22 +177,37 @@ def build_app(panel: Panel) -> Any:
     async def do_action(request: Any) -> Any:
         """POST /actions — единственная точка правки данных из панели.
 
-        Проверяем сессию и CSRF, дальше форма уходит в ``admin_core.web.actions``:
-        салон берётся из сессии выбора, а не из формы — подменить нельзя.
+        Порядок проверок: сессия → CSRF → роль на конкретное действие.
+        Салон берётся из сессии, а не из формы: подменить нельзя.
         """
-        session = request.cookies.get(SESSION_COOKIE, "")
-        if not panel.authorized(session):
+        session_token = request.cookies.get(SESSION_COOKIE, "")
+        session = panel.session_of(session_token)
+        if not panel.authorized(session_token):
             return web.HTTPFound("/login")
         form = await request.post()
-        if not panel.csrf_ok(session, str(form.get("csrf", ""))):
+        if not panel.csrf_ok(session_token, str(form.get("csrf", ""))):
             panel.metrics.errors.labels("csrf").inc()
-            return web.HTTPFound("/today?err=1&msg=" + quote(
-                "Форма устарела — обновите страницу и попробуйте снова", safe=""
-            ))
-        salon, _salons = await panel.salon_or_first(request)
+            return web.HTTPFound(
+                "/today?err=1&msg=" + quote("Форма устарела — обновите страницу", safe="")
+            )
+        role = session.role if session else "guest"
+        action = str(form.get("action", ""))
+        if not can_action(role, action):
+            panel.metrics.errors.labels("forbidden").inc()
+            return web.HTTPFound(
+                "/today?err=1&msg=" + quote(
+                    f"Роли «{role_label(role)}» не хватает прав на это действие", safe=""
+                )
+            )
+        if session is None:
+            return web.HTTPFound("/login")
+        salon, _salons = await panel.salon_for_session(request, session)
         if salon is None:
             return web.HTTPFound("/today?err=1&msg=" + quote("Нет подключённых точек", safe=""))
-        result = await actions.apply_form(panel.pool, str(salon["id"]), form)
+        actor = audit_actor(role, session.login)
+        result = await actions.apply_form(
+            panel.pool, str(salon["id"]), form, actor=actor
+        )
         back = str(form.get("back", "/today")) or "/today"
         if back.startswith("/") and "salon=" not in back:
             back = back + ("&" if "?" in back else "?") + f"salon={salon['id']}"
@@ -187,10 +225,24 @@ def build_app(panel: Panel) -> Any:
         return web.Response(text=login_page(), content_type="text/html")
 
     async def login_post(request: Any) -> Any:
-        data = await request.post()
-        token = panel.login(str(data.get("password", "")))
+        form = await request.post()
+        login = str(form.get("login", "")).strip()
+        password = str(form.get("password", ""))
+        code = str(form.get("code", ""))
+        token, error = await panel.login_user(login, password, code)
+        if error == "need_totp":
+            return web.Response(
+                text=login_page(
+                    "Введите код из приложения-аутентификатора",
+                    login=login, need_totp=True,
+                ),
+                content_type="text/html",
+            )
         if not token:
-            return web.Response(text=login_page("Неверный пароль"), content_type="text/html")
+            return web.Response(
+                text=login_page("Неверный логин или пароль", login=login),
+                content_type="text/html",
+            )
         resp = web.HTTPFound("/today")
         resp.set_cookie(SESSION_COOKIE, token, httponly=True, samesite="Lax", path="/")
         return resp

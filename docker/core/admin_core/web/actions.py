@@ -66,11 +66,15 @@ def fail(code: str, message: str = "") -> dict[str, Any]:
     return {"ok": False, "error": code, "message": message or ERRORS.get(code, code)}
 
 
-async def apply_form(pool: Any, salon_id: str, form: dict[str, Any]) -> dict[str, Any]:
+async def apply_form(
+    pool: Any, salon_id: str, form: dict[str, Any], *, actor: str = "owner:panel"
+) -> dict[str, Any]:
     """Единая точка входа для всех форм панели.
 
     ``form["action"]`` — что делаем; остальные поля зависят от действия.
+    ``actor`` — кто именно правит: роль и логин попадают в ``audit_log``.
     Наружу отдаём словарь с ``ok`` и понятным человеку ``message``.
+    Проверку роли делает вызывающий (HTTP-слой) — здесь только бизнес-правила.
     """
     crm = InternalCRM(pool)
     action = str(form.get("action", ""))
@@ -80,7 +84,7 @@ async def apply_form(pool: Any, salon_id: str, form: dict[str, Any]) -> dict[str
         status = str(form.get("status", ""))
         if not booking_id:
             return fail("not_found")
-        result = await crm.set_booking_status(salon_id, booking_id, status)
+        result = await crm.set_booking_status(salon_id, booking_id, status, actor=actor)
         if not result["ok"]:
             return fail(result.get("error", "save_failed"))
         label = {
@@ -102,7 +106,8 @@ async def apply_form(pool: Any, salon_id: str, form: dict[str, Any]) -> dict[str
         if not MIN_DURATION <= duration <= MAX_DURATION:
             return fail("bad_duration")
         result = await crm.update_service(
-            salon_id, service_id, price=price, duration_min=duration, is_active=active
+            salon_id, service_id, price=price, duration_min=duration,
+            is_active=active, actor=actor,
         )
         if not result["ok"]:
             return fail(result.get("error", "save_failed"))
@@ -114,7 +119,7 @@ async def apply_form(pool: Any, salon_id: str, form: dict[str, Any]) -> dict[str
         notes = str(form.get("notes", "")).strip()
         prepay = "requires_prepayment" in form
         result = await crm.set_client_flags(
-            salon_id, client_id, requires_prepayment=prepay, notes=notes
+            salon_id, client_id, requires_prepayment=prepay, notes=notes, actor=actor
         )
         if not result["ok"]:
             return fail(result.get("error", "save_failed"))
@@ -138,7 +143,7 @@ async def apply_form(pool: Any, salon_id: str, form: dict[str, Any]) -> dict[str
                 salon_id, master_id, weekday, start, end
             )
         result = await crm.set_working_hours(
-            salon_id, master_id, weekday, start=start, end=end, enabled=enabled
+            salon_id, master_id, weekday, start=start, end=end, enabled=enabled, actor=actor
         )
         if not result["ok"]:
             return fail(result.get("error", "save_failed"))

@@ -1,4 +1,4 @@
-# AI-администратор для автосервисов и стоматологий — документы проекта
+﻿# AI-администратор для автосервисов и стоматологий — документы проекта
 
 Продукт: голосовой + текстовый AI-администратор (звонки 24/7, WhatsApp/Telegram,
 запись в YCLIENTS/Altegio, AMO CRM, I-dent, 1С:Медицина, Medesk) для автосервисов и
@@ -73,7 +73,7 @@ ruff check docker                                  # стиль/импорты/�
 python -m mypy docker/core/admin_core --ignore-missing-imports
 
 # тесты (нужен запущенный postgres из docker/):
-cd docker && docker compose run --rm cli python -m pytest -q   # 63 теста
+cd docker && docker compose run --rm cli python -m pytest -q   # 84 теста
 ```
 
 CI — `.github/workflows/ci.yml`, на каждый push/PR: **lint** (ruff + mypy + compileall) →
@@ -85,8 +85,16 @@ CI — `.github/workflows/ci.yml`, на каждый push/PR: **lint** (ruff + m
 `docker/core/admin_core/ratelimit.py`.
 
 Веб-панель (фаза 4, MVP): `docker compose up -d web` → http://localhost:8082/today,
-вход по `WEB_PANEL_PASSWORD`; `/health` и `/metrics` — на 8083. Разделы: Сегодня, Записи,
-Клиенты, Прайс, Мастера, Диалоги, Аудит, Настройки. **Правки работают**: цены и длительность
-услуг, рабочие дни мастера, статус записи, предоплата и заметки клиента — каждая правка
-в `audit_log`. Логика — `docker/core/admin_core/web`, разбор референса и дорожная карта —
+вход по e-mail и паролю (`panel_users`, PBKDF2), при необходимости — код TOTP;
+`/health` и `/metrics` — на 8083. Разделы: Сегодня, Записи, Клиенты, Прайс, Мастера,
+Диалоги, Аудит, Настройки. **Правки работают**: цены и длительность услуг, рабочие
+дни мастера, статус записи, предоплата и заметки клиента — каждая правка в `audit_log`
+с указанием роли и логина. Роли: владелец точки, администратор, наша команда.
+Логика — `docker/core/admin_core/web`, разбор референса и дорожная карта —
 `ADMIN_PANEL.md`.
+
+Учётные записи создаются из CLI (пароль и секрет 2FA печатаются один раз):
+```
+docker compose run --rm cli python cli.py --user boss@example.com --role owner \
+    --password "пароль-не-короче-8" --salon "Виктория" [--totp]
+```

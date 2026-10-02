@@ -134,9 +134,16 @@ def layout(
     )
 
 
-def login_page(error: str = "") -> str:
-    """Вход по паролю (DEVELOPMENT_PLAN.md §8.2)."""
-    msg = f'<div class="msg">{esc(error)}</div>' if error else ""
+def login_page(error: str = "", *, login: str = "", need_totp: bool = False) -> str:
+    """Вход в панель: логин + пароль (+ код 2FA, если у пользователя включена)."""
+    msg = f'<div class="flash err">{esc(error)}</div>' if error else ""
+    totp_field = ""
+    if need_totp:
+        totp_field = (
+            '<label for="code">Код из приложения (6 цифр)</label>'
+            '<input id="code" name="code" type="text" inputmode="numeric" '
+            'pattern="[0-9]{6}" maxlength="6" autofocus required>'
+        )
     return (
         '<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
@@ -146,8 +153,12 @@ def login_page(error: str = "") -> str:
         '<div class="brand" style="padding:0 0 6px">Дежурный<span>24</span></div>'
         '<div class="sub">Панель управления точкой</div>'
         f"{msg}"
-        "<label for=\"pwd\">Пароль</label>"
-        '<input id="pwd" name="password" type="password" autofocus required>'
+        '<label for="login">Логин (e-mail)</label>'
+        f'<input id="login" name="login" type="email" value="{esc(login)}" '
+        f"{'autofocus' if not need_totp else ''} required>"
+        '<label for="pwd">Пароль</label>'
+        '<input id="pwd" name="password" type="password" required>'
+        f"{totp_field}"
         '<div style="margin-top:18px"><button type="submit" style="width:100%">Войти</button></div>'
         "</form></div></body></html>"
     )

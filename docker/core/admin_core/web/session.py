@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import secrets
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -16,19 +17,58 @@ from zoneinfo import ZoneInfo
 from admin_core.health import ServiceMetrics
 
 from . import queries
+from .roles import can
+from .users import authenticate
 
 SESSION_TTL = timedelta(hours=12)
 SESSION_COOKIE = "dz24_session"
 
 
-class Panel:
-    """Состояние панели: пул БД, метрики, таблица сессий."""
+@dataclass
+class PageCtx:
+    """Что странице нужно знать о текущем посетителе.
 
-    def __init__(self, pool: Any, password: str, *, metrics: ServiceMetrics | None = None) -> None:
+    Роль — чтобы прятать недоступные действия из интерфейса (сервер всё равно
+    проверяет права повторно), csrf — чтобы формы проходили проверку.
+    """
+
+    csrf: str
+    role: str
+    login: str = ""
+
+    def may(self, permission: str) -> bool:
+        """Показать действие в UI только если роль действительно может им воспользоваться."""
+        return can(self.role, permission)
+
+
+@dataclass
+class Session:
+    """Одна сессия панели: кто вошёл, с какой ролью и до какого момента."""
+
+    user: dict[str, Any] | None
+    role: str
+    login: str
+    salon_id: str | None
+    until: datetime
+
+    @property
+    def can_see_all_salons(self) -> bool:
+        """Команда видит все точки; владелец — только свою."""
+        return self.role == "team"
+
+
+class Panel:
+    """Состояние панели: пул БД, метрики, таблица сессий.
+
+    Сессия хранит не только токен, но и пользователя с ролью — права проверяются
+    на каждом действии, а не только на входе (роль может измениться).
+    """
+
+    def __init__(self, pool: Any, password: str = "", *, metrics: ServiceMetrics | None = None) -> None:
         self.pool = pool
-        self.password = password
+        self.password = password  # запасной вход для демо, если нет учёток
         self.metrics = metrics or ServiceMetrics("web-service")
-        self.sessions: dict[str, datetime] = {}
+        self.sessions: dict[str, Session] = {}
         # серверный секрет для CSRF: токен привязан к сессии, подделать его нельзя
         self.secret = secrets.token_bytes(32)
 
@@ -42,26 +82,52 @@ class Panel:
             return False
         return hmac.compare_digest(self.csrf_token(session_token), submitted)
 
+    async def login_user(self, login: str, password: str, code: str = "") -> tuple[str, str]:
+        """Вход по учётной записи. Возвращает (токен, ошибка); токен '' — не вошли."""
+        result = await authenticate(self.pool, login, password, code)
+        if not result["ok"]:
+            if result["error"] == "need_totp":
+                return "", "need_totp"
+            self.metrics.errors.labels("login").inc()
+            return "", "invalid"
+        user = result["user"]
+        token = secrets.token_urlsafe(24)
+        self.sessions[token] = Session(
+            user=user, role=user["role"], login=user["login"],
+            salon_id=user["salon_id"], until=datetime.now(ZoneInfo("UTC")) + SESSION_TTL,
+        )
+        self.metrics.messages.labels("login").inc()
+        return token, ""
+
     def login(self, password: str) -> str | None:
-        """Сверяем пароль константным временем; при успехе — токен сессии."""
+        """Аварийный вход по общему паролю из env — только когда учёток нет."""
         if not self.password or not hmac.compare_digest(password, self.password):
             self.metrics.errors.labels("login").inc()
             return None
         token = secrets.token_urlsafe(24)
-        self.sessions[token] = datetime.now(ZoneInfo("UTC")) + SESSION_TTL
+        self.sessions[token] = Session(
+            user=None, role="team", login="env",
+            salon_id=None, until=datetime.now(ZoneInfo("UTC")) + SESSION_TTL,
+        )
         return token
 
     def authorized(self, token: str) -> bool:
         """Проверка cookie; просроченные и чужие токены попутно вычищаем."""
-        if not token:
+        session = self.sessions.get(token or "")
+        if session is None:
             return False
-        until = self.sessions.get(token)
-        if until is None:
-            return False
-        if datetime.now(ZoneInfo("UTC")) > until:
+        if datetime.now(ZoneInfo("UTC")) > session.until:
             self.sessions.pop(token, None)
             return False
         return True
+
+    def session_of(self, token: str) -> Session | None:
+        return self.sessions.get(token or "")
+
+    def role_of(self, token: str) -> str:
+        """Роль текущей сессии; без сессии — гость (ни одного права)."""
+        session = self.sessions.get(token or "")
+        return session.role if session else "guest"
 
     def logout(self, token: str) -> None:
         self.sessions.pop(token or "", None)
@@ -75,6 +141,26 @@ class Panel:
         wanted = request.query.get("salon") or request.cookies.get("salon")
         found = next((s for s in salons if str(s["id"]) == str(wanted)), None)
         return found or (salons[0] if salons else None), salons
+
+    async def salon_for_session(
+        self, request: Any, session: Session
+    ) -> tuple[dict | None, list[dict]]:
+        """Выбор салона с учётом роли.
+
+        Команда видит все точки и может переключаться; владелец и администратор
+        ограничены своей точкой — даже если подставить чужой ``?salon=``, вернётся
+        его салон, а не чужой (изоляция по tenant_id).
+        """
+        if not session.can_see_all_salons:
+            mine = session.salon_id
+            row = await self.pool.fetchrow(
+                "SELECT id, name, plan, crm_provider, timezone FROM salons "
+                "WHERE id = $1 AND is_active",
+                mine,
+            )
+            own = dict(row) if row else None
+            return own, [own] if own else []
+        return await self.salon_or_first(request)
 
 
 def check_builder_signatures(builders: dict[str, Any]) -> None:
