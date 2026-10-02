@@ -73,7 +73,7 @@ ruff check docker                                  # стиль/импорты/�
 python -m mypy docker/core/admin_core --ignore-missing-imports
 
 # тесты (нужен запущенный postgres из docker/):
-cd docker && docker compose run --rm cli python -m pytest -q   # 22 теста
+cd docker && docker compose run --rm cli python -m pytest -q   # 44 теста
 ```
 
 CI — `.github/workflows/ci.yml`, на каждый push/PR: **lint** (ruff + mypy + compileall) →
@@ -83,3 +83,8 @@ CI — `.github/workflows/ci.yml`, на каждый push/PR: **lint** (ruff + m
 Мониторинг ТГ-бота: `GET :8080/health` (JSON, 503 при недоступной БД) и `GET :8080/metrics`
 (Prometheus-формат) — модуль `docker/core/admin_core/health.py`; rate-limit сообщений —
 `docker/core/admin_core/ratelimit.py`.
+
+Веб-панель (фаза 4, MVP): `docker compose up -d web` → http://localhost:8082/today,
+вход по `WEB_PANEL_PASSWORD`; `/health` и `/metrics` — на 8083. Разделы: Сегодня, Записи,
+Клиенты, Прайс, Мастера, Диалоги, Аудит, Настройки. Логика — `docker/core/admin_core/web`,
+разбор референса и дорожная карта — `ADMIN_PANEL.md`.

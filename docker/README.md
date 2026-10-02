@@ -24,6 +24,7 @@ docker compose logs -f bot-service
 | bot-service | ai-admin-bot | 8080→8080 | скелет. **Фаза 2:** aiogram (Telegram) + pywa (WhatsApp) |
 | call-service | ai-admin-call | 8081→8080 | скелет. **Фаза 3:** Pipecat: VAD → SpeechKit STT → LLM → TTS, SIP |
 | worker | ai-admin-worker | — | скелет. **Фазы 4–5:** outbox, напоминания, рободо-звон, лимиты тарифа |
+| web | ai-admin-web | 8082→8080, 8083→8081 | **Фаза 4:** веб-панель точки — http://localhost:8082/today |
 
 Каждый сервис при старте печатает отчёт конфигурации (какие ключи заданы в `.env`) и ждёт PostgreSQL.
 
@@ -42,6 +43,13 @@ docker compose run --rm cli python -m pytest -q      # тесты (нужен з
 ```
 
 После создания YC-аккаунта: в `docker/.env` → `LLM_PROVIDER=yandexgpt`, `YC_API_KEY`, `YC_FOLDER_ID`.
+## Веб-панель (фаза 4)
+
+`docker compose up -d web` → http://localhost:8082/today, пароль — `WEB_PANEL_PASSWORD`
+в `.env` (если переменная не задана, вход закрыт полностью). Разделы: Сегодня, Записи,
+Клиенты, Прайс, Мастера, Диалоги, Аудит, Настройки. MVP только читает данные
+(правки расписания и услуг — следующий шаг фазы 4). `/health` и `/metrics` — на 8083.
+Разбор референса и дорожная карта панели: `ADMIN_PANEL.md`.
 
 ## Telegram-бот (фаза 2)
 

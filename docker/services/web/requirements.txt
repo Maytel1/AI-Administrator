@@ -1,0 +1,4 @@
+# Фаза 4: веб-панель (личный кабинет точки + админка команды) — aiohttp, как health-сервер.
+aiohttp>=3.9,<4
+asyncpg>=0.30,<0.31
+prometheus-client>=0.20,<2   # /health и /metrics через admin_core.health

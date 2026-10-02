@@ -1,0 +1,127 @@
+"""Общий каркас HTML панели: сайдбар, плитки, таблицы, бейджи.
+
+Каркас собирается строками — без шаблонизатора: панели не нужна лишняя
+зависимость, а весь текст всё равно проходит через ``html.escape``.
+Стиль — ``app/static.css``, отдаётся сервисом отдельным маршрутом.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
+from html import escape
+from typing import Any, Iterable
+from zoneinfo import ZoneInfo
+
+NAV = [
+    ("/today", "Сегодня", "◎"),
+    ("/bookings", "Записи", "▦"),
+    ("/clients", "Клиенты", "☺"),
+    ("/services", "Прайс", "₽"),
+    ("/masters", "Мастера", "✂"),
+    ("/dialogs", "Диалоги", "✉"),
+    ("/audit", "Аудит", "⚑"),
+    ("/settings", "Настройки", "⚙"),
+]
+
+
+def esc(value: Any) -> str:
+    """Экранирование: в панель попадают имена и телефоны клиентов (ПДн)."""
+    return escape("" if value is None else str(value), quote=True)
+
+
+def money(value: Any) -> str:
+    """1200.0 → «1 200 ₽» — разряды неразрывным пробелом, как принято в прайсах."""
+    try:
+        n = float(value or 0)
+    except (TypeError, ValueError):
+        return "—"
+    return f"{int(round(n)):,}".replace(",", " ") + " ₽"
+
+
+def dt_local(value: Any, tz: ZoneInfo, fmt: str = "%H:%M") -> str:
+    """Время из БД (aware UTC) → местное время салона."""
+    if value is None:
+        return "—"
+    if not isinstance(value, datetime):
+        return str(value)
+    return value.astimezone(tz).strftime(fmt)
+
+
+def badge(text: str, tone: str = "gray") -> str:
+    return f'<span class="badge b-{tone}">{esc(text)}</span>'
+
+
+def tile(value: str, label: str, tone: str = "") -> str:
+    style = f' style="color:var(--{tone})"' if tone else ""
+    return f'<div class="tile"><b{style}>{esc(value)}</b><span>{esc(label)}</span></div>'
+
+
+def card(title: str, body: str) -> str:
+    return f'<div class="card"><h2>{esc(title)}</h2>{body}</div>'
+
+
+def table(headers: Iterable[str], rows: list[list[str]], empty: str = "Пока пусто") -> str:
+    """Пустую таблицу заменяем подсказкой — пустая сетка выглядит как ошибка."""
+    if not rows:
+        return f'<div class="empty">{esc(empty)}</div>'
+    head = "".join(f"<th>{esc(h)}</th>" for h in headers)
+    body = "".join("<tr>" + "".join(f"<td>{c}</td>" for c in r) + "</tr>" for r in rows)
+    return f"<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
+
+
+def layout(
+    title: str,
+    active: str,
+    content: str,
+    *,
+    salon: dict | None = None,
+    salons: list[dict] | None = None,
+) -> str:
+    """Страница целиком: сайдбар с активным разделом и переключатель салона."""
+    sid = salon["id"] if salon else ""
+    nav = "".join(
+        f'<a href="{path}?salon={esc(sid)}" class="{"active" if path == active else ""}">'
+        f"<i>{icon}</i>{esc(name)}</a>"
+        for path, name, icon in NAV
+    )
+    switch = ""
+    if salons:
+        opts = "".join(
+            f'<option value="{esc(s["id"])}"{" selected" if sid == str(s["id"]) else ""}>'
+            f'{esc(s["name"])}</option>'
+            for s in salons
+        )
+        switch = (
+            '<form method="get" action="/salon" style="min-width:210px">'
+            f'<select name="id" onchange="this.form.submit()">{opts}</select></form>'
+        )
+    return (
+        '<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        f"<title>{esc(title)} — Дежурный24</title>"
+        '<link rel="stylesheet" href="/static.css"></head><body>'
+        '<div class="shell"><aside><div class="brand">Дежурный<span>24</span></div>'
+        f"<nav>{nav}</nav>"
+        '<div class="foot">MVP · read-only<br>фаза 4</div></aside>'
+        f'<main><div class="top">{content}{switch}</div></main>'
+        "</div></body></html>"
+    )
+
+
+def login_page(error: str = "") -> str:
+    """Вход по паролю (DEVELOPMENT_PLAN.md §8.2)."""
+    msg = f'<div class="msg">{esc(error)}</div>' if error else ""
+    return (
+        '<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        "<title>Вход — Дежурный24</title>"
+        '<link rel="stylesheet" href="/static.css"></head><body>'
+        '<div class="login"><form method="post" action="/login">'
+        '<div class="brand" style="padding:0 0 6px">Дежурный<span>24</span></div>'
+        '<div class="sub">Панель управления точкой</div>'
+        f"{msg}"
+        "<label for=\"pwd\">Пароль</label>"
+        '<input id="pwd" name="password" type="password" autofocus required>'
+        '<div style="margin-top:18px"><button type="submit" style="width:100%">Войти</button></div>'
+        "</form></div></body></html>"
+    )
