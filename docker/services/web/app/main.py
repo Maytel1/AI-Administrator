@@ -130,17 +130,25 @@ async def _audit(
 async def _reports(
     panel: Panel, salon: dict, salons: list[dict], request: Any, ctx: PageCtx | None = None
 ) -> str:
-    """Отчёт за 30 дней: выручка, воронка бота, загрузка и потери."""
+    """Отчёт за выбранный период + сравнение с предыдущим таким же.
+
+    Период приходит из ``?period=`` (7/30/90/месяц). Про сравнение владелец
+    просит прямо: одно число выручки ничего не значит без «а сколько было».
+    """
     tz = await queries.salon_tz(panel.pool, str(salon["id"]))
-    now = datetime.now(tz)
-    end = (now + timedelta(days=1)).astimezone(ZoneInfo("UTC"))
-    start = (now - timedelta(days=30)).astimezone(ZoneInfo("UTC"))
+    current, previous = reports.resolve_period(request.query.get("period"), tz)
+    salon_id = str(salon["id"])
     data = {
-        "by_day": await reports.revenue_by_day(panel.pool, str(salon["id"]), start, end),
-        "load": await reports.load_by_master(panel.pool, str(salon["id"]), start, end),
-        "funnel": await reports.funnel(panel.pool, str(salon["id"]), start, end),
-        "loss": await reports.cancellations(panel.pool, str(salon["id"]), start, end),
+        "period_key": current.key,
+        "periods": list(reports.PERIODS),
+        "window": current,
+        "previous_window": previous,
+        "by_day": await reports.revenue_by_day(panel.pool, salon_id, current.start, current.end),
+        "load": await reports.load_by_master(panel.pool, salon_id, current.start, current.end),
     }
+    data.update(await reports.compare_periods(panel.pool, salon_id, current, previous))
+    data["funnel"] = data["current"]["funnel"]
+    data["loss"] = data["current"]["loss"]
     msg, err = _flash_from(request)
     return page_reports(data, salon, salons, msg, err)
 

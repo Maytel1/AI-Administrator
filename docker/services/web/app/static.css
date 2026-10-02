@@ -100,6 +100,14 @@ form.stack button{width:100%}
 .chart .bar-fill{width:100%;background:var(--accent);border-radius:3px 3px 0 0;min-height:2px}
 .chart .bar-col span{color:var(--subtle);font-size:9px;margin-top:4px;white-space:nowrap}
 .chart .bar-col:hover .bar-fill{background:var(--accent-hover)}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 4px}
+.tabs .tab{padding:6px 12px;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:13px;background:var(--surface-2)}
+.tabs .tab:hover{background:var(--hover);color:var(--text)}
+.tabs .tab-active{background:var(--accent);border-color:var(--accent);color:#fff}
+.trend{display:block;font-size:11px;margin-top:4px;color:var(--subtle)}
+.trend.up{color:#34d399}
+.trend.down{color:#f87171}
+.trend.flat,.trend.muted{color:var(--subtle)}
 .login{display:flex;min-height:100vh;align-items:center;justify-content:center}
 .login form{
   background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg);

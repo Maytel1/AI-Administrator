@@ -1,0 +1,53 @@
+# Продовый TLS termination для панели. Использование:
+#   1) получить сертификат (Let's Encrypt или коммерческий) и положить в docker/certs:
+#        fullchain.pem  — сертификат + цепочка
+#        privkey.pem    — приватный ключ
+#   2) docker/.env:
+#        WEB_PUBLIC_HOST=panel.example.ru
+#   3) docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Панель в проде наружу не публикуется: порт 8082/8083 остаются только внутри
+# сети compose, снаружи их видит лишь nginx. Иначе WEB_TRUST_PROXY=1 перестанет
+# быть безопасным (любой мог бы подделать X-Forwarded-Proto и получить
+# «защищённое» соединение).
+#
+# HSTS включается ПОСЛЕ того, как HTTPS заработал на реальном домене: браузер
+# запоминает его на год и http://localhost перестанет открываться.
+
+services:
+  web:
+    environment:
+      # nginx — единственный, кто говорит панели «это https»
+      WEB_TRUST_PROXY: "1"
+      WEB_PUBLIC_HOST: ${WEB_PUBLIC_HOST:-}
+      # TLS терминирует nginx, самому вебу сертификат не нужен
+      WEB_TLS_CERT: ""
+      WEB_TLS_KEY: ""
+    ports: !reset []
+    expose:
+      - "8080"
+      - "8081"
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: ai-admin-nginx
+    depends_on:
+      web:
+        condition: service_started
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/options-ssl-params.conf:/etc/nginx/snippets/options-ssl-params.conf:ro
+      - ./nginx/proxy_params_default:/etc/nginx/proxy_params_default:ro
+      - ./certs:/etc/nginx/certs:ro
+      - ./nginx/acme:/var/www/certbot:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      WEB_PUBLIC_HOST: ${WEB_PUBLIC_HOST:-panel.example.ru}
+    healthcheck:
+      test: ["CMD-SHELL", "nginx -t || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped

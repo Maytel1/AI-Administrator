@@ -52,9 +52,14 @@ def badge(text: str, tone: str = "gray") -> str:
     return f'<span class="badge b-{tone}">{esc(text)}</span>'
 
 
-def tile(value: str, label: str, tone: str = "") -> str:
+def tile(value: str, label: str, tone: str = "", extra: str = "") -> str:
+    """Плитка показателя. ``extra`` — необязательная подпись снизу (тренд, сноска)."""
     style = f' style="color:var(--{tone})"' if tone else ""
-    return f'<div class="tile"><b{style}>{esc(value)}</b><span>{esc(label)}</span></div>'
+    foot = f"{extra}" if extra else ""
+    return (
+        f'<div class="tile"><b{style}>{esc(value)}</b><span>{esc(label)}</span>'
+        f"{foot}</div>"
+    )
 
 
 def card(title: str, body: str) -> str:

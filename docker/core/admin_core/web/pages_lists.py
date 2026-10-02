@@ -482,18 +482,27 @@ def page_reports(
     salons: list[dict] | None,
     flash: str = "",
     flash_error: bool = False,
-    days: int = 30,
 ) -> str:
-    """Отчёт за период: деньги, воронка бота, загрузка мастеров и потери."""
-    funnel_stats = data["funnel"]
+    """Отчёт за выбранный период + сравнение с предыдущим таким же."""
+    stats = data["funnel"]
+    diff = data.get("diff") or {}
+    window = data.get("window")
+    label = window.label if window else "период"
+    prev_window = data.get("previous_window")
+    prev_label = prev_window.label if prev_window else "прошлый период"
     tiles = "".join(
         [
-            tile(money(funnel_stats["revenue"]), f"выручка за {days} дней", "green"),
-            tile(str(funnel_stats["bookings"]), "записей"),
-            tile(str(funnel_stats["dialogs"]), "диалогов с клиентами"),
-            tile(f'{funnel_stats["conversion"]}%', "конверсия диалогов в запись", "accent"),
-            tile(money(funnel_stats["avg_check"]), "средний чек"),
-            tile(f'{data["loss"]["lost_rate"]}%', "отмен и неявок", "yellow"),
+            tile(money(stats["revenue"]), f"выручка · {label}", "green",
+                 _trend(diff.get("revenue"))),
+            tile(str(stats["bookings"]), "записей", "", _trend(diff.get("bookings"))),
+            tile(str(stats["dialogs"]), "диалогов с клиентами", "",
+                 _trend(diff.get("dialogs"))),
+            tile(f'{stats["conversion"]}%', "конверсия диалогов в запись", "accent",
+                 _trend(diff.get("conversion"))),
+            tile(money(stats["avg_check"]), "средний чек", "",
+                 _trend(diff.get("avg_check"))),
+            tile(f'{data["loss"]["lost_rate"]}%', "отмен и неявок", "yellow",
+                 _trend(diff.get("lost_rate"), good_down=True)),
         ]
     )
     load_rows = [
@@ -509,18 +518,89 @@ def page_reports(
         ["Всего записей", str(data["loss"]["total"])],
         ["Отменено клиентом", str(data["loss"]["cancelled"])],
         ["Не пришёл", str(data["loss"]["no_show"])],
-        ["Новых клиентов", str(funnel_stats["new_clients"])],
-        ["Затраты на LLM", money(funnel_stats["llm_cost"])],
+        ["Новых клиентов", str(stats["new_clients"])],
+        ["Затраты на LLM", money(stats["llm_cost"])],
     ]
     content = (
         "<h1>Отчёты</h1>"
-        f'<p class="sub">Период: последние {days} дней · по факту записей и диалогов</p>'
         + flash_html(flash, flash_error)
+        + _period_tabs(data.get("periods") or [], data.get("period_key") or "30", salon)
+        + f'<p class="sub">{esc(label)} · сравнение с {esc(prev_label)}'
+        + " · по факту записей и диалогов</p>"
         + f'<div class="tiles">{tiles}</div>'
         + card("Выручка по дням", _bar_chart(data["by_day"], ZoneInfo("UTC")))
+        + card(
+            "Сравнение с прошлым периодом",
+            _compare_table(diff, prev_label) if diff else
+            '<div class="empty">Сравнение появится вместе с выбором периода</div>',
+        )
         + card("Загрузка мастеров", table(
             ["Мастер", "Записей", "Занято", "Выручка"], load_rows, "Данных пока нет",
         ))
         + card("Потери и затраты", table(["Показатель", "Значение"], loss_rows))
     )
     return layout("Отчёты", "/reports", content, salon=salon, salons=salons)
+
+
+def _period_tabs(periods: list[tuple[str, str, Any]], current: str, salon: dict | None) -> str:
+    """Переключатель периода: ссылки, а не форма — период видно в адресной строке."""
+    if not periods:
+        return ""
+    sid = esc(salon["id"]) if salon else ""
+    items = []
+    for key, label, _days in periods:
+        active = " tab-active" if key == current else ""
+        link = f"/reports?period={esc(key)}" + (f"&amp;salon={sid}" if sid else "")
+        items.append(f'<a class="tab{active}" href="{link}">{esc(label)}</a>')
+    return f'<div class="tabs">{"".join(items)}</div>'
+
+
+def _trend(value: dict[str, Any] | None, *, good_down: bool = False) -> str:
+    """Подпись «+12 % к прошлому периоду» под плиткой.
+
+    Пустой прочерк, когда сравнивать не с чем: «+100 %» от нуля — не результат,
+    а ошибка деления, и показывать её нельзя.
+    """
+    if not value:
+        return ""
+    percent = value["percent"]
+    if percent is None:
+        return '<span class="trend muted">не с чем сравнить</span>'
+    tone = "up" if value["change"] > 0 else ("down" if value["change"] < 0 else "flat")
+    if tone != "flat" and good_down:
+        tone = "up" if tone == "down" else "down"
+    sign = "+" if value["change"] > 0 else ""
+    return f'<span class="trend {tone}">{sign}{percent} % к прошлому</span>'
+
+
+def _compare_table(diff: dict[str, Any], prev_label: str) -> str:
+    """Таблица «сейчас / было / изменение» — цифры, а не только проценты."""
+    rows: list[tuple[str, str, bool]] = [
+        ("Выручка", "revenue", True),
+        ("Записей", "bookings", False),
+        ("Диалогов", "dialogs", False),
+        ("Конверсия, %", "conversion", False),
+        ("Средний чек", "avg_check", True),
+        ("Отмен и неявок, %", "lost_rate", False),
+        ("Новых клиентов", "new_clients", False),
+    ]
+    out = []
+    for title, key, is_money in rows:
+        value = diff.get(key)
+        if not value:
+            continue
+        percent = value.get("percent")
+        change = f"{percent:+} %" if percent is not None else "—"
+        fmt = money if is_money else (lambda x: str(int(round(float(x)))))
+        out.append(
+            [
+                esc(title),
+                esc(fmt(value["current"])),
+                esc(fmt(value["previous"])),
+                esc(change),
+            ]
+        )
+    return table(
+        ["Показатель", "Сейчас", esc(prev_label).title(), "Изменение"], out,
+        "Пока нет данных за прошлый период",
+    )

@@ -1,4 +1,4 @@
-﻿__pycache__/
+__pycache__/
 *.pyc
 .env
 
@@ -22,3 +22,7 @@ docker/b_log.txt
 docker/b_err.txt
 docker/up_log.txt
 docker/up_err.txt
+
+
+# prod TLS: certificates and ACME challenge stay out of git
+docker/nginx/acme/
