@@ -59,11 +59,36 @@ jobs:
         working-directory: docker/core
         run: python -m pytest -q
 
+  deploy_ready:
+    name: готовность деплоя
+    # Секреты GitHub недоступны в условии job, поэтому проверяем их отдельным
+    # шагом: пустой DEPLOY_HOST = деплоить некуда, job выключается.
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - id: check
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          if [ -n "$DEPLOY_HOST" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "сервер задан: деплой включён"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "DEPLOY_HOST не задан: деплой пропускается"
+          fi
+
   deploy:
     name: деплой на прод (по ssh)
     # Только main и только если всё зелёное: тесты обязаны пройти до выкатки.
-    needs: [lint, test, docs]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # Пока секреты деплоя не заведены, job пропускается: иначе каждый пуш в main
+    # давал бы красный статус из-за отсутствия сервера, и статус CI перестал бы
+    # что-то значить. Включается переменной окружения DEPLOY_ENABLED=true.
+    needs: [lint, test, docs, deploy_ready]
+    if: >-
+      github.ref == 'refs/heads/main' && github.event_name == 'push'
+      && needs.deploy_ready.outputs.enabled == 'true'
     runs-on: ubuntu-latest
     environment: production
     steps:
