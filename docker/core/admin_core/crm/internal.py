@@ -283,6 +283,71 @@ class InternalCRM(CRMProvider):
             result["waitlist_offer"] = offer
         return result
 
+    async def reschedule(
+        self, salon_id: str, booking_id: str, new_start: datetime, *,
+        actor: str = "owner:panel",
+    ) -> dict[str, Any]:
+        """Перенос записи на другое время.
+
+        Старый слот освобождается автоматически (мы меняем время самой строки, а не
+        создаём новую запись): иначе в истории появился бы фантом отмены, и клиент
+        получил бы два подтверждения. Двойная бронь на новом времени отсекает
+        exclusion-констрейнт БД — то есть гонку двух администраторов.
+        """
+        service = await self.pool.fetchrow(
+            "SELECT b.id, b.service_id, b.status, sv.duration_min, sv.title "
+            "FROM bookings b JOIN services sv ON sv.id = b.service_id "
+            "WHERE b.id = $1 AND b.salon_id = $2",
+            booking_id, salon_id,
+        )
+        if not service:
+            return {"ok": False, "error": "not_found"}
+        if service["status"] not in ("booked", "confirmed"):
+            return {"ok": False, "error": "bad_status",
+                    "message": "Переносить можно только активную запись"}
+        moment = new_start if new_start.tzinfo else new_start.replace(tzinfo=ZoneInfo("UTC"))
+        ends_at = moment + timedelta(minutes=int(service["duration_min"] or 60))
+        try:
+            row = await self.pool.fetchrow(
+                "UPDATE bookings SET starts_at = $3, ends_at = $4 "
+                "WHERE id = $1 AND salon_id = $2 RETURNING id, starts_at",
+                booking_id, salon_id, moment.astimezone(ZoneInfo("UTC")), ends_at,
+            )
+        except asyncpg.ExclusionViolationError:
+            return {"ok": False, "error": "slot_taken",
+                    "message": "Это время уже занято — выберите другое"}
+        await self._audit(
+            salon_id, actor, "reschedule_booking",
+            {"booking_id": str(booking_id), "new_start": moment.isoformat()},
+        )
+        return {"ok": True, "booking_id": str(row["id"]), "starts_at": row["starts_at"],
+                "service": service["title"]}
+
+    async def set_prepayment(
+        self, salon_id: str, booking_id: str, status: str, *,
+        actor: str = "owner:panel",
+    ) -> dict[str, Any]:
+        """Отметить предоплату: offered → paid / declined.
+
+        Без этого статусы из 004 живут мёртвыми: мы обещаем клиенту предоплату
+        в разговоре, но никто не может её принять.
+        """
+        allowed = ("not_required", "offered", "paid", "declined")
+        if status not in allowed:
+            return {"ok": False, "error": "bad_status"}
+        row = await self.pool.fetchrow(
+            "UPDATE bookings SET prepayment_status = $3 "
+            "WHERE id = $1 AND salon_id = $2 RETURNING id, prepayment_status",
+            booking_id, salon_id, status,
+        )
+        if not row:
+            return {"ok": False, "error": "not_found"}
+        await self._audit(
+            salon_id, actor, "set_prepayment",
+            {"booking_id": str(booking_id), "prepayment_status": status},
+        )
+        return {"ok": True, "prepayment_status": status}
+
     async def update_service(
         self, salon_id: str, service_id: str, *, price: Any, duration_min: int,
         is_active: bool, actor: str = "owner:panel",

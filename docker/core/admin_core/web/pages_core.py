@@ -13,6 +13,7 @@ from .render import (
     action_form,
     badge,
     card,
+    csrf_field,
     dt_local,
     esc,
     layout,
@@ -71,6 +72,47 @@ def _status_buttons(
     return " ".join(buttons)
 
 
+def _reschedule_form(booking_id: str, csrf: str, back: str) -> str:
+    """Форма переноса: одно поле с датой и временем.
+
+    Отдельная форма, а не кнопка: перенос требует указать новое время, а лишняя
+    кнопка без поля только путает — «перенести» куда?
+    """
+    if not csrf:
+        return ""
+    return (
+        f'<form method="post" action="/actions" class="inline">'
+        f'<input type="hidden" name="action" value="booking_reschedule">'
+        f'<input type="hidden" name="booking_id" value="{esc(booking_id)}">'
+        f'<input type="hidden" name="back" value="{esc(back)}">'
+        f"{csrf_field(csrf)}"
+        '<input type="datetime-local" name="new_start" required '
+        'style="background:var(--surface-2);color:var(--text);border:1px solid '
+        'var(--border);border-radius:6px;padding:4px 6px;font-size:12px">'
+        '<button type="submit" class="btn-mini">Перенести</button>'
+        "</form>"
+    )
+
+
+def _prepayment_buttons(
+    booking_id: str, status: str, csrf: str, back: str, *, may_edit: bool = True
+) -> str:
+    """Приём предоплаты из панели: статусы из 004 иначе остались бы мёртвыми."""
+    if not csrf or not may_edit or status == "not_required":
+        return ""
+    hidden = f'<input type="hidden" name="booking_id" value="{esc(booking_id)}">'
+    buttons = []
+    for code, label in (("paid", "Оплачено"), ("offered", "Ждём оплату")):
+        if code == status:
+            continue
+        buttons.append(
+            action_form("prepayment_set", csrf, back,
+                        hidden + f'<input type="hidden" name="prepayment_status" value="{code}">',
+                        label)
+        )
+    return " ".join(buttons)
+
+
 def page_today(
     stats: dict[str, Any],
     schedule: list[dict[str, Any]],
@@ -113,6 +155,11 @@ def page_today(
             money(b["price"]),
             _status_badge(b["status"]),
             _status_buttons(str(b["id"]), b["status"], csrf, may_status, f"/today{sid}"),
+            _prepayment_buttons(
+                str(b["id"]), b.get("prepayment_status") or "not_required",
+                csrf, f"/today{sid}", may_edit=may_status,
+            )
+            + _reschedule_form(str(b["id"]), csrf if may_status else "", f"/today{sid}"),
         ]
         for b in schedule
     ]
@@ -173,6 +220,11 @@ def page_bookings(
             esc(SOURCE_RU.get(b["source"], b["source"])),
             _status_badge(b["status"]),
             _status_buttons(str(b["id"]), b["status"], csrf, may_status, back),
+            _prepayment_buttons(
+                str(b["id"]), b.get("prepayment_status") or "not_required",
+                csrf, back, may_edit=may_status,
+            )
+            + _reschedule_form(str(b["id"]), csrf if may_status else "", back),
         ]
         for b in rows
     ]

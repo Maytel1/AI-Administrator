@@ -142,6 +142,25 @@ async def process_alerts(
     return sent
 
 
+async def process_retention(pool: asyncpg.Pool, metrics: ServiceMetrics) -> dict[str, object]:
+    """Раз в сутки чистим ПДн старше срока хранения.
+
+    Запуск в полночь по локальному времени: нагрузка в этот момент нулевая,
+    а если worker пропустил тик — следующий день ничего не исправит.
+    """
+    from admin_core.retention import purge_personal_data  # noqa: PLC0415
+
+    now = datetime.now(ZoneInfo("UTC"))
+    if now.hour != 3:
+        return {"skipped": True}
+    stats = await purge_personal_data(pool)
+    removed = int(stats["dialog_messages"]) + int(stats["media_rows"])
+    if removed:
+        metrics.messages.labels("pdn_purged", str(stats["dialog_messages"])).inc()
+        print(f"[worker] удалено по сроку хранения: {stats}", flush=True)
+    return stats
+
+
 async def main() -> None:
     name = os.getenv("SERVICE_NAME", "worker")
     print(f"[{name}] старт: напоминания, лист ожидания, тревоги", flush=True)
@@ -183,6 +202,7 @@ async def main() -> None:
                 ):
                     await process_salon(pool, dict(salon), sender, metrics)
                 await process_alerts(pool, sender, metrics)
+                await process_retention(pool, metrics)
             except Exception as exc:  # noqa: BLE001 — цикл не должен умирать
                 metrics.errors.labels("tick").inc()
                 print(f"[{name}] ошибка тика: {type(exc).__name__}: {exc}", flush=True)

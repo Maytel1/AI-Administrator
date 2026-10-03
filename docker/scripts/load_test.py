@@ -108,7 +108,7 @@ async def run(
                     if not result.get("ok"):
                         failures += 1
                         if first_error is None:
-                            first_error = f"{result.get('error')} (время {minute // 60:02d}:{minute % 60:02d})"
+                            first_error = str(result.get("error"))
                 except Exception as exc:  # noqa: BLE001 — слот занят это не ошибка системы
                     failures += 1
                     if first_error is None:

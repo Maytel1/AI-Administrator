@@ -1,0 +1,16 @@
+# Обновления зависимостей приезжают сами: без этого обновления безопасности
+# приезжают только вручную, а в requirements.txt живут asyncpg, aiogram и aiohttp.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /docker/services/cli
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    labels: [dependencies, ci]

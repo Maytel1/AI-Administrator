@@ -1,8 +1,10 @@
-# Фаза 1: ядро. Внешние SDK не нужны — всё через httpx/asyncpg.
+# Фаза 1: SDK. Остальные нативные модули не нужны — httpx/asyncpg.
 asyncpg>=0.30,<0.31
 httpx>=0.27,<0.30
 tzdata>=2024.1
+
 # Тесты (запускаются в контейнере cli):
 pytest>=8
 pytest-asyncio>=0.23
-prometheus-client>=0.20,<2   # рендер /metrics в тестах admin_core.health
+prometheus-client>=0.20,<2   # рендер /metrics через admin_core.health
+aiohttp>=3.9,<4              # тесты HTTP-слоя панели (test_utils)

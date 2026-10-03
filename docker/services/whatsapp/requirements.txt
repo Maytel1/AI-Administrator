@@ -1,0 +1,5 @@
+# WhatsApp-канал: те же зависимости, что у call-service + HTTP-клиент LLM.
+asyncpg>=0.30,<0.31
+prometheus-client>=0.20,<2   # /health и /metrics через admin_core.health
+aiohttp>=3.9,<4            # HTTP-контур звонков
+httpx>=0.27,<0.30              # HTTP-клиент LLM-провайдера (admin_core.llm)

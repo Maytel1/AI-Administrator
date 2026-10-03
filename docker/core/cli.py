@@ -15,7 +15,7 @@ import asyncio
 from admin_core.agent.agent import AgentSession
 from admin_core.config import get_settings
 from admin_core.crm import make_crm
-from admin_core.db import get_pool, run_migrations
+from admin_core.db import get_pool, run_migrations, rollback_migrations
 from admin_core.llm import make_provider
 from admin_core.web.auth import provisioning_uri
 
@@ -156,6 +156,22 @@ async def _salon_id(pool, name: str | None) -> str | None:
     return str(row["id"]) if row else None
 
 
+async def do_rollback(args: argparse.Namespace) -> None:
+    """Откатить последние миграции: ``python cli.py --rollback [шагов]``."""
+    pool = await get_pool()
+    try:
+        rolled = await rollback_migrations(pool, steps=args.rollback)
+    finally:
+        await pool.close()
+    if rolled:
+        print(f"Откачено: {', '.join(rolled)}")
+    else:
+        print(
+            "Откатывать нечего: у применённых миграций нет секции -- ROLLBACK. "
+            "Восстановитесь из бэкапа (scripts/restore_db.ps1)."
+        )
+
+
 async def do_forget(args: argparse.Namespace) -> None:
     """Удаление данных клиента по запросу (152-ФЗ) — из CLI, а не из панели.
 
@@ -191,7 +207,6 @@ async def do_onboard(args: argparse.Namespace) -> None:
     Менеджер не должен собирать точку по пяти разным командам — пока он
     ковыряется, клиент ждёт.
     """
-    from admin_core.crm.internal import InternalCRM
     from admin_core.web.users import create_user
 
     pool = await get_pool()
@@ -202,7 +217,8 @@ async def do_onboard(args: argparse.Namespace) -> None:
             args.name, args.timezone, args.plan,
         )
         salon_id = str(salon["id"])
-        crm = InternalCRM(pool)
+        # мастера и услуги создаём напрямую: CRM требует готовых тарифов,
+        # а тут мы только что их и создаём.
         master = await pool.fetchrow(
             "INSERT INTO masters (salon_id, name) VALUES ($1, $2) RETURNING id",
             salon_id, args.master,
@@ -259,6 +275,10 @@ def main() -> None:
     parser.add_argument(
         "--timezone", default="Asia/Yekaterinburg", help="часовой пояс салона (--onboard)"
     )
+    parser.add_argument(
+        "--rollback", type=int, nargs="?", const=1, default=0,
+        help="Откатить последние миграции из migrations/ (по умолчанию 1)",
+    )
     args = parser.parse_args()
     if args.seed:
         asyncio.run(do_seed())
@@ -268,6 +288,8 @@ def main() -> None:
         asyncio.run(do_forget(args))
     elif args.onboard:
         asyncio.run(do_onboard(args))
+    elif args.rollback:
+        asyncio.run(do_rollback(args))
     else:
         asyncio.run(dialog())
 

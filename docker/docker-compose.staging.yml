@@ -1,0 +1,54 @@
+# Staging: та же конфигурация, что на проде, но с другими именами, портами и БД.
+#
+# Зачем он: прод-стек собирается вручную, и опечатку в docker-compose.prod.yml
+# мы узнавали бы уже на сервере. Здесь проверяется весь контур целиком:
+#   docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d
+#
+# Отличия от прода: другие порты и имена контейнеров, своя БД и том,
+# WEB_PUBLIC_HOST=localhost и выключенный HSTS.
+name: ai-staging
+
+services:
+  postgres:
+    container_name: ai-stg-postgres
+    environment:
+      POSTGRES_DB: aiadmin_staging
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    # !override обязателен: списки в compose объединяются, и без него к этим
+    # портам добавились бы продовые — staging поднялся бы на занятом 5433.
+    ports: !override
+      - "5434:5432"
+
+  web:
+    container_name: ai-stg-web
+    environment:
+      WEB_PUBLIC_HOST: localhost
+      WEB_HSTS_MAX_AGE: "0"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-aiadmin}:${POSTGRES_PASSWORD:-aiadmin_dev}@postgres:5432/aiadmin_staging
+    ports: !override
+      - "8182:8080"
+      - "8183:8081"
+
+  worker:
+    container_name: ai-stg-worker
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-aiadmin}:${POSTGRES_PASSWORD:-aiadmin_dev}@postgres:5432/aiadmin_staging
+    ports: !override
+      - "8184:8084"
+
+  bot-service:
+    container_name: ai-stg-bot
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-aiadmin}:${POSTGRES_PASSWORD:-aiadmin_dev}@postgres:5432/aiadmin_staging
+    ports: !override
+      - "8191:8080"
+
+  call-service:
+    container_name: ai-stg-call
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-aiadmin}:${POSTGRES_PASSWORD:-aiadmin_dev}@postgres:5432/aiadmin_staging
+    ports: !override
+      - "8185:8080"
+      - "8186:8081"

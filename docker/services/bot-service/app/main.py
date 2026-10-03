@@ -11,6 +11,7 @@ pywa (WhatsApp) подключается следующим шагом на эт
 import asyncio
 import os
 import sys
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from admin_core.agent.agent import AgentSession
@@ -185,7 +186,7 @@ async def main() -> None:
         action = (callback.data or "").split(":", 1)[-1]
         answer = {
             "ok": "Записали: вы придёте. Ждём вас!",
-            "move": "Понял. Позвоните в салон, и мы подберём другое время.",
+            "move": "Понял. Выберите удобное время — перенесу запись.",
             "cancel": "Жаль. Запись отменена — слот освободили для других.",
         }.get(action, "Не понял нажатие — позвоните в салон, и мы поправим.")
         booking = None
@@ -211,7 +212,87 @@ async def main() -> None:
             await state.log(chat_id, "user", f"нажата кнопка: {action}")
         await callback.answer(answer[:200], show_alert=False)
         if callback.message:
-            await callback.message.answer(answer)
+            if action == "move" and booking:
+                await _offer_move(callback.message, str(booking["salon_id"]),
+                                  str(booking["id"]), chat_id)
+            else:
+                await callback.message.answer(answer)
+
+    async def _offer_move(
+        message: Message, salon_id: str, booking_id: str, chat_id: int
+    ) -> None:
+        """Показать три ближайших свободных слона для переноса.
+
+        Раньше кнопка «Перенести» отвечала «позвоните в салон» — это ровно тот
+        клиент, который из-за невозможности прийти потом просто не приходит.
+        """
+        from admin_core.crm.internal import InternalCRM  # noqa: PLC0415
+
+        tz = ZoneInfo(state.salon.get("timezone") or "Asia/Yekaterinburg")
+        crm = InternalCRM(state.pool)
+        title = await state.pool.fetchval(
+            "SELECT sv.title FROM bookings b JOIN services sv ON sv.id = b.service_id "
+            "WHERE b.id = $1",
+            booking_id,
+        )
+        try:
+            slots = await crm.get_free_slots(
+                salon_id, str(title or ""), days_ahead=3
+            )
+        except Exception:  # noqa: BLE001 — подсказка не должна ронять чат
+            slots = []
+        if not slots:
+            await message.answer(
+                "Свободных окон в ближайшие дни нет. Позвоните в салон — подберём "
+                "время вручную."
+            )
+            return
+        buttons = []
+        for slot in slots[:3]:
+            try:
+                moment = datetime.fromisoformat(str(slot["start_iso"]))
+            except (KeyError, TypeError, ValueError):
+                continue
+            when = moment.astimezone(tz).strftime("%d.%m в %H:%M")
+            buttons.append([InlineKeyboardButton(
+                text=f"{when} · {slot.get('master_name', '')}".strip(" ·"),
+                callback_data=f"move:{booking_id}:{int(moment.timestamp())}",
+            )])
+        if not buttons:
+            await message.answer("Свободных окон не нашлось. Позвоните в салон.")
+            return
+        await message.answer(
+            "Свободное время:", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons)
+        )
+
+    @dp.callback_query(F.data.startswith("move:"))
+    async def move_booking(callback) -> None:
+        """Клиент выбрал новый слот — переносим запись на него."""
+        from admin_core.crm.internal import InternalCRM  # noqa: PLC0415
+
+        _, booking_id, stamp = (callback.data or "").split(":")
+        salon_id = await state.pool.fetchval(
+            "SELECT salon_id FROM bookings WHERE id = $1", booking_id
+        )
+        if not salon_id:
+            await callback.answer("Запись не найдена", show_alert=True)
+            return
+        result = await InternalCRM(state.pool).reschedule(
+            str(salon_id), booking_id,
+            datetime.fromtimestamp(int(stamp), tz=ZoneInfo("UTC")),
+            actor="bot:telegram",
+        )
+        tz = ZoneInfo(state.salon.get("timezone") or "Asia/Yekaterinburg")
+        if not result["ok"]:
+            await callback.answer(
+                result.get("message", "Не получилось перенести — позвоните в салон"),
+                show_alert=True,
+            )
+            return
+        when = result["starts_at"].astimezone(tz).strftime("%d.%m в %H:%M")
+        await callback.answer("Перенёс", show_alert=False)
+        if callback.message:
+            await callback.message.answer(f"Готово, ждём вас {when}!")
 
     @dp.message(Command("bookings"))
     async def my_bookings(message: Message) -> None:
@@ -268,14 +349,16 @@ async def main() -> None:
             await callback.answer("Сначала поделитесь номером", show_alert=True)
             return
         booking = await state.pool.fetchrow(
-            "UPDATE bookings SET status = 'cancelled' WHERE client_id = $1 "
+            "SELECT id, salon_id FROM bookings WHERE client_id = $1 "
             "AND status IN ('booked','confirmed') AND starts_at >= now() "
-            "ORDER BY starts_at LIMIT 1 RETURNING id, salon_id",
+            "ORDER BY starts_at LIMIT 1",
             client_id,
         )
         if not booking:
             await callback.answer("Запись уже отменена или её нет", show_alert=True)
             return
+        # Через CRM, а не сырым UPDATE: только там срабатывает освобождение
+        # слота, лист ожидания и запись в аудит.
         await InternalCRM(state.pool).set_booking_status(
             str(booking["salon_id"]), str(booking["id"]), "cancelled", actor="bot:telegram"
         )

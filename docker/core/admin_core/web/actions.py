@@ -8,8 +8,9 @@
 from __future__ import annotations
 
 import uuid
-from datetime import time
+from datetime import datetime, time
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from admin_core.crm.internal import InternalCRM
 
@@ -234,6 +235,26 @@ async def apply_form(
     if action == "client_create":
         return await _client_create(pool, salon_id, form, actor=actor)
 
+    if action == "booking_reschedule":
+        return await _booking_reschedule(pool, salon_id, form, actor=actor)
+
+    if action == "prepayment_set":
+
+        booking_id = _uuid(form.get("booking_id"))
+        status = str(form.get("prepayment_status", ""))
+        if not booking_id:
+            return fail("bad_id", "Некорректный идентификатор записи")
+        result = await crm.set_prepayment(salon_id, booking_id, status, actor=actor)
+        if not result["ok"]:
+            return fail(result["error"])
+        labels = {
+            "paid": "Предоплата получена",
+            "declined": "Клиент отказался от предоплаты",
+            "offered": "Предоплата предложена",
+            "not_required": "Предоплата не требуется",
+        }
+        return ok(labels.get(status, "Предоплата обновлена"))
+
     if action == "waitlist_add":
         return await _waitlist_add(pool, salon_id, form, actor=actor)
 
@@ -292,6 +313,35 @@ async def _service_create(
     if not result["ok"]:
         return fail(result["error"], result["message"])
     return ok(f"Услуга «{result['title']}» добавлена: {_money(price)}, {duration} мин")
+
+
+async def _booking_reschedule(
+    pool: Any, salon_id: str, form: dict[str, Any], *, actor: str
+) -> dict[str, Any]:
+    """Перенос записи на новое время из формы панели.
+
+    Время приходит в формате ``datetime-local`` (без таймзоны) и считается
+    в таймзоне салона: администратор видит «12:00» на стенке салона, а не UTC.
+    """
+    booking_id = _uuid(form.get("booking_id"))
+    if not booking_id:
+        return fail("bad_id", "Некорректный идентификатор записи")
+    tz_name = await pool.fetchval(
+        "SELECT timezone FROM salons WHERE id = $1", salon_id
+    )
+    try:
+        moment = datetime.fromisoformat(str(form.get("new_start", ""))).replace(
+            tzinfo=ZoneInfo(tz_name or "Asia/Yekaterinburg")
+        )
+    except ValueError:
+        return fail("bad_time", "Укажите дату и время в формате 2026-10-05 12:00")
+    result = await InternalCRM(pool).reschedule(
+        salon_id, booking_id, moment, actor=actor
+    )
+    if not result["ok"]:
+        return fail(result["error"], result.get("message", ""))
+    when = result["starts_at"].astimezone(ZoneInfo(tz_name or "Asia/Yekaterinburg"))
+    return ok(f"Перенесено на {when.strftime('%d.%m в %H:%M')}")
 
 
 async def _waitlist_add(

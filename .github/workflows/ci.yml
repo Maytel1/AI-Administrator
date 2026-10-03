@@ -59,6 +59,41 @@ jobs:
         working-directory: docker/core
         run: python -m pytest -q
 
+  deploy:
+    name: деплой на прод (по ssh)
+    # Только main и только если всё зелёное: тесты обязаны пройти до выкатки.
+    needs: [lint, test, docs]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: деплой
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          # Бэкап ДО выкатки: откат кода без отката данных невозможен.
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH/docker' \
+            && powershell -ExecutionPolicy Bypass -File scripts/backup_db.ps1"
+          rsync -az --delete --exclude .git --exclude .env --exclude backups \
+            --exclude 'certs' --exclude '*.log' ./ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH/docker' \
+            && docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+               build web worker bot-service call-service \
+            && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d \
+            && docker compose -f docker-compose.yml -f docker-compose.prod.yml ps"
+      - name: уведомление
+        if: always()
+        run: echo "деплой ${{ github.sha }} завершён с кодом ${{ job.status }}"
+
   docs:
     name: сборка и валидация документов
     runs-on: ubuntu-latest

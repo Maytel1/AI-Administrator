@@ -187,6 +187,29 @@ class Panel:
         self.metrics.messages.labels("login").inc()
         return token, ""
 
+    async def open_session(
+        self, *, role: str, login: str, salon_id: str | None,
+        user: dict[str, Any] | None = None,
+    ) -> str:
+        """Выдать сессию минуя проверку пароля.
+
+        Нужна для тестов HTTP-слоя и для аварийного входа на сервере. Вход через
+        форму пароль проверяет обязательно — этот метод для тех, у кого есть
+        прямой доступ к процессу.
+
+        Сессия обязательно попадает в БД: ``authorized()`` сверяется с
+        ``panel_sessions``, иначе «аварийный» вход работал бы только до первого
+        же запроса и тихо выкидывал бы администратора.
+        """
+        token = secrets.token_urlsafe(24)
+        session = Session(
+            user=user or {"login": login, "role": role}, role=role, login=login,
+            salon_id=salon_id, until=datetime.now(ZoneInfo("UTC")) + SESSION_TTL,
+        )
+        self.sessions[token] = session
+        await self._save_session(token, session)
+        return token
+
     async def _save_session(self, token: str, session: Session) -> None:
         if self.pool is None:
             return

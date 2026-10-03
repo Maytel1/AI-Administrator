@@ -69,6 +69,31 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  whatsapp:
+    build:
+      context: .
+      dockerfile: services/whatsapp/Dockerfile
+    container_name: ai-admin-whatsapp
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-aiadmin}:${POSTGRES_PASSWORD:-aiadmin_dev}@postgres:5432/${POSTGRES_DB:-aiadmin}
+      SERVICE_NAME: whatsapp
+      LLM_PROVIDER: ${LLM_PROVIDER:-}
+      # Токены Meta Cloud API: без них сервис не стартует (проверка required()).
+      WHATSAPP_TOKEN: ${WHATSAPP_TOKEN:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
+      WHATSAPP_HTTP_PORT: 8080
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "${WHATSAPP_HTTP_PORT:-8086}:8080"   # webhook Meta Cloud API
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
   call-service:
     build:
       context: .

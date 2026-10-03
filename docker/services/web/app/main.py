@@ -8,6 +8,7 @@
 Права проверяются дважды: недоступное прячется в UI и отбивается на сервере.
 """
 
+import asyncio
 import os
 import traceback
 from datetime import datetime, timedelta
@@ -16,6 +17,7 @@ from typing import Any
 from urllib.parse import quote, urlencode
 from zoneinfo import ZoneInfo
 
+from admin_core.bot_quality import bot_quality
 from admin_core.db import get_pool, run_migrations
 from admin_core.health import ServiceMetrics, make_health_app, start_health_server
 from admin_core.web import actions, dashboard, queries, reports, users
@@ -168,6 +170,12 @@ async def _reports(
     data.update(await reports.compare_periods(panel.pool, salon_id, current, previous))
     data["funnel"] = data["current"]["funnel"]
     data["loss"] = data["current"]["loss"]
+    quality, previous_quality = await asyncio.gather(
+        bot_quality(panel.pool, salon_id, current.start, current.end),
+        bot_quality(panel.pool, salon_id, previous.start, previous.end),
+    )
+    data["bot"] = quality
+    data["bot_previous"] = previous_quality
     msg, err = _flash_from(request)
     return page_reports(data, salon, salons, msg, err, ctx)
 
@@ -204,7 +212,7 @@ async def _settings(
 ) -> str:
     """Настройки: показываем, кто вошёл, его права и команду точки."""
     env = {"LLM_PROVIDER": os.getenv("LLM_PROVIDER", "—")}
-    session = panel.session_of(request.cookies.get(SESSION_COOKIE, ""))
+    session = await panel.session_of(request.cookies.get(SESSION_COOKIE, ""))
     if session is None:
         raise RuntimeError("сессия потеряна между проверкой и обработкой")
     who = {"login": session.login, "role": session.role}
@@ -403,7 +411,7 @@ def build_app(
         Файл содержит ПДн клиентов по косвенным признакам, поэтому отдаём его
         с ``no-store`` и без кэша — как остальные страницы панели.
         """
-        from admin_core.web import exports  # noqa: PLC0415
+        from admin_core import exports  # noqa: PLC0415
 
         session_token = request.cookies.get(SESSION_COOKIE, "")
         session = await panel.session_of(session_token)
@@ -428,7 +436,10 @@ def build_app(
             )
         return web.Response(
             body=payload,
-            content_type="text/csv; charset=utf-8",
+            # charset передаётся отдельным аргументом: aiohttp запрещает его
+            # внутри content_type и отвечает 500 — выгрузка не работала ни разу.
+            content_type="text/csv",
+            charset="utf-8",
             headers={
                 "Content-Disposition": (
                     f'attachment; filename="otchet-{kind}-'

@@ -64,7 +64,12 @@ async def run_migrations(pool: asyncpg.Pool) -> list[str]:
                     )
                 applied |= set(BASELINE)
             if MIGRATIONS_DIR.exists():
-                for f in sorted(MIGRATIONS_DIR.glob("*.sql")):
+                # *.rollback.sql — откаты к миграциям, а не сами миграции:
+                # накатив их, мы бы удалили только что созданные таблицы.
+                for f in [
+                    f for f in sorted(MIGRATIONS_DIR.glob("*.sql"))
+                    if not f.name.endswith(".rollback.sql")
+                ]:
                     if f.name in applied:
                         continue
                     async with conn.transaction():
@@ -77,3 +82,50 @@ async def run_migrations(pool: asyncpg.Pool) -> list[str]:
         finally:
             await conn.execute("SELECT pg_advisory_unlock($1)", MIGRATION_LOCK_ID)
     return applied_now
+
+
+async def rollback_migrations(pool: asyncpg.Pool, steps: int = 1) -> list[str]:
+    """Откатить последние ``steps`` миграций из папки ``migrations/``.
+
+    Зачем: ошибочную миграцию на проде иначе чинят только восстановлением из
+    бэкапа — это часы простоя. Откат выполняет парный файл ``<имя>.rollback.sql``;
+    если его нет, миграция считается неоткатываемой и остаётся на месте.
+
+    Возвращает список имён, которые действительно откатились.
+    """
+    files = sorted(MIGRATIONS_DIR.glob("*.sql")) if MIGRATIONS_DIR.exists() else []
+    # *.rollback.sql — не миграции, а откаты к ним: иначе они накатились бы
+    # как обычные миграции и удалили бы созданные таблицы.
+    files = [f for f in files if not f.name.endswith(".rollback.sql")]
+    if not files:
+        return []
+    async with pool.acquire() as conn:
+        await conn.execute("SELECT pg_advisory_lock($1)", MIGRATION_LOCK_ID)
+        rolled: list[str] = []
+        try:
+            for f in reversed(files):
+                if len(rolled) >= steps:
+                    break
+                if not await conn.fetchval(
+                    "SELECT EXISTS (SELECT 1 FROM schema_migrations WHERE name = $1)",
+                    f.name,
+                ):
+                    continue
+                rollback_file = f.with_name(f.stem + ".rollback.sql")
+                if not rollback_file.exists():
+                    print(
+                        f"[migrations] {f.name}: нет {rollback_file.name}, "
+                        "откат пропущен",
+                        flush=True,
+                    )
+                    continue
+                async with conn.transaction():
+                    await conn.execute(rollback_file.read_text(encoding="utf-8"))
+                    await conn.execute(
+                        "DELETE FROM schema_migrations WHERE name = $1", f.name
+                    )
+                rolled.append(f.name)
+                print(f"[migrations] rolled back {f.name}", flush=True)
+        finally:
+            await conn.execute("SELECT pg_advisory_unlock($1)", MIGRATION_LOCK_ID)
+    return rolled

@@ -644,6 +644,23 @@ def page_reports(
         ["Новых клиентов", str(stats["new_clients"])],
         ["Затраты на LLM", money(stats["llm_cost"])],
     ]
+    bot = data.get("bot") or {}
+    bot_prev = data.get("bot_previous") or {}
+    bot_rows = [
+        ["Диалогов", str(bot.get("dialogs", 0)), str(bot_prev.get("dialogs", 0))],
+        ["Закончились записью", str(bot.get("dialogs_with_booking", 0)),
+         str(bot_prev.get("dialogs_with_booking", 0))],
+        ["Конверсия в запись", f'{bot.get("conversion", 0)}%',
+         f'{bot_prev.get("conversion", 0)}%'],
+        ["Попросили живого человека", str(bot.get("escalations", 0)),
+         str(bot_prev.get("escalations", 0))],
+        ["Доля уходов к человеку", f'{bot.get("escalation_rate", 0)}%',
+         f'{bot_prev.get("escalation_rate", 0)}%'],
+        ["Сообщений клиента в среднем", str(bot.get("avg_turns", 0)),
+         str(bot_prev.get("avg_turns", 0))],
+        ["Записей через бота", str(bot.get("bookings_via_bot", 0)),
+         str(bot_prev.get("bookings_via_bot", 0))],
+    ]
     content = (
         "<h1>Отчёты</h1>"
         + flash_html(flash, flash_error)
@@ -667,6 +684,13 @@ def page_reports(
             ["Мастер", "Записей", "Занято", "Выручка"], load_rows, "Данных пока нет",
         ))
         + card("Потери и затраты", table(["Показатель", "Значение"], loss_rows))
+        + card(
+            f"Качество бота: {label} и {prev_label}",
+            table(["Показатель", label, prev_label], bot_rows)
+            if bot.get("dialogs") else
+            "<div class='empty'>За период диалогов не было — метрики появятся,"
+            '<div class="empty">За период диалогов не было — метрики появятся,'
+        )
     )
     return layout("Отчёты", "/reports", content, salon=salon, salons=salons, role=_role(ctx))
 
