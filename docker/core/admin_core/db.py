@@ -21,7 +21,26 @@ BASELINE = [
     "004_schema_dialogs_ops.sql",
 ]
 
-MIGRATIONS_DIR = pathlib.Path(os.getenv("MIGRATIONS_DIR", "/app/migrations"))
+def _migrations_dir() -> pathlib.Path:
+    """Каталог миграций: переменная окружения, иначе — первый найденный.
+
+    Жёсткий `/app/migrations` работал только в контейнере: в CI и при запуске
+    тестов из репозитория каталога нет, миграции не накатываются, и тесты
+    падают на пустом списке миграций вместо проверки отката.
+    """
+    configured = os.getenv("MIGRATIONS_DIR")
+    if configured:
+        return pathlib.Path(configured)
+    here = pathlib.Path(__file__).resolve()
+    # В контейнере модуль лежит в /app/admin_core, в репозитории — в
+    # docker/core/admin_core, поэтому каталог миграций ищем от корня ядра.
+    for candidate in (here.parents[1] / "migrations", pathlib.Path("/app/migrations")):
+        if candidate.is_dir():
+            return candidate
+    return pathlib.Path("/app/migrations")
+
+
+MIGRATIONS_DIR = _migrations_dir()
 
 # Сериализация параллельных запусков раннера: bot-service и worker стартуют
 # одновременно и оба зовут run_migrations (GAP_ANALYSIS §6.1).
