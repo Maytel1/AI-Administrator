@@ -11,4 +11,5 @@ COPY core/pytest.ini /app/pytest.ini
 COPY core/seed.py /app/seed.py
 COPY core/cli.py /app/cli.py
 COPY core/migrations /app/migrations
+COPY scripts /app/scripts
 CMD ["python", "cli.py"]

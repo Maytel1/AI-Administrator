@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -37,6 +38,50 @@ async def waitlist_size(pool: Any, salon_id: str) -> int:
     return int(await pool.fetchval(
         "SELECT count(*) FROM waitlist WHERE salon_id = $1 AND active", salon_id
     ))
+
+
+async def list_waitlist(pool: Any, salon_id: str) -> list[dict[str, Any]]:
+    """Очередь точки для панели: кто ждёт, какую услугу и с какого времени."""
+    return [
+        dict(row) for row in await pool.fetch(
+            """
+            SELECT w.id, w.client_id, w.service_id, w.note, w.created_at,
+                   c.phone, c.name, s.title AS service_title
+            FROM waitlist w
+            JOIN clients c ON c.id = w.client_id
+            LEFT JOIN services s ON s.id = w.service_id
+            WHERE w.salon_id = $1 AND w.active
+            ORDER BY w.created_at
+            LIMIT 200
+            """,
+            salon_id,
+        )
+    ]
+
+
+async def drop_from_waitlist(
+    pool: Any, salon_id: str, waitlist_id: str, *, actor: str = "owner:panel"
+) -> dict[str, Any]:
+    """Убрать клиента из очереди: он записался сам или передумал.
+
+    Запись не удаляется, а помечается неактивной — историю предложений видно
+    в ``audit_log`` и в поле ``offered_at``.
+    """
+    row = await pool.fetchrow(
+        "UPDATE waitlist SET active = false, offered_at = now() "
+        "WHERE id = $1 AND salon_id = $2 AND active RETURNING client_id",
+        waitlist_id, salon_id,
+    )
+    if not row:
+        return {"ok": False, "error": "not_found"}
+    await pool.execute(
+        "INSERT INTO audit_log (salon_id, actor, action, details) "
+        "VALUES ($1, $2, 'waitlist_drop', $3)",
+        salon_id, actor,
+        json.dumps({"waitlist_id": waitlist_id, "client_id": str(row["client_id"])},
+                   ensure_ascii=False),
+    )
+    return {"ok": True}
 
 
 async def take_waitlist_offer(

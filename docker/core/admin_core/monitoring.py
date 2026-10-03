@@ -80,6 +80,48 @@ async def login_failures_since(pool: Any, *, since: datetime) -> dict[str, Any]:
     return {"fails": int(row["fails"] or 0), "ips": int(row["ips"] or 0)}
 
 
+async def _revenue_alerts(pool: Any, salons: list[dict[str, Any]]) -> list[Alert]:
+    """Тревоги о падении выручки: сравниваем недели попарно.
+
+    Недельный срез выбран потому, что месяц к месяцу слишком шумно из-за
+    отпусков и праздников — сработало бы кричащее «упало», а потом ложное
+    «всё выросло».
+    """
+    found: list[Alert] = []
+    for salon in salons:
+        drop = await pool.fetchrow(
+            """
+            WITH last AS (
+                SELECT COALESCE(sum(sv.price), 0) AS revenue FROM bookings b
+                JOIN services sv ON sv.id = b.service_id
+                WHERE b.salon_id = $1 AND b.starts_at >= now() - interval '7 days'
+                  AND b.status IN ('booked','confirmed','completed')
+            ), prev AS (
+                SELECT COALESCE(sum(sv.price), 0) AS revenue FROM bookings b
+                JOIN services sv ON sv.id = b.service_id
+                WHERE b.salon_id = $1 AND b.starts_at >= now() - interval '14 days'
+                  AND b.starts_at < now() - interval '7 days'
+                  AND b.status IN ('booked','confirmed','completed')
+            )
+            SELECT last.revenue AS last_week, prev.revenue AS prev_week
+            FROM last, prev
+            """,
+            salon["id"],
+        )
+        previous = float(drop["prev_week"] or 0) if drop else 0.0
+        if previous <= 0:      # сравнивать не с чем: пустая неделя — не просадка
+            continue
+        change = (float(drop["last_week"] or 0) - previous) / previous
+        if change <= -0.3:     # упали на треть и больше
+            found.append(Alert(
+                f"revenue_drop:{salon['id']}",
+                f"Выручка «{salon['name']}» упала на {abs(round(change * 100))}% "
+                "к прошлой неделе — стоит посмотреть, что сломалось",
+                "critical",
+            ))
+    return found
+
+
 async def check_alerts(pool: Any, *, now: datetime | None = None) -> list[Alert]:
     """Проверяет всё, что умеет проверять без доступа к железу.
 
@@ -133,13 +175,15 @@ async def check_alerts(pool: Any, *, now: datetime | None = None) -> list[Alert]
 
     # Точка может быть переведена на внешнюю CRM без ключей: тогда бот не сможет
     # ни показать слоты, ни записать клиента — и никто об этом не узнает.
-    from .crm.connectors import unavailable_salons  # noqa: PLC0415
-
     salons = [
         dict(row) for row in await pool.fetch(
             "SELECT id, name, crm_provider FROM salons WHERE is_active"
         )
     ]
+    found.extend(await _revenue_alerts(pool, salons))
+
+    from .crm.connectors import unavailable_salons  # noqa: PLC0415
+
     for salon in unavailable_salons(salons):
         found.append(Alert(
             f"crm_not_ready:{salon['salon_id']}",
@@ -156,6 +200,42 @@ def render_alert(alert: Alert, *, salon: str | None = None) -> str:
     mark = "🔴" if alert.severity == "critical" else "🟡"
     prefix = f"{mark} {salon}: " if salon else f"{mark} "
     return f"{prefix}{alert.text}"
+
+
+async def forget_client(
+    pool: Any, salon_id: str, client_id: str, *, actor: str = "system:request",
+) -> dict[str, Any]:
+    """Удаление клиента по запросу (ст. 3-ФЗ о персональных данных).
+
+    Что происходит: карточка обезличивается, история записей остаётся, но без
+    связи с человеком. Полное удаление строк ломает отчётность и учёт налогов,
+    поэтому ПДн стираются, а финансовый след — нет.
+    """
+    before = await pool.fetchrow(
+        "SELECT phone, name, notes FROM clients WHERE id = $1 AND salon_id = $2",
+        client_id, salon_id,
+    )
+    if not before:
+        return {"ok": False, "error": "not_found"}
+    await pool.execute(
+        "UPDATE clients SET phone = $3, name = NULL, notes = NULL, "
+        "requires_prepayment = false WHERE id = $1 AND salon_id = $2",
+        client_id, salon_id, f"erased-{str(client_id)[:8]}",
+    )
+    # Диалоги — тоже ПДн: оставляем факт, убираем содержание.
+    await pool.execute(
+        "UPDATE dialog_messages SET content = '[удалено по запросу субъекта ПДн]' "
+        "WHERE dialog_id IN (SELECT id FROM dialogs WHERE client_id = $1)",
+        client_id,
+    )
+    await pool.execute(
+        "INSERT INTO audit_log (salon_id, actor, action, details) "
+        "VALUES ($1, $2, 'forget_client', $3)",
+        salon_id, actor,
+        json.dumps({"client_id": client_id, "phone_last4": (before["phone"] or "")[-2:]},
+                   ensure_ascii=False),
+    )
+    return {"ok": True, "client_id": client_id}
 
 
 def json_report(rows: list[dict[str, Any]]) -> str:

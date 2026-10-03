@@ -1,4 +1,4 @@
-﻿"""Страницы панели: «Сегодня» и «Записи».
+"""Страницы панели: «Сегодня» и «Записи».
 
 «Сегодня» — главный экран владельца точки: записи, деньги, вклад бота,
 диалоги и загрузка мастеров. Дальше идёт «Записи» с фильтром по статусу.
@@ -25,6 +25,13 @@ from .render import (
 )
 
 
+def _role(ctx: Any | None) -> str:
+    """Роль посетителя для каркаса: что показывать в меню.
+
+    Берётся из контекста запроса, а не из формы: иначе ссылку в меню можно
+    было бы выдать себе за чужую роль параметром.
+    """
+    return str(getattr(ctx, "role", "") or "")
 def _ctx_parts(ctx: Any | None, permission: str) -> tuple[str, bool]:
     """Достаём csrf и право на правку из PageCtx.
 
@@ -126,7 +133,7 @@ def page_today(
             ),
         )
     )
-    return layout("Сегодня", "/today", content, salon=salon, salons=salons)
+    return layout("Сегодня", "/today", content, salon=salon, salons=salons, role=_role(ctx))
 
 
 def page_bookings(
@@ -184,4 +191,4 @@ def page_bookings(
             ),
         )
     )
-    return layout("Записи", "/bookings", content, salon=salon, salons=salons)
+    return layout("Записи", "/bookings", content, salon=salon, salons=salons, role=_role(ctx))

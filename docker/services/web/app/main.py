@@ -25,6 +25,7 @@ from admin_core.web.pages_lists import (
     page_clients,
     page_dialogs,
     page_masters,
+    page_network,
     page_reports,
     page_services,
     page_settings,
@@ -83,10 +84,28 @@ async def _bookings(
 async def _clients(
     panel: Panel, salon: dict, salons: list[dict], request: Any, ctx: PageCtx | None = None
 ) -> str:
+    """Клиенты точки + лист ожидания: кому предложим освободившийся слот."""
+    from admin_core.waitlist import list_waitlist  # noqa: PLC0415
+
     tz = await queries.salon_tz(panel.pool, str(salon["id"]))
     rows = await queries.clients_list(panel.pool, str(salon["id"]))
+    queue = await list_waitlist(panel.pool, str(salon["id"]))
+    services = await queries.services(panel.pool, str(salon["id"]))
     msg, err = _flash_from(request)
-    return page_clients(rows, tz, salon, salons, ctx, msg, err)
+    html = page_clients(rows, tz, salon, salons, ctx, msg, err)
+    return html.replace("<!--WAITLIST-->", _waitlist_block(queue, services, ctx, salon))
+
+
+def _waitlist_block(
+    queue: list[dict[str, Any]],
+    services: list[dict[str, Any]],
+    ctx: PageCtx | None,
+    salon: dict[str, Any] | None,
+) -> str:
+    """Карточка «Лист ожидания»: очередь и форма добавления клиента."""
+    from admin_core.web.pages_lists import waitlist_block  # noqa: PLC0415
+
+    return waitlist_block(queue, services, ctx, salon)
 
 
 async def _services(
@@ -115,7 +134,7 @@ async def _dialogs(
     dialog_id = request.query.get("id", "")
     if dialog_id:
         messages = await queries.dialog_messages(panel.pool, dialog_id)
-    return page_dialogs(rows, messages, tz, salon, salons)
+    return page_dialogs(rows, messages, tz, salon, salons, ctx)
 
 
 async def _audit(
@@ -124,7 +143,7 @@ async def _audit(
     tz = await queries.salon_tz(panel.pool, str(salon["id"]))
     rows = await queries.audit_list(panel.pool, str(salon["id"]))
     msg, err = _flash_from(request)
-    return page_audit(rows, tz, salon, salons)
+    return page_audit(rows, tz, salon, salons, ctx)
 
 
 async def _reports(
@@ -150,7 +169,34 @@ async def _reports(
     data["funnel"] = data["current"]["funnel"]
     data["loss"] = data["current"]["loss"]
     msg, err = _flash_from(request)
-    return page_reports(data, salon, salons, msg, err)
+    return page_reports(data, salon, salons, msg, err, ctx)
+
+
+async def _network(
+    panel: Panel, salon: dict, salons: list[dict], request: Any, ctx: PageCtx | None = None
+) -> str:
+    """Сводка по всем точкам — только для роли «наша команда».
+
+    Владельцу точки чужие цифры показывать нельзя даже при подмене URL:
+    проверка идёт по ``all_salons``, а не по тому, что пришло в ссылке.
+    """
+    from admin_core.exports import network_summary  # noqa: PLC0415
+
+    role = ctx.role if ctx else "guest"
+    if not can(role, "all_salons"):
+        panel.metrics.errors.labels("forbidden").inc()
+        return page_network([], {}, salon, salons, "Недостаточно прав на сводку", True)
+    days = 30
+    rows = await network_summary(panel.pool, days=days)
+    totals = {
+        "salons": len(rows),
+        "revenue": sum(float(r["revenue"] or 0) for r in rows),
+        "bookings": sum(int(r["bookings"] or 0) for r in rows),
+        "no_shows": sum(int(r["no_shows"] or 0) for r in rows),
+        "clients": sum(int(r["clients"] or 0) for r in rows),
+    }
+    msg, err = _flash_from(request)
+    return page_network(rows, totals, salon, salons, msg, err, days, ctx)
 
 
 async def _settings(
@@ -396,6 +442,7 @@ def build_app(
         "/today": _today, "/bookings": _bookings, "/clients": _clients,
         "/services": _services, "/masters": _masters, "/dialogs": _dialogs,
         "/audit": _audit, "/settings": _settings, "/reports": _reports,
+        "/network": _network,
     }
     check_builder_signatures(sections)  # падаем на старте, а не в HTTP
     app = web.Application(middlewares=[security])

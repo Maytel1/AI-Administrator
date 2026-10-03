@@ -25,6 +25,122 @@ from .render import (
 )
 
 
+def _role(ctx: Any | None) -> str:
+    """Роль посетителя для каркаса: что показывать в меню.
+
+    Берётся из контекста запроса, а не из формы: иначе ссылку в меню можно
+    было бы выдумать себе ролью в параметрах.
+    """
+    return str(getattr(ctx, "role", "") or "")
+
+
+def waitlist_block(
+    queue: list[dict[str, Any]],
+    services: list[dict[str, Any]],
+    ctx: Any | None,
+    salon: dict[str, Any] | None,
+) -> str:
+    """Карточка «Лист ожидания»: кто ждёт и форма добавления.
+
+    Пустая очередь — это не ошибка, а «никто не ждёт»: блок нужен всегда,
+    иначе владелец не знает, что возможность есть.
+    """
+    csrf, _may_drop = _ctx_parts(ctx, "client_create")
+    sid = esc(salon["id"]) if salon else ""
+    back = f"/clients?salon={sid}"
+    rows = [
+        [
+            esc(item.get("phone") or "—"),
+            esc(item.get("name") or "без имени"),
+            esc(item.get("service_title") or "любая услуга"),
+            esc((item.get("note") or "")[:40]),
+            dt_local(item.get("created_at"), ZoneInfo("Asia/Yekaterinburg")),
+            action_form(
+                "waitlist_drop", csrf, back,
+                f'<input type="hidden" name="waitlist_id" value="{esc(item["id"])}">',
+                "Убрать",
+            ),
+        ]
+        for item in queue
+    ]
+    options = "".join(
+        f'<option value="{esc(s["id"])}">{esc(s["title"])}</option>'
+        for s in services
+    )
+    form = (
+        '<form method="post" action="/actions" class="stack" '
+        'style="margin-top:12px">'
+        '<input type="hidden" name="action" value="waitlist_add">'
+        f'<input type="hidden" name="back" value="{back}">'
+        f"{csrf_field(csrf)}"
+        '<div class="cell"><span>Телефон</span>'
+        '<input type="tel" name="phone" placeholder="+79001234567" required></div>'
+        '<div class="cell"><span>Услуга</span>'
+        f'<select name="service_id"><option value="">любая</option>{options}</select></div>'
+        '<div class="cell"><span>Заметка</span>'
+        '<input type="text" name="note" placeholder="хочет утром"></div>'
+        '<div class="cell"><span>&nbsp;</span>'
+        '<button type="submit">В лист ожидания</button></div>'
+        "</form>"
+    )
+    body = table(
+        ["Телефон", "Клиент", "Услуга", "Заметка", "С", "Действие"], rows,
+        "Пока никто не ждёт — сюда можно поставить клиента",
+    )
+    return card(f"Лист ожидания ({len(queue)})", body + form)
+
+
+def page_network(
+    rows: list[dict[str, Any]],
+    totals: dict[str, Any],
+    salon: dict | None,
+    salons: list[dict] | None,
+    flash: str = "",
+    flash_error: bool = False,
+    days: int = 30,
+    ctx: Any | None = None,
+) -> str:
+    """Сводка по всем точкам — то, ради чего нужна роль «наша команда».
+
+    Владелец точки сюда не попадает: функция вызывается только при ``all_salons``,
+    а лишняя навигация у него была бы враньём в интерфейсе.
+    """
+    table_rows = [
+        [
+            esc(row["salon"]),
+            badge(str(row.get("plan") or "—"), "accent"),
+            str(row["bookings"]),
+            money(row["revenue"]),
+            str(row["no_shows"]),
+            str(row["clients"]),
+        ]
+        for row in rows
+    ]
+    tiles = "".join(
+        [
+            tile(str(totals.get("salons", 0)), "точек в сети"),
+            tile(money(totals.get("revenue", 0.0)), f"выручка за {days} дней", "green"),
+            tile(str(totals.get("bookings", 0)), "записей"),
+            tile(str(totals.get("no_shows", 0)), "неявок", "yellow"),
+            tile(str(totals.get("clients", 0)), "клиентов всего"),
+        ]
+    )
+    content = (
+        "<h1>Сеть точек</h1>"
+        f'<p class="sub">Все точки, где мы работаем · период {days} дней</p>'
+        + flash_html(flash, flash_error)
+        + f'<div class="tiles">{tiles}</div>'
+        + card(
+            "Точки",
+            table(
+                ["Точка", "Тариф", "Записей", "Выручка", "Неявок", "Клиентов"],
+                table_rows, "Активных точек нет",
+            ),
+        )
+    )
+    return layout("Сеть", "/network", content, salon=salon, salons=salons, role=_role(ctx))
+
+
 def page_clients(
     rows: list[dict[str, Any]],
     tz: ZoneInfo,
@@ -93,8 +209,9 @@ def page_clients(
         f'<p class="sub">Карточек: {len(rows)}. Опознание «своих» — по номеру телефона</p>'
         + flash_html(flash, flash_error)
         + card("Карточки клиентов", body + add_form)
+        + "<!--WAITLIST-->"
     )
-    return layout("Клиенты", "/clients", content, salon=salon, salons=salons)
+    return layout("Клиенты", "/clients", content, salon=salon, salons=salons, role=_role(ctx))
 
 
 def page_services(
@@ -182,7 +299,7 @@ def page_services(
             (f'<div class="grid-cards">{body}</div>' if cards else body) + add_form,
         )
     )
-    return layout("Прайс", "/services", content, salon=salon, salons=salons)
+    return layout("Прайс", "/services", content, salon=salon, salons=salons, role=_role(ctx))
 
 
 def page_masters(
@@ -260,13 +377,14 @@ def page_masters(
         + flash_html(flash, flash_error)
         + card("Команда и график", body + add_form)
     )
-    return layout("Мастера", "/masters", content, salon=salon, salons=salons)
+    return layout("Мастера", "/masters", content, salon=salon, salons=salons, role=_role(ctx))
 def page_dialogs(
     rows: list[dict[str, Any]],
     messages: list[dict[str, Any]] | None,
     tz: ZoneInfo,
     salon: dict | None,
     salons: list[dict] | None,
+    ctx: Any | None = None,
 ) -> str:
     """Диалоги бота — видно, как бот отвечает клиенту (контроль качества ответов)."""
     from .queries import CHANNEL_RU
@@ -306,11 +424,15 @@ def page_dialogs(
                 f"<br>{esc(m['content'])}</div>"
             )
         content += card("Переписка", "".join(bubbles) or '<div class="empty">Сообщений нет</div>')
-    return layout("Диалоги", "/dialogs", content, salon=salon, salons=salons)
+    return layout("Диалоги", "/dialogs", content, salon=salon, salons=salons, role=_role(ctx))
 
 
 def page_audit(
-    rows: list[dict[str, Any]], tz: ZoneInfo, salon: dict | None, salons: list[dict] | None
+    rows: list[dict[str, Any]],
+    tz: ZoneInfo,
+    salon: dict | None,
+    salons: list[dict] | None,
+    ctx: Any | None = None,
 ) -> str:
     """Журнал аудита: кто и что сделал — основа для разбора споров."""
     body = []
@@ -334,7 +456,7 @@ def page_audit(
             table(["Когда", "Кто", "Действие", "Детали"], body, "Журнал пуст."),
         )
     )
-    return layout("Аудит", "/audit", content, salon=salon, salons=salons)
+    return layout("Аудит", "/audit", content, salon=salon, salons=salons, role=_role(ctx))
 
 
 def page_settings(
@@ -454,7 +576,7 @@ def page_settings(
         + people
         + note
     )
-    return layout("Настройки", "/settings", content, salon=salon, salons=salons)
+    return layout("Настройки", "/settings", content, salon=salon, salons=salons, role=_role(ctx))
 def _bar_chart(rows: list[dict[str, Any]], tz: ZoneInfo) -> str:
     """Столбики выручки по дням — без JS и внешних библиотек.
 
@@ -482,6 +604,7 @@ def page_reports(
     salons: list[dict] | None,
     flash: str = "",
     flash_error: bool = False,
+    ctx: Any | None = None,
 ) -> str:
     """Отчёт за выбранный период + сравнение с предыдущим таким же."""
     stats = data["funnel"]
@@ -545,7 +668,7 @@ def page_reports(
         ))
         + card("Потери и затраты", table(["Показатель", "Значение"], loss_rows))
     )
-    return layout("Отчёты", "/reports", content, salon=salon, salons=salons)
+    return layout("Отчёты", "/reports", content, salon=salon, salons=salons, role=_role(ctx))
 
 
 def _period_tabs(periods: list[tuple[str, str, Any]], current: str, salon: dict | None) -> str:

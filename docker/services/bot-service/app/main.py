@@ -11,6 +11,7 @@ pywa (WhatsApp) подключается следующим шагом на эт
 import asyncio
 import os
 import sys
+from zoneinfo import ZoneInfo
 
 from admin_core.agent.agent import AgentSession
 from admin_core.crm import make_crm
@@ -21,10 +22,25 @@ from admin_core.ratelimit import RateLimiter
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.client.telegram import TelegramAPIServer
-from aiogram.filters import CommandStart
-from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup
+from aiogram.filters import Command, CommandStart
+from aiogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    Message,
+    ReplyKeyboardMarkup,
+)
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+
+# Статусы записи словами для клиента: внутренние коды в чат не показываем.
+STATUS_RU = {
+    "booked": "ожидает подтверждения",
+    "confirmed": "подтверждена",
+    "completed": "выполнена",
+    "cancelled": "отменена",
+    "no_show": "не пришли",
+}
 
 
 def normalize_phone(raw: str) -> str:
@@ -196,6 +212,86 @@ async def main() -> None:
         await callback.answer(answer[:200], show_alert=False)
         if callback.message:
             await callback.message.answer(answer)
+
+    @dp.message(Command("bookings"))
+    async def my_bookings(message: Message) -> None:
+        """Клиент сам смотрит и отменяет записи — без оператора.
+
+        Раньше любой вопрос про запись шёл человеку: это и нагрузка, и ожидание.
+        """
+        client_id = await state.pool.fetchval(
+            "SELECT client_id FROM dialogs WHERE chat_id = $1 ORDER BY id DESC LIMIT 1",
+            message.chat.id,
+        )
+        if not client_id:
+            await message.answer("Я вас ещё не узнал. Нажмите «📱 Поделиться номером».")
+            return
+        rows = await state.pool.fetch(
+            "SELECT b.starts_at, b.status, sv.title "
+            "FROM bookings b JOIN services sv ON sv.id = b.service_id "
+            "WHERE b.client_id = $1 AND b.starts_at >= now() - interval '2 hours' "
+            "ORDER BY b.starts_at LIMIT 5",
+            client_id,
+        )
+        if not rows:
+            await message.answer(
+                "Предстоящих записей нет. Записаться можно прямо здесь — скажите, "
+                "на какое время удобно."
+            )
+            return
+        tz = ZoneInfo(state.salon.get("timezone") or "Asia/Yekaterinburg")
+        lines = ["Ваши записи:"]
+        buttons = []
+        for row in rows:
+            when = row["starts_at"].astimezone(tz).strftime("%d.%m в %H:%M")
+            lines.append(f"• {when} — {row['title']} ({STATUS_RU.get(row['status'], row['status'])})")
+            if row["status"] in ("booked", "confirmed"):
+                buttons.append([
+                    InlineKeyboardButton(
+                        text=f"Отменить {when}",
+                        callback_data=f"cancel:{row['starts_at'].timestamp():.0f}",
+                    )
+                ])
+        markup = InlineKeyboardMarkup(inline_keyboard=buttons) if buttons else None
+        await message.answer("\n".join(lines), reply_markup=markup)
+
+    @dp.callback_query(F.data.startswith("cancel:"))
+    async def cancel_booking(callback) -> None:
+        """Клиент отменил запись сам — слот освобождается, слот уходит в лист ожидания."""
+        from admin_core.crm.internal import InternalCRM  # noqa: PLC0415
+
+        client_id = await state.pool.fetchval(
+            "SELECT client_id FROM dialogs WHERE chat_id = $1 ORDER BY id DESC LIMIT 1",
+            callback.message.chat.id if callback.message else 0,
+        )
+        if not client_id:
+            await callback.answer("Сначала поделитесь номером", show_alert=True)
+            return
+        booking = await state.pool.fetchrow(
+            "UPDATE bookings SET status = 'cancelled' WHERE client_id = $1 "
+            "AND status IN ('booked','confirmed') AND starts_at >= now() "
+            "ORDER BY starts_at LIMIT 1 RETURNING id, salon_id",
+            client_id,
+        )
+        if not booking:
+            await callback.answer("Запись уже отменена или её нет", show_alert=True)
+            return
+        await InternalCRM(state.pool).set_booking_status(
+            str(booking["salon_id"]), str(booking["id"]), "cancelled", actor="bot:telegram"
+        )
+        await callback.answer("Отменено. Если захотите вернуться — просто напишите",
+                              show_alert=False)
+
+    @dp.message(Command("help"))
+    async def help_cmd(message: Message) -> None:
+        """Короткая справка: что бот умеет и как записаться."""
+        await message.answer(
+            "Я администратор салона «Анна». Умею:\n"
+            "• показать свободное время и записать вас (/bookings — ваши записи);\n"
+            "• напомнить о визите за сутки и за два часа;\n"
+            "• отменить или перенести запись — кнопками прямо в сообщении.\n\n"
+            "Напишите, на что хотите записаться, и на какое время удобно.",
+        )
 
     me = await bot.get_me()
     print(f"[bot] polling as @{me.username} (LLM: {state.provider.name})", flush=True)

@@ -53,6 +53,8 @@ ACTION_PERMISSION = {
     "master_create": P_CATALOG,
     "master_archive": P_CATALOG,
     "client_create": P_CLIENT_CREATE,
+    "waitlist_add": P_CLIENT_CREATE,
+    "waitlist_drop": P_CLIENT_CREATE,
     "client_save": P_CLIENT_FLAGS,
     "hours_save": P_SCHEDULE,
     "user_create": P_USERS,

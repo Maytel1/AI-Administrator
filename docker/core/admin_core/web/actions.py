@@ -1,4 +1,4 @@
-﻿"""Правки из панели: разбор формы → вызов CRM → понятный результат.
+"""Правки из панели: разбор формы → вызов CRM → понятный результат.
 
 Здесь только HTTP-забота (валидация ввода, коды ошибок, тексты для человека);
 бизнес-правила и аудит — в ``admin_core.crm.internal.InternalCRM``.
@@ -234,6 +234,20 @@ async def apply_form(
     if action == "client_create":
         return await _client_create(pool, salon_id, form, actor=actor)
 
+    if action == "waitlist_add":
+        return await _waitlist_add(pool, salon_id, form, actor=actor)
+
+    if action == "waitlist_drop":
+        from ..waitlist import drop_from_waitlist  # noqa: PLC0415
+
+        wid = _uuid(form.get("waitlist_id"))
+        if not wid:
+            return fail("bad_id", "Некорректный идентификатор записи очереди")
+        result = await drop_from_waitlist(pool, salon_id, wid, actor=actor)
+        if not result["ok"]:
+            return fail("not_found")
+        return ok("Клиент убран из листа ожидания")
+
     if action == "user_create":
         # пароль не приходит из браузера: генерируем и показываем один раз
         return await _user_create(pool, salon_id, form, actor=actor)
@@ -278,6 +292,26 @@ async def _service_create(
     if not result["ok"]:
         return fail(result["error"], result["message"])
     return ok(f"Услуга «{result['title']}» добавлена: {_money(price)}, {duration} мин")
+
+
+async def _waitlist_add(
+    pool: Any, salon_id: str, form: dict[str, Any], *, actor: str
+) -> dict[str, Any]:
+    """Клиент в лист ожидания: освободившийся слот уйдёт ему автоматически."""
+    from ..waitlist import add_to_waitlist, list_waitlist  # noqa: PLC0415
+
+    phone = str(form.get("phone", "")).strip()
+    digits = "".join(ch for ch in phone if ch.isdigit())
+    if len(digits) < 10:
+        return fail("bad_phone", "Телефон нужен полностью — например +79001234567")
+    client = await InternalCRM(pool).ensure_client(salon_id, phone, None)
+    service_id = _uuid(form.get("service_id")) or None
+    await add_to_waitlist(
+        pool, salon_id, str(client["id"]), service_id=service_id,
+        note=str(form.get("note", "")).strip() or None,
+    )
+    queue = len(await list_waitlist(pool, salon_id))
+    return ok(f"Клиент в листе ожидания (в очереди {queue}) — вернём, как только освободится")
 
 
 async def _client_create(

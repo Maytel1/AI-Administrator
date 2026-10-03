@@ -20,6 +20,7 @@ NAV = [
     ("/masters", "Мастера", "✂"),
     ("/dialogs", "Диалоги", "✉"),
     ("/reports", "Отчёты", "◷"),
+    ("/network", "Сеть", "◈"),
     ("/audit", "Аудит", "⚑"),
     ("/settings", "Настройки", "⚙"),
 ]
@@ -108,13 +109,20 @@ def layout(
     *,
     salon: dict | None = None,
     salons: list[dict] | None = None,
+    role: str = "",
 ) -> str:
     """Страница целиком: сайдбар с активным разделом и переключатель салона."""
     sid = salon["id"] if salon else ""
+    # «Сеть» видит только роль нашей команды: владельцу точки показывать
+    # чужую выручку незачем, а ссылка в меню была бы враньём в интерфейсе.
+    nav_items = [
+        item for item in NAV
+        if item[0] != "/network" or (role and role == "team")
+    ]
     nav = "".join(
         f'<a href="{path}?salon={esc(sid)}" class="{"active" if path == active else ""}">'
         f"<i>{icon}</i>{esc(name)}</a>"
-        for path, name, icon in NAV
+        for path, name, icon in nav_items
     )
     switch = ""
     if salons:

@@ -16,10 +16,19 @@ UTC = ZoneInfo("UTC")
 
 
 async def _booking(pool, salon, client):
-    """Запись через обычный путь бота (у тестового мастера есть слоты все дни)."""
-    return await InternalCRM(pool).create_booking(
+    """Запись через обычный путь бота по реально свободному слоту.
+
+    Раньше здесь было жёсткое «12:00» — и после полудня тест падал: слот
+    уходил на следующий день, а get_free_slots отдаёт максимум 12 окон.
+    Теперь берём первый свободный, и тест не зависит от времени суток.
+    """
+    crm = InternalCRM(pool)
+    free = await crm.get_free_slots(str(salon["id"]), "Тест стрижка")
+    assert free, "у тестового мастера должны быть свободные слоты"
+    slot = free[0]
+    return await crm.create_booking(
         str(salon["id"]), str(client["id"]), "Тест стрижка",
-        time_text="12:00", created_by="test",
+        time_text=slot["start_text"], offered=[slot], created_by="test",
     )
 
 
