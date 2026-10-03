@@ -292,8 +292,16 @@ async def billing_status(pool: Any, salon: dict[str, Any]) -> dict[str, Any]:
         salon_id,
     )
     expired = paid_until_date is not None and paid_until_date < date.today()
+    # Итоги месяца по сети: бухгалтерия спрашивает «сколько должны» раньше всего.
+    totals = await pool.fetchrow(
+        "SELECT coalesce(sum(amount) FILTER (WHERE status = 'paid'), 0) AS paid,"
+        "       coalesce(sum(amount) FILTER (WHERE status = 'issued'), 0) AS debt "
+        "FROM payments WHERE period_start >= date_trunc('month', CURRENT_DATE)"
+    )
     return {
         "plan": salon.get("plan"),
+        "paid_amount": float(totals["paid"] or 0),
+        "debt": float(totals["debt"] or 0),
         "price": price_of(str(salon.get("plan") or "start")),
         "paid_until": paid_until_date,
         "expired": expired,

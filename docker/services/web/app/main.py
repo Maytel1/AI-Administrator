@@ -486,6 +486,65 @@ def build_app(
             },
         )
 
+    async def accounting_export(request: Any) -> Any:
+        """Бухгалтерские выгрузки: /accounting.csv?kind=payments|clients|debtors.
+
+        Реестр счетов и клиентов видит вся сеть (роль team). Право — ``billing``,
+        а не ``reports``: в выгрузке счетов есть ИНН и реквизиты плательщика, и
+        отдавать их владельцу салона было бы утечкой расчёта с нами.
+        """
+        from admin_core import exports  # noqa: PLC0415
+
+        session_token = request.cookies.get(SESSION_COOKIE, "")
+        session = await panel.session_of(session_token)
+        if not await panel.authorized(session_token) or session is None:
+            return web.Response(status=302, headers={"Location": "/login"})
+        if not can(session.role, "billing"):
+            panel.metrics.errors.labels("forbidden").inc()
+            return web.Response(status=403, text="Недостаточно прав на выгрузку")
+        kind = request.query.get("kind") or "payments"
+        salon, _salons = await panel.salon_for_session(request, session)
+        if salon is None:
+            return web.Response(status=404, text="Нет подключённых точек")
+        if kind == "clients":
+            payload = exports.clients_csv(
+                await exports.clients_registry(panel.pool, salon_id=str(salon["id"]))
+            )
+            name = "klienty"
+        elif kind == "debtors":
+            payload = exports.to_csv(
+                [
+                    "Салон", "Плательщик", "Тип", "ИНН", "Тариф",
+                    "Неоплаченных счетов", "Долг", "Оплачено до", "Просрочено с",
+                ],
+                [
+                    [
+                        row["name"], row["legal_name"],
+                        {"self_employed": "самозанятый", "ip": "ИП",
+                         "llc": "ООО"}.get(str(row["client_type"]), "—"),
+                        row["inn"], row["plan"], row["unpaid"],
+                        f"{float(row['debt'] or 0):.2f}",
+                        row["paid_until"] or "", row["oldest_due"] or "",
+                    ]
+                    for row in await exports.debtors(panel.pool)
+                ],
+            )
+            name = "dolgi"
+        else:
+            payload = exports.payments_csv(
+                await exports.payments_registry(panel.pool)
+            )
+            name = "scheta"
+        return web.Response(
+            body=payload,
+            content_type="text/csv",
+            charset="utf-8",
+            headers={
+                "Content-Disposition": f'attachment; filename="{name}.csv"',
+                "Cache-Control": "no-store",
+            },
+        )
+
     sections = {
         "/today": _today, "/bookings": _bookings, "/clients": _clients,
         "/services": _services, "/masters": _masters, "/dialogs": _dialogs,
@@ -503,6 +562,7 @@ def build_app(
     app.router.add_post("/actions", do_action)
     app.router.add_get("/static.css", static_css)
     app.router.add_get("/export.csv", export_csv)
+    app.router.add_get("/accounting.csv", accounting_export)
     for path, builder in sections.items():
         app.router.add_get(path, lambda r, b=builder: page(r, b))
     return app

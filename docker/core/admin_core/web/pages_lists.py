@@ -719,6 +719,14 @@ def page_billing(
             "оплачено до", "" if not expired else "yellow", "",
         )
         + tile(str(status.get("plan") or ""), "тариф", "", "")
+        + tile(
+            f'{status.get("debt", 0):.0f} руб.', "долг сети",
+            "yellow" if status.get("debt") else "", "",
+        )
+        + tile(
+            f'{status.get("paid_amount", 0):.0f} руб.', "оплачено за месяц",
+            "green", "",
+        )
         + "</div>"
     )
     actions = (
@@ -757,7 +765,14 @@ def page_billing(
     return layout(
         "Тариф и оплата", "/billing",
         "<h1>Тариф и оплата</h1>" + flash_html(flash, flash_error) + head
-        + (f'<div class="row-end">{actions}</div>' if actions else "")
+        + (
+            '<div class="row-end">'
+            + '<a class="tab" href="/accounting.csv?kind=payments">Счета (CSV)</a> '
+            + '<a class="tab" href="/accounting.csv?kind=debtors">Долги (CSV)</a> '
+            + '<a class="tab" href="/accounting.csv?kind=clients">Клиенты (CSV)</a>'
+            + actions + "</div>"
+            if actions else ""
+        )
         + card("История платежей", table(
             ["Период с", "Период по", "Сумма", "Статус", "Оплачен"], rows,
             "Платежей пока не было",
