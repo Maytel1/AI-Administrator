@@ -266,6 +266,44 @@ def build_app(
 ) -> Any:
     """Приложение aiohttp: статика, логин, разделы панели."""
     from aiohttp import web  # noqa: PLC0415 — в cli-контейнере aiohttp нет
+    @web.middleware
+    async def trace(request: Any, handler: Any) -> Any:
+        """Проставляет correlation-id на каждый запрос и кладёт его в заголовок.
+
+        Один идентификатор связывает веб, CRM и запись в аудите: по нему
+        находится вся цепочка одного клика, а не «примерно в 14:32».
+        """
+        import time  # noqa: PLC0415
+
+        from admin_core.logging_setup import (  # noqa: PLC0415
+            log_event, new_request_id, request_id, setup_logging,
+        )
+
+        log = setup_logging("web")
+        cid = request.headers.get("X-Request-Id") or new_request_id()
+        token = request_id.set(cid)
+        started = time.perf_counter()
+        try:
+            response = await handler(request)
+            elapsed = int((time.perf_counter() - started) * 1000)
+            log_event(
+                log, 20, "request",
+                cid=cid, path=request.path, method=request.method,
+                status=getattr(response, "status", 0), ms=elapsed,
+            )
+            try:
+                response.headers["X-Request-Id"] = cid
+            except Exception:  # noqa: BLE001,S110 — у stream-ответов нет заголовков
+                pass
+            return response
+        except Exception as exc:
+            log_event(
+                log, 40, "request failed", cid=cid, path=request.path,
+                error=f"{type(exc).__name__}: {exc}",
+            )
+            raise
+        finally:
+            request_id.reset(token)
 
     @web.middleware
     async def security(request: Any, handler: Any) -> Any:
@@ -553,7 +591,7 @@ def build_app(
         "/network": _network,
     }
     check_builder_signatures(sections)  # падаем на старте, а не в HTTP
-    app = web.Application(middlewares=[security])
+    app = web.Application(middlewares=[trace, security])
     app.router.add_get("/", index)
     app.router.add_get("/login", login_get)
     app.router.add_post("/login", login_post)
