@@ -24,6 +24,10 @@ docker/up_log.txt
 docker/up_err.txt
 
 
+# Логи прогонов и отладочные дампы: появляются при каждом запуске тестов
+# и docker compose, коммитить их незачем — они каждый раз разные.
+*.log
+
 # prod TLS: certificates and ACME challenge stay out of git
 docker/nginx/acme/
 
