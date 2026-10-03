@@ -78,7 +78,7 @@ hr{border:0;border-top:1px solid var(--line);margin:28px 0}
 <span class="chip">источник: <code>ADMIN_PANEL.md</code></span>
 </div>
 <div class="rule"></div>
-<nav class="toc-chips"><a href="#s1">1. Референс: что посмотрели</a><a href="#s2">2. Что сделано у нас</a><a href="#s3">3. Доступ и команды</a><a href="#s4">4. Чего сознательно нет в MVP</a><a href="#s5">5. Дорожная карта панели</a><a href="#s10">10. Что добавлено в 2026-09-30 (волна 3)</a><a href="#s11">11. Надёжность канала и выкатки (волна 4)</a><a href="#s12">12. Оплата: ручной счёт + СБП (волна 5)</a><a href="#s13">13. Карточка плательщика и автосчёт (волна 6)</a><a href="#s14">14. Часовой пояс UTC+5 (волна 7)</a><a href="#s15">15. Бухгалтерские выгрузки (волна 8)</a><a href="#s16">16. Качество бота и логи (волна 9)</a><a href="#s17">17. Нагрузка и покрытие панели (волна 10)</a><a href="#s18">18. Сквозная проверка панели (`scripts/smoke_admin.py`)</a></nav>
+<nav class="toc-chips"><a href="#s1">1. Референс: что посмотрели</a><a href="#s2">2. Что сделано у нас</a><a href="#s3">3. Доступ и команды</a><a href="#s4">4. Чего сознательно нет в MVP</a><a href="#s5">5. Дорожная карта панели</a><a href="#s10">10. Что добавлено в 2026-09-30 (волна 3)</a><a href="#s11">11. Надёжность канала и выкатки (волна 4)</a><a href="#s12">12. Оплата: ручной счёт + СБП (волна 5)</a><a href="#s13">13. Карточка плательщика и автосчёт (волна 6)</a><a href="#s14">14. Часовой пояс UTC+5 (волна 7)</a><a href="#s15">15. Бухгалтерские выгрузки (волна 8)</a><a href="#s16">16. Качество бота и логи (волна 9)</a><a href="#s17">17. Нагрузка и покрытие панели (волна 10)</a><a href="#s18">18. Сквозная проверка панели (`scripts/smoke_admin.py`)</a><a href="#s19">19. Проверено на живом стенде</a></nav>
 </header>
 <p>Фаза 4, дата: 30.09.2026. Реализовано: <strong>MVP с правками</strong> — панель работает на<br>настоящих данных (PostgreSQL, <code>admin_core</code>) и позволяет менять расписание,<br>цены и статусы записей. Запуск: <code>docker compose up -d web</code> → http://localhost:8082/today</p>
 <h2 id="s1"><span class="num">1</span><span>Референс: что посмотрели</span></h2>
@@ -284,6 +284,15 @@ hr{border:0;border-top:1px solid var(--line);margin:28px 0}
 <p>отсутствие в меню — корректное скрытие, а не потерянный пункт.</p>
 <p>Прогон на живом стенде: все проверки пройдены.</p>
 <p>Правки безопасности, подтверждённые этим прогоном: rate-limit входа срабатывает<br>на 5-й попытке, чужой <code>Host</code> не влияет на редиректы, <code>/health</code> и <code>/metrics</code><br>снаружи не видны, выгрузки <code>accounting.csv</code> закрыты для роли <code>owner</code>.</p>
+<h2 id="s19"><span class="num">19</span><span>Проверено на живом стенде</span></h2>
+<p><strong>Права ролей (реальные сессии, не только тесты).</strong></p>
+<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Раздел</th><th>staff</th><th>owner</th><th>team</th></tr></thead><tbody><tr><td><code>/billing</code></td><td>отказ с объяснением, реквизитов нет</td><td>отказ</td><td>данные</td></tr><tr><td><code>/network</code></td><td>отказ</td><td>отказ</td><td>сводка</td></tr><tr><td><code>/accounting.csv</code></td><td>403</td><td>403</td><td>200</td></tr><tr><td><code>/audit</code>, <code>/settings</code></td><td>доступны</td><td>доступны</td><td>доступны</td></tr></tbody></table></div>
+<p>Отказ отдаётся кодом 200 со страницей-объяснением: человек видит причину,<br>а не пустой экран; при этом реквизиты и сводка по сети в ответ не попадают.<br>Пункты <code>/billing</code> и <code>/network</code> у <code>staff</code> и <code>owner</code> скрыты из меню, но URL<br>защищён проверкой права — это проверено прямым запросом.</p>
+<p><strong>Бэкап и восстановление.</strong></p>
+<ul><li><code>scripts/backup_db.ps1</code>: дамп 397 КБ, <code>pg_restore --list</code> проходит, ротация 14 дней;</li><li>восстановление проверено в отдельную базу <code>restore_check</code>: 21 таблица,</li></ul>
+<p>182 салона, 3 пользователя, 4 записи — данные целы, тестовая база удалена.</p>
+<p><strong>Запуск бэкапа на Windows.</strong> Скрипт подписан Execution Policy, поэтому<br>запускать так:</p>
+<p>```<br>powershell -NoProfile -ExecutionPolicy Bypass -File scripts/backup_db.ps1<br>```</p>
 <footer class="src">Сгенерировано из <code>ADMIN_PANEL.md</code> · перегенерация: <code>python build_html_docs.py</code> · не редактируйте HTML вручную</footer>
 </article></main>
 <button id="top" title="Наверх">↑</button>
