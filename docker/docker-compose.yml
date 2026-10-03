@@ -10,6 +10,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-aiadmin}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aiadmin_dev}
       POSTGRES_DB: ${POSTGRES_DB:-aiadmin}
+      TZ: Asia/Yekaterinburg
+      PGTZ: Asia/Yekaterinburg
       POSTGRES_INITDB_ARGS: "--encoding=UTF8"
     ports:
       - "${POSTGRES_PORT:-5433}:5432"

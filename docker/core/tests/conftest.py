@@ -3,19 +3,17 @@
 import uuid
 from datetime import time
 
-import asyncpg
 import pytest
-from admin_core.config import get_settings
 from admin_core.crm.internal import InternalCRM
-from admin_core.db import run_migrations
+from admin_core.db import get_pool, run_migrations
 
 
 @pytest.fixture()
 async def pool():
     try:
-        pool = await asyncpg.create_pool(
-            get_settings().database_url, min_size=1, max_size=3
-        )
+        # Через get_pool: он ставит agreed-таймзону соединению, и тесты
+        # видят ту же дату, что и приложение.
+        pool = await get_pool()
     except Exception as exc:  # noqa: BLE001
         pytest.skip(f"БД недоступна ({type(exc).__name__}) — запустите docker compose up")
     # Миграции накатываем здесь: тесты проверяют код, который зависит от схемы.

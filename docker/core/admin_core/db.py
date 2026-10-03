@@ -6,6 +6,7 @@
 таблице schema_migrations.
 """
 
+from zoneinfo import ZoneInfo
 import os
 import pathlib
 
@@ -26,11 +27,49 @@ MIGRATIONS_DIR = pathlib.Path(os.getenv("MIGRATIONS_DIR", "/app/migrations"))
 # одновременно и оба зовут run_migrations (GAP_ANALYSIS §6.1).
 MIGRATION_LOCK_ID = 833_221_101
 
+# Единый часовой пояс проекта: UTC+5 без перехода на летнее время.
+DB_TIMEZONE = os.getenv("DB_TIMEZONE", "Asia/Yekaterinburg")
+
 
 async def get_pool(dsn: str | None = None) -> asyncpg.Pool:
-    return await asyncpg.create_pool(
-        dsn or get_settings().database_url, min_size=1, max_size=5
+    """Пул соединений с единым часовым поясом — UTC+5 (Екатеринбург).
+
+    Зачем: worker считал дату по своему TZ, а БД жила в UTC. На стыке суток
+    «сегодня» в приложении и в БД расходились на день, и счёт выставлялся не в
+    тот день. Теперь и БД, и worker считают в одной зоне — ``DB_TIMEZONE``.
+    """
+    settings = get_settings()
+    # server_settings, а не init: методы уровня пула (fetchval) берут
+    # временное соединение, и init на них не распространяется — БД отвечала
+    # UTC, пока acquire() отдавал Екатеринбург.
+    pool = await asyncpg.create_pool(
+        dsn or settings.database_url, min_size=1, max_size=5,
+        server_settings={"timezone": db_timezone()},
     )
+    return pool
+
+
+async def _init_connection(conn: asyncpg.Connection) -> None:
+    """Соединение, взятое напрямую, тоже должно быть в agreed-таймзоне.
+
+    ``SET TIME ZONE`` не принимает параметры, поэтому значение подставляется
+    текстом. Экранируем кавычки и отсекаем точку с запятой — иначе опечатка в
+    переменной окружения превратится в произвольный SQL.
+    """
+    name = db_timezone().replace("'", "").replace(";", "")[:64]
+    await conn.execute(f"SET TIME ZONE '{name}'")
+
+
+def db_timezone() -> str:
+    """Часовой пояс БД с проверкой: опечатка в TZ молча ломала бы даты."""
+    name = os.getenv("DB_TIMEZONE", DB_TIMEZONE)
+    try:
+        ZoneInfo(name)
+    except Exception as exc:  # noqa: BLE001 — сообщаем понятно
+        raise RuntimeError(
+            f"DB_TIMEZONE={name!r} не является часовым поясом: {exc}"
+        ) from exc
+    return name
 
 
 async def run_migrations(pool: asyncpg.Pool) -> list[str]:
