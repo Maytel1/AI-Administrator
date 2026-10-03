@@ -1,4 +1,78 @@
-# Docker — локальный dev-стек (фаза 0)
+# Runbook: что делать, когда что-то сломалось
+
+Инструкции для дежурного, а не для разработчика. Каждая начинается с
+«посмотри сюда», потом — «сделай это», и только потом — «если не помогло».
+
+Правило номер один: **сначала бэкап, потом любые ручные правки БД.**
+Восстановление из дампа дешевле, чем разбор последствий эксперимента на проде.
+
+## 0. За 60 секунд: что вообще сломано
+
+```
+cd docker
+docker compose ps                 # кто Up, кто Restarting, кто Exited
+docker compose logs --tail 30     # последние строки всех сервисов
+```
+
+Проверка живых сервисов (каждый отвечает JSON; пусто = сервис мёртв):
+
+| Что | Команда | Норма |
+|---|---|---|
+| Бот (Telegram/WhatsApp) | `curl http://localhost:8080/health` | `"db": "ok"` |
+| Панель | `curl http://localhost:8083/health` | `"status": "ok"` |
+| Worker | `curl http://localhost:8084/health` | `"db": "ok"` |
+| Автоответчик | `curl http://localhost:8085/health` | `"db": "ok"` |
+| call-service API | `curl http://localhost:8081/health` | `unauthorized` — это норма: порт требует токен |
+
+В **проде** эти порты снаружи закрыты (видно только nginx), поэтому проверять
+изнутри: `docker compose exec web wget -qO- http://127.0.0.1:8081/health`.
+
+Что означают значения:
+- `"db": "down"` → БД недоступна, идём в раздел 1;
+- `"status": "unhealthy"` → сервис жив, но сам сообщает о проблеме;
+- пусто / таймаут → сервис упал, идём в раздел 2.
+
+## 1. БД не поднимается или отвечает медленно
+
+Симптом: у всех сервисов `"db": "down"`, в логах `Connection refused` на 5432.
+
+```
+docker compose ps postgres             # должен быть Up (healthy)
+docker compose logs --tail 50 postgres
+docker compose restart postgres
+```
+
+Если не помогло — **проверьте место на диске**, это самая частая причина:
+
+```
+docker system df
+docker exec ai-admin-postgres df -h /var/lib/postgresql/data
+```
+
+Если диск заполнен, сначала **не удаляйте данные вручную** — сбросьте вес:
+`docker system prune` (контейнеры остановятся, volume с данными останется).
+
+Если БД поднялась, но данные «пропали» — не паникуйте, проверьте бэкап
+(раздел 4) и **не накатывайте миграции на пустую базу**.
+
+## 2. Сервис упал (контейнер в Restarting)
+
+```
+docker compose logs --tail 80 <сервис>     # web | worker | bot-service | call-service
+docker compose restart <сервис>
+```
+
+Частые причины по убыванию частоты:
+
+1. **Не применены миграции.** Симптом в логах — ошибка вида
+   `relation "..." does not exist`. Лечится:
+   `docker compose run --rm cli python -m run_migrations`.
+2. **Нет ключей в `.env`.** Сервис печатает `not set` в отчёте конфигурации.
+   Ничего не «додумывайте» — добавьте ключ в `docker/.env` и перезапустите.
+3. **Порт занят другим процессом.** Проверка: `netstat -ano | findstr :8082`.
+
+Если сервис падает сразу после старта и в логах нет внятной ошибки —
+увеличьте verbosity: `LOG_LEVEL=DEBUG` в `.env`, затем `docker compose up -d`.
 
 Скелет из DEVELOPMENT_PLAN.md: «docker-compose (call-service, bot-service, worker, PostgreSQL)».
 Всё локально, затраты 0 ₽ — платные внешние API (YandexGPT/SpeechKit) скелет не вызывает.
@@ -73,7 +147,133 @@ docker compose logs -f bot-service
 - Токен бота лежит только в `docker/.env` (в git не попадает) и в логи не выводится — печатается лишь имя бота.
 - `pywa` (WhatsApp) добавится на тот же роутер, когда подтвердится легальность WhatsApp Business API в РФ.
 
-## Дорога по фазам
+## 3. Не пускает в панель / «Неверный логин или пароль»
+
+```
+# 1) есть ли вообще учётная запись
+docker compose exec postgres psql -U aiadmin -d aiadmin \
+  -c "SELECT login, role, is_active, totp_enabled FROM panel_users"
+
+# 2) сброс пароля
+docker compose run --rm cli python cli.py --user <login> --password <новый> \
+  --role <owner|staff|team> --salon "<название салона>"
+```
+
+Важно: `--salon` ждёт **название**, а не ID салона.
+
+Если вход верный, а панель всё равно отдаёт форму входа — почти всегда
+истекла блокировка по rate-limit: 5 неудачных попыток на логин дают 429
+на 15 минут. **Подождите 15 минут**, пароль подбирать не нужно.
+
+Сбросить счётчик можно только перезапуском процесса панели:
+`docker compose restart web`.
+
+## 4. Восстановление из бэкапа
+
+Бэкап делает `scripts/backup_db.ps1` (проверен: дамп ~400 КБ, `pg_restore --list` проходит).
+
+Последний дамп:
+```
+dir docker\backups\*.dump | Sort-Object Name -Descending | Select-Object -First 3
+```
+
+Восстановление (скрипт сам требует подтверждения):
+```
+powershell -ExecutionPolicy Bypass -File scripts\restore_db.ps1 -Dump "docker\backups\<файл>.dump"
+```
+
+Проверить, что дамп вообще пригоден, **до** восстановления в прод:
+```
+docker compose exec -T postgres pg_restore --list < путь/дамп.dump
+```
+
+> На Windows скрипты запускаются с `-ExecutionPolicy Bypass`: без него
+> PowerShell откажется выполнять неподписанный файл.
+
+## 5. Панель открывается по HTTP, а надо HTTPS / истёк сертификат
+
+Симптом: браузер предупреждает о сертификате либо редирект на HTTP не работает.
+
+1. Проверьте, что сертификат и ключ лежат в `docker/certs/`
+   (`fullchain.pem`, `privkey.pem`) и что их срок не истёк.
+2. Прод запускается с двумя файлами compose:
+   ```
+   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+   ```
+3. Проверка: `powershell -ExecutionPolicy Bypass -File scripts\check_prod_tls.ps1`.
+
+**HSTS включайте только после того, как HTTPS заработал на реальном домене:**
+браузер запоминает его на год, и `http://localhost` перестанет открываться.
+
+Если панель в проде доступна снаружи по HTTP — это не «не настроено»,
+это дыра. Порт панели в прод-композе снят (`ports: !reset []`) специально:
+наружу его не публикуют, чтобы `WEB_TRUST_PROXY=1` нельзя было обмануть.
+
+## 6. Бот перестал отвечать (Telegram/WhatsApp)
+
+```
+docker compose logs --tail 50 bot-service
+curl http://localhost:8080/metrics | findstr /i telegram
+```
+
+Проверьте, что прокси жив (в РФ `api.telegram.org` недоступен напрямую):
+```
+curl https://<worker>.workers.dev/bot123456789:FakeToken/getMe
+```
+Ответ `{"ok":false,"error_code":401}` — это хорошо: значит, прокси отвечает,
+токен неверный. Если соединение не устанавливается — проблема в прокси.
+
+## 7. Откат миграции
+
+Если новая миграция сломала прод, откатываем **код и данные** вместе:
+
+```
+docker compose run --rm cli python scripts/run_migrations.py --rollback 1
+```
+
+Скрипт выполнит парный файл `<имя>.rollback.sql` и уберёт запись из
+`schema_migrations`. Если файла отката нет — миграция неоткатываема,
+единственный путь: восстановление из бэкапа (раздел 4).
+
+**Перед откатом** посмотрите, что именно будет откатывано:
+`docker compose run --rm cli python scripts/run_migrations.py --status`.
+
+## 8. Всё сломалось, времени мало
+
+Порядок действий, который не усугубляет ситуацию:
+
+1. `docker compose ps` — понять, кто упал.
+2. Если упала БД → раздел 1. Если сервис → раздел 2.
+3. **Не трогайте БД руками**, пока не снят бэкап: `backup_db.ps1`.
+4. Не меняйте два сервиса одновременно: после каждого шага — `docker compose ps`.
+5. Сомневаетесь — откатывайтесь на последний зелёный CI:
+
+```
+gh run list --limit 5
+git log --oneline -5
+```
+
+## 9. Проверка перед выкаткой
+
+Прогон всех проверок одной командой (те же шаги, что в CI):
+```
+python verify.py
+```
+
+Он же покажет, зелёный ли последний прогон GitHub Actions: `python verify.py --ci`.
+
+## Кого звать
+
+| Симптом | К кому |
+|---|---|
+| Бот молчит, панель работает | Telegram/WhatsApp: прокси Cloudflare, токен, Meta |
+| Панель молчит | web-сервис, nginx, сертификат |
+| Всё молчит | postgres, потом хост: диск, память |
+| Перестало работать после выкатки | Откат (раздел 7), потом разбор |
+
+---
+
+# Docker — локальный dev-стек (фаза 0)
 
 1. **Фаза 1** — схема БД (миграции в `postgres/init/`), CRM-адаптер (Altegio/YCLIENTS), LLM-агент, CLI-режим диалога. Критерий: 90% тестовых диалогов пишут запись в CRM.
 2. **Фаза 2** — `aiogram` в bot-service (эхо-бот), публичный HTTPS для вебхуков (или polling локально), подтверждающие SMS/мессенджер-уведомления.
