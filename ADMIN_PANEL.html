@@ -78,7 +78,7 @@ hr{border:0;border-top:1px solid var(--line);margin:28px 0}
 <span class="chip">источник: <code>ADMIN_PANEL.md</code></span>
 </div>
 <div class="rule"></div>
-<nav class="toc-chips"><a href="#s1">1. Референс: что посмотрели</a><a href="#s2">2. Что сделано у нас</a><a href="#s3">3. Доступ и команды</a><a href="#s4">4. Чего сознательно нет в MVP</a><a href="#s5">5. Дорожная карта панели</a><a href="#s10">10. Что добавлено в 2026-09-30 (волна 3)</a></nav>
+<nav class="toc-chips"><a href="#s1">1. Референс: что посмотрели</a><a href="#s2">2. Что сделано у нас</a><a href="#s3">3. Доступ и команды</a><a href="#s4">4. Чего сознательно нет в MVP</a><a href="#s5">5. Дорожная карта панели</a><a href="#s10">10. Что добавлено в 2026-09-30 (волна 3)</a><a href="#s11">11. Надёжность канала и выкатки (волна 4)</a></nav>
 </header>
 <p>Фаза 4, дата: 30.09.2026. Реализовано: <strong>MVP с правками</strong> — панель работает на<br>настоящих данных (PostgreSQL, <code>admin_core</code>) и позволяет менять расписание,<br>цены и статусы записей. Запуск: <code>docker compose up -d web</code> → http://localhost:8082/today</p>
 <h2 id="s1"><span class="num">1</span><span>Референс: что посмотрели</span></h2>
@@ -220,6 +220,13 @@ hr{border:0;border-top:1px solid var(--line);margin:28px 0}
 <ul><li><strong>CI</strong> — добавлен деплой по ssh (только после зелёных тестов, с бэкапом перед</li></ul>
 <p>выкаткой) и Dependabot для обновлений зависимостей.</p>
 <ul><li><strong>Тесты HTTP-слоя</strong> — 9 тестов маршрутов, CSRF, прав и заголовков безопасности.</li></ul>
+<h2 id="s11"><span class="num">11</span><span>Надёжность канала и выкатки (волна 4)</span></h2>
+<ul><li><strong>Вебхук больше не теряет сообщения.</strong> Раньше бралось только первое сообщение</li></ul>
+<p>первого change: если клиент отправил два подряд, на второе никто не отвечал.<br>Теперь разбираются все сообщения payload в порядке отправки<br>(channels/whatsapp_payload.py).</p>
+<ul><li><strong>Повторная доставка не приводит к дублю.</strong> Meta повторяет webhook при сбое:</li></ul>
+<p>фиксируем wamid в inbound_messages ДО обработки, повтор уходит тихим 200<br>с duplicates=N — без второго ответа клиенту и без второй брони.</p>
+<ul><li><strong>Автооткат выкатки.</strong> scripts/deploy.ps1 сохраняет текущие образы,</li></ul>
+<p>разворачивает новые, проверяет состояние контейнеров и при провале<br>возвращает предыдущие образы. Раньше шаблон заканчивался на compose ps,<br>и «успешная» выкатка могла оставить прод в рестарт-листе.</p>
 <footer class="src">Сгенерировано из <code>ADMIN_PANEL.md</code> · перегенерация: <code>python build_html_docs.py</code> · не редактируйте HTML вручную</footer>
 </article></main>
 <button id="top" title="Наверх">↑</button>

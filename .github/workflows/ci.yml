@@ -86,10 +86,27 @@ jobs:
           rsync -az --delete --exclude .git --exclude .env --exclude backups \
             --exclude 'certs' --exclude '*.log' ./ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
           ssh "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH/docker' \
-            && docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-               build web worker bot-service call-service \
-            && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d \
-            && docker compose -f docker-compose.yml -f docker-compose.prod.yml ps"
+            && powershell -ExecutionPolicy Bypass -File scripts/deploy.ps1"
+      - name: автооткат при неудачной выкатке
+        # Скрипт сам сохраняет образы до выкатки и возвращает их, если сервисы
+        # не поднялись. Без этого шага «успешный» деплой мог оставить прод в
+        # рестарт-листе, и заметить это можно было бы только по жалобам.
+        if: failure()
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH/docker' \
+            && ls -1dt deploy-backup/* | head -1 \
+            && for tar in \$(ls -1dt deploy-backup/* | head -1)/*.tar; do docker load -i \$tar; done \
+            && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --force-recreate"
       - name: уведомление
         if: always()
         run: echo "деплой ${{ github.sha }} завершён с кодом ${{ job.status }}"

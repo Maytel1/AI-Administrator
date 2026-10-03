@@ -24,7 +24,9 @@ sys.path.insert(0, "/app")
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "core"))
 
 from admin_core.agent.agent import AgentSession  # noqa: E402
+from admin_core.channels.inbound import claim  # noqa: E402
 from admin_core.channels.whatsapp_auth import verify_signature  # noqa: E402
+from admin_core.channels.whatsapp_payload import extract  # noqa: E402
 from admin_core.crm import make_crm  # noqa: E402
 from admin_core.db import get_pool, run_migrations  # noqa: E402
 from admin_core.health import (  # noqa: E402
@@ -89,7 +91,6 @@ async def find_salon(pool: Any, phone: str) -> dict[str, Any] | None:
         "ORDER BY b.starts_at DESC LIMIT 1",
         digits,
     )
-
 async def _reply(
     pool: Any, llm: Any, crm: Any, salon: dict, phone: str, text: str,
     metrics: ServiceMetrics,
@@ -147,10 +148,11 @@ async def build_app() -> web.Application:
         return web.Response(text=challenge, content_type="text/plain")
 
     async def incoming(request: web.Request) -> web.Response:
+        """Входящий webhook Meta: подпись, все сообщения, без повторов."""
         body = await request.read()
         signature = request.headers.get("X-Hub-Signature-256", "")
         if not verify_signature(body, signature, APP_SECRET):
-            # Без APP_SECRET пропустить проверку нельзя: подпись — единственное,
+            # Без APP_SECRET проверку пропустить нельзя: подпись — единственное,
             # что отличает Meta от любого чужого POST в наш эндпоинт.
             metrics.errors.labels("signature").inc()
             return web.Response(status=401, text="bad signature")
@@ -159,23 +161,31 @@ async def build_app() -> web.Application:
         except Exception:  # noqa: BLE001 — не-JSON приходит только при ошибках Meta
             return web.Response(status=400, text="bad json")
 
+        # Раньше бралось только первое сообщение первого change: остальные
+        # клиентские сообщения терялись молча, и он думал, что его не услышали.
+        messages = extract(payload)
         handled = 0
-        for entry in payload.get("entry", []):
-            for change in entry.get("changes", []):
-                value = change.get("value", {})
-                messages = value.get("messages") or [{}]
-                message = messages[0]
-                text = (message.get("text") or {}).get("body", "")
-                sender = message.get("from", "")
-                if not text or not sender:
-                    continue
-                salon = await find_salon(pool, sender)
+        duplicates = 0
+        for message in messages:
+            if await claim(pool, "whatsapp", message.wamid, message.text):
+                salon = await find_salon(pool, message.phone)
                 if salon is None:
                     metrics.messages.labels("dropped").inc()
                     continue
                 handled += 1
-                await _reply(pool, llm, crm, salon, sender, text, metrics)
-        return web.json_response({"handled": handled})
+                await _reply(
+                    pool, llm, crm, salon, message.phone, message.text, metrics
+                )
+            else:
+                # Повторная доставка: Meta не должна получать ошибку, но и второй
+                # ответ клиенту (и вторая бронь) быть не должно.
+                duplicates += 1
+                metrics.messages.labels("duplicate").inc()
+        return web.json_response(
+            {"handled": handled, "duplicates": duplicates,
+             "received": len(messages)}
+        )
+
 
     async def health(_request: web.Request) -> web.Response:
         db_ok = await ping_db(pool)
