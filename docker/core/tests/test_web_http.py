@@ -11,6 +11,7 @@
 
 
 import pytest
+import yarl
 
 # HTTP-слой лежит в /app/app: тесты делают ровно import app.main, как сервис.
 
@@ -230,6 +231,76 @@ async def test_overdue_payment_raises_alert(demo, pool):
     alerts = await check_alerts(pool)
     kinds = {alert.kind for alert in alerts}
     assert "payments_overdue" in kinds
+
+
+async def test_every_section_answers_for_owner(client):
+    """Каждый раздел панели открывается владельцу: список берём из кода, не рукой.
+
+    Именно так раньше терялся раздел — он был в коде, но не в меню и не в
+    тестах, и обнаруживался только пользователем.
+    """
+    import ast  # noqa: PLC0415
+    import pathlib  # noqa: PLC0415
+
+    # В тестовом образе код веба лежит в /app/app, в репозитории — services/web/app.
+    candidates = [
+        pathlib.Path(__file__).resolve().parents[2] / "services" / "web" / "app" / "main.py",
+        pathlib.Path("/app/app/main.py"),
+    ]
+    target = next(path for path in candidates if path.exists())
+    tree = ast.parse(target.read_text(encoding="utf-8"))
+    paths: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and getattr(node.targets[0], "id", "") == "sections":
+            paths = [key.value for key in node.value.keys]
+    assert len(paths) >= 10, "список разделов должен покрывать всю панель"
+    http, _panel, _token, _demo = client
+    for path in paths:
+        response = await http.get(path)
+        assert response.status == 200, f"{path} -> {response.status}"
+        assert LOGIN_MARK not in await response.text(), f"{path} показал вход"
+
+
+async def test_every_action_is_covered_by_permissions(client):
+    """Каждое действие формы имеет запись о требуемом праве.
+
+    Действие без права — это либо «доступно всем», либо «недоступно никому»;
+    оба варианта ломают панель тихо.
+    """
+    import ast  # noqa: PLC0415
+    import pathlib  # noqa: PLC0415
+
+    from admin_core.web.roles import can_action  # noqa: PLC0415
+
+    core = pathlib.Path(__file__).resolve().parents[1]
+    tree = ast.parse((core / "admin_core" / "web" / "actions.py").read_text(encoding="utf-8"))
+    actions: list[str] = []
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Compare)
+            and isinstance(node.left, ast.Name)
+            and node.left.id == "action"
+        ):
+            actions.append(node.comparators[0].value)
+    assert len(actions) >= 18, "в actions.py должно быть не меньше 18 действий"
+    for action in actions:
+        assert can_action("team", action) or can_action("owner", action), (
+            f"действие {action} недоступно ни одной роли"
+        )
+    # Опасные действия не должны достаться администратору точки.
+    for action in ("user_create", "user_totp", "user_disable", "invoice_issue",
+                   "payment_mark_paid", "legal_save"):
+        if action in actions:
+            assert can_action("staff", action) is False, (
+                f"{action} не должно быть доступно администратору"
+            )
+
+
+async def _csrf(http) -> str:  # noqa: ANN001
+    """Токен сессии используется как CSRF в тестах HTTP-слоя."""
+    return http.session.cookie_jar.filter_cookies(
+        yarl.URL("http://127.0.0.1")
+    )["dz24_session"].value
 
 
 if __name__ == "__main__":  # pragma: no cover

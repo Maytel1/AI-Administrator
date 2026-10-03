@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import asyncio
 import pathlib
 import sys
@@ -135,17 +136,159 @@ async def run(
         await pool.close()
 
 
+async def run_panel(
+    base_url: str, *, requests: int = 100, concurrency: int = 8, max_ms: int = 800
+) -> int:
+    """Нагрузка на HTTP-слой панели: разделы, выгрузки, health.
+
+    Раньше мерили только запись в БД, а панель — то, чем люди пользуются каждый
+    день. Сценарий повторяет обычный путь: «Сегодня», «Записи», отчёты, CSV.
+    """
+    import time  # noqa: PLC0415
+
+    import aiohttp  # noqa: PLC0415
+
+    paths = [
+        "/today", "/bookings", "/clients", "/services", "/masters",
+        "/reports", "/dialogs", "/export.csv?period=30",
+        "/accounting.csv?kind=payments", "/health",
+    ]
+    latencies: list[float] = []
+    errors = 0
+    connector = aiohttp.TCPConnector(limit=concurrency * 2, ssl=False)
+    timeout = aiohttp.ClientTimeout(total=20)
+
+    async def hit(session: aiohttp.ClientSession, path: str) -> None:
+        nonlocal errors
+        started = time.perf_counter()
+        try:
+            async with session.get(base_url + path, timeout=timeout) as response:
+                await response.read()
+                # Редирект на вход для анонимного клиента — норма, не сбой.
+                if response.status >= 500:
+                    errors += 1
+        except Exception:  # noqa: BLE001 — сетевой сбой тоже в счёт
+            errors += 1
+        latencies.append((time.perf_counter() - started) * 1000)
+
+    async with aiohttp.ClientSession(connector=connector) as session:
+        tasks: list = []
+        for index in range(requests):
+            tasks.append(hit(session, paths[index % len(paths)]))
+            if len(tasks) >= concurrency:
+                await asyncio.gather(*tasks)
+                tasks = []
+        if tasks:
+            await asyncio.gather(*tasks)
+
+    latencies.sort()
+    p50 = latencies[len(latencies) // 2] if latencies else 0.0
+    p95 = latencies[int(len(latencies) * 0.95) - 1] if latencies else 0.0
+    print(
+        f"ПАНЕЛЬ: {requests} запросов, p50={p50:.0f} мс, p95={p95:.0f} мс, "
+        f"ошибок 5xx: {errors}"
+    )
+    ok = p95 <= max_ms and errors == 0
+    print("ИТОГ:", "держит порог" if ok else f"ПРОВАЛ: p95 {p95:.0f} > {max_ms}")
+    return 0 if ok else 1
+async def run_webhook(
+    webhook_url: str, secret: str, *, requests: int = 100, concurrency: int = 8,
+    max_ms: int = 500,
+) -> int:
+    """Нагрузка на вебхук с проверкой идемпотентности под давлением.
+
+    Половина запросов — повторы тех же wamid: они обязаны дать duplicates, а не
+    второй ответ, иначе под нагрузкой клиент получит две записи.
+    """
+    import time  # noqa: PLC0415
+
+    import aiohttp  # noqa: PLC0415
+
+    from admin_core.channels.whatsapp_auth import sign_body  # noqa: PLC0415
+
+    latencies: list[float] = []
+    duplicates = 0
+    handled = 0
+    failures = 0
+    connector = aiohttp.TCPConnector(limit=concurrency * 2)
+    timeout = aiohttp.ClientTimeout(total=20)
+
+    async def hit(session: aiohttp.ClientSession, wamid: str) -> None:
+        nonlocal duplicates, handled, failures
+        body = json.dumps({"entry": [{"changes": [{"value": {"messages": [{
+            "id": wamid, "from": "79999999999", "timestamp": "1",
+            "text": {"body": "хочу записаться"},
+        }]}}]}]}).encode("utf-8")
+        started = time.perf_counter()
+        try:
+            async with session.post(
+                webhook_url, data=body,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Hub-Signature-256": sign_body(body, secret),
+                },
+                timeout=timeout,
+            ) as response:
+                data = await response.json()
+                handled += int(data.get("handled", 0))
+                duplicates += int(data.get("duplicates", 0))
+        except Exception:  # noqa: BLE001 — сетевой сбой считаем отдельно
+            failures += 1
+        latencies.append((time.perf_counter() - started) * 1000)
+
+    async with aiohttp.ClientSession(connector=connector) as session:
+        tasks: list = []
+        for index in range(requests):
+            tasks.append(hit(session, f"wamid.load.{index // 2}"))
+            if len(tasks) >= concurrency:
+                await asyncio.gather(*tasks)
+                tasks = []
+        if tasks:
+            await asyncio.gather(*tasks)
+
+    latencies.sort()
+    p95 = latencies[int(len(latencies) * 0.95) - 1] if latencies else 0.0
+    print(
+        f"ВЕБХУК: {requests} запросов, p95={p95:.0f} мс, обработано={handled}, "
+        f"дублей={duplicates}, сбоев={failures}"
+    )
+    ok = p95 <= max_ms and failures == 0
+    print("ИТОГ:", "держит порог" if ok else f"ПРОВАЛ: p95 {p95:.0f} > {max_ms}")
+    return 0 if ok else 1
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Нагрузочный тест записи (запись в БД)")
+    """Три сценария нагрузки: БД, панель и вебхук."""
+    parser = argparse.ArgumentParser(description="Нагрузочные тесты")
     parser.add_argument("--requests", type=int, default=200)
     parser.add_argument("--masters", type=int, default=4)
     parser.add_argument("--concurrency", type=int, default=10)
     parser.add_argument("--max-ms", type=int, default=1500)
+    parser.add_argument("--panel-url", default="")
+    parser.add_argument("--webhook-url", default="")
+    parser.add_argument("--webhook-secret", default="")
     parser.add_argument(
         "--dsn",
         default="postgresql://aiadmin:aiadmin_dev@postgres:5432/aiadmin",
     )
     args = parser.parse_args()
+
+    if args.panel_url or args.webhook_url:
+        async def both() -> int:
+            code = 0
+            if args.panel_url:
+                code |= await run_panel(
+                    args.panel_url, requests=args.requests,
+                    concurrency=args.concurrency, max_ms=args.max_ms,
+                )
+            if args.webhook_url and args.webhook_secret:
+                code |= await run_webhook(
+                    args.webhook_url, args.webhook_secret, requests=args.requests,
+                    concurrency=args.concurrency, max_ms=args.max_ms,
+                )
+            return code
+
+        raise SystemExit(asyncio.run(both()))
+
     raise SystemExit(asyncio.run(run(
         args.dsn, requests=args.requests, masters=args.masters,
         concurrency=args.concurrency, max_ms=args.max_ms,
