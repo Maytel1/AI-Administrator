@@ -14,8 +14,54 @@
 # HSTS включается ПОСЛЕ того, как HTTPS заработал на реальном домене: браузер
 # запоминает его на год и http://localhost перестанет открываться.
 
+# Продовый профиль: лимиты ресурсов, чтобы сервис, ушедший в цикл
+# потребления памяти, не утащил за собой хост.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Ограничения намеренно скромные: на виртуалке 2 ГБ сумма лимитов не должна
+# превышать ~1.5 ГБ, иначе postgres начнёт упираться в память при нагрузке.
+# Под свой ВМ правьте числа здесь, а не в основном compose.
+
 services:
+  postgres:
+    environment:
+      # Медленные запросы видно сразу, а не по жалобам «панель подвисла».
+      LOG_MIN_DURATION_STATEMENT: ${PG_SLOW_MS:-200}
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+    command:
+      - postgres
+      - -c
+      - max_connections=100
+      - -c
+      - shared_buffers=192MB
+
   web:
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+
+  worker:
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  bot-service:
+    deploy:
+      resources:
+        limits:
+          memory: 320M
+
+  call-service:
+    deploy:
+      resources:
+        limits:
+          memory: 384M
     environment:
       # nginx — единственный, кто говорит панели «это https»
       WEB_TRUST_PROXY: "1"

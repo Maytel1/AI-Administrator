@@ -42,6 +42,34 @@ class _FakePool:
         return self._value
 
 
+async def test_db_metric_follows_ping_result() -> None:
+    """`service_db_up` обязан отражать живое состояние БД, а не константу.
+
+    На ней строится алерт DatabaseUnavailable: если метрика всегда 1, «упавшую»
+    БД никто не заметит — сервис при этом продолжает отвечать 200.
+    """
+    from admin_core.health import ServiceMetrics, make_health_app
+    from aiohttp.test_utils import TestClient, TestServer
+
+    metrics = ServiceMetrics("test-service")
+    client = TestClient(TestServer(make_health_app(metrics, pool=_FakePool(fails=True))))
+    await client.start_server()
+    try:
+        await client.get("/health")
+        assert 'service_db_up{service="test-service"} 0.0' in metrics.render().decode()
+    finally:
+        await client.close()
+
+    healthy = ServiceMetrics("test-ok")
+    client_ok = TestClient(TestServer(make_health_app(healthy, pool=_FakePool())))
+    await client_ok.start_server()
+    try:
+        await client_ok.get("/health")
+        assert 'service_db_up{service="test-ok"} 1.0' in healthy.render().decode()
+    finally:
+        await client_ok.close()
+
+
 async def test_ping_db_ok():
     assert await ping_db(_FakePool()) is True
 

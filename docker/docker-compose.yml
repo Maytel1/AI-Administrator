@@ -162,5 +162,26 @@ services:
     stdin_open: true
     tty: true
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ai-admin-prometheus
+    # Отдельный профиль: метрики полезны не всем и занимают память.
+    # Запуск: docker compose --profile monitoring up -d
+    profiles: ["monitoring"]
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - promdata:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    # Порты сервисов наружу закрыты, поэтому ходим к ним по внутренней сети.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=${PROM_RETENTION:-15d}
+
 volumes:
   pgdata:
+  promdata:

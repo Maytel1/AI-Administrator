@@ -14,6 +14,8 @@ docker compose ps                 # кто Up, кто Restarting, кто Exited
 docker compose logs --tail 30     # последние строки всех сервисов
 ```
 
+Метрики и алерты: раздел 10 ниже.
+
 Проверка живых сервисов (каждый отвечает JSON; пусто = сервис мёртв):
 
 | Что | Команда | Норма |
@@ -270,6 +272,53 @@ python verify.py
 | Панель молчит | web-сервис, nginx, сертификат |
 | Всё молчит | postgres, потом хост: диск, память |
 | Перестало работать после выкатки | Откат (раздел 7), потом разбор |
+
+## 10. Метрики и алерты
+
+Prometheus живёт в отдельном профиле, чтобы не жесть память, когда он не нужен:
+
+```
+docker compose --profile monitoring up -d prometheus
+```
+
+Веб-интерфейс: <http://localhost:9090>. Проверить, что все сервисы видны:
+
+```
+curl http://localhost:9090/api/v1/targets?state=active
+```
+
+Что собирается:
+
+| Метрика | Что показывает |
+|---|---|
+| `service_up{service}` | сервис поднят |
+| `service_db_up{service}` | **отвечает ли БД** — отличает «упал сервис» от «упала БД» |
+| `service_uptime_seconds` | аптайм (по нему видно рестарты) |
+| `service_messages_total` | обработано сообщений |
+| `service_errors_total{where}` | ошибки по местам (`csrf`, `forbidden`, `login_failed`…) |
+| `service_rate_limited_total{reason}` | отклонено антиспамом |
+
+Правила алертов — `docker/monitoring/alerts.yml`, шесть штук:
+
+| Алерт | Когда | Что делать |
+|---|---|---|
+| `ServiceDown` | нет метрик 2 мин | runbook, раздел 2 |
+| `DatabaseUnavailable` | `service_db_up == 0` | runbook, раздел 1 |
+| `ServiceRestartedOften` | >3 рестарта бота в час | логи, раздел 2 |
+| `ErrorRateHigh` | >5 ошибок за 5 мин | логи по `cid` из JSON-логов |
+| `RateLimitSpike` | много отклонений антиспамом | один клиент шлёт по кругу |
+| `NoMessagesForLongTime` | полчаса тишины | бот перестал отвечать |
+
+Проверить правила без запуска Prometheus:
+
+```
+docker run --rm --entrypoint promtool -v %CD%\monitoring:/etc/prometheus prom/prometheus:latest check config /etc/prometheus/prometheus.yml
+```
+
+Куда уходят уведомления — пока никуда: в `alerts.yml` заполняется
+`annotations.summary`, но без Alertmanager или Telegram-интеграции они
+видны только в интерфейсе Prometheus. Подключение уведомлений — задача
+фазы 4 (нужен канал, куда писать: Telegram-группа или почта).
 
 ---
 

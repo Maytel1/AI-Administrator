@@ -28,6 +28,10 @@ class ServiceMetrics:
         self._started = time.monotonic()
         self.up = Gauge("service_up", "Сервис поднят (1)", ["service"], registry=reg)
         self.uptime = Gauge("service_uptime_seconds", "Аптайм, сек", ["service"], registry=reg)
+        # Доступность БД отдельной метрикой: без неё алерт «сервис жив, но БД
+        # недоступна» не отличить от «сервис целиком упал» — а чинить нужно
+        # разное. Ставится в 0 при провале ping_db (см. make_health_app).
+        self.db = Gauge("service_db_up", "БД отвечает (1)", ["service"], registry=reg)
         self.messages = Counter(
             "service_messages_total", "Обработано сообщений", ["kind"], registry=reg
         )
@@ -90,6 +94,9 @@ def make_health_app(
 
     async def health(_request):  # noqa: ANN202
         db_ok = await ping_db(pool) if pool is not None else True
+        # Метрику обновляем здесь, а не в render(): /health зовут чаще, чем
+        # скрейпят метрики, и ping_db стоит делать по необходимости.
+        metrics.db.labels(metrics.service).set(1 if db_ok else 0)
         ext = extra() if callable(extra) else extra
         payload = health_payload(
             db_ok=db_ok,

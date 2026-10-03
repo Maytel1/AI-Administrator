@@ -1,0 +1,73 @@
+# Правила алертов: что действительно требует внимания человека.
+#
+# Фильтр «на каждый чих»: пороги подобраны так, чтобы ночью не прилетало
+# по три сообщения об одном и том же. Правило, которое срабатывает постоянно,
+# через неделю перестают читать — и пропускают настоящую поломку.
+
+groups:
+  # --- Живость сервисов и БД -------------------------------------------------
+  - name: availability
+    rules:
+      - alert: ServiceDown
+        expr: up{job="services"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Сервис не отвечает: {{ $labels.instance }}"
+          description: >-
+            Метрики не собираются дольше 2 минут. Проверьте:
+            docker compose ps, docker compose logs --tail 50 {{ $labels.instance }}
+
+      - alert: DatabaseUnavailable
+        expr: service_db_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "БД недоступна для {{ $labels.service }}"
+          description: >-
+            Сервис жив, но SELECT 1 не проходит. Идём в runbook, раздел 1:
+            состояние контейнера postgres и место на диске.
+
+      - alert: ServiceRestartedOften
+        expr: changes(service_up{service="bot-service"}[1h]) > 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Бот перезапускается больше 3 раз в час"
+          description: "Почти наверняка падает на миграциях или отсутствующих ключах."
+
+  # --- Ошибки и потребители ресурсов -----------------------------------------
+  - name: errors
+    rules:
+      - alert: ErrorRateHigh
+        # 5 ошибок за 5 минут: при нашем потоке это всплеск, а не шум.
+        expr: sum(rate(service_errors_total[5m])) > 0.017
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Ошибок больше 5 за 5 минут"
+          description: "Смотрите логи по cid из JSON-логов: log_service_errors_total."
+
+      - alert: RateLimitSpike
+        # Много отклонений = либо атака, либо сломанный клиент шлёт по кругу.
+        expr: sum(rate(service_rate_limited_total[10m])) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Много запросов отклонено rate-limiter'ом"
+          description: "Проверьте, не идёт ли один и тот же текст от одного чата."
+
+      - alert: NoMessagesForLongTime
+        # Тишина в диалогах — тоже поломка: возможно, бот перестал отвечать.
+        expr: sum(rate(service_messages_total[30m])) == 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Полчаса нет ни одного сообщения"
+          description: "Если это тестовый стенд — игнорируйте. На проде проверьте бота."
