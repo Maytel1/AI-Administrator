@@ -38,7 +38,12 @@ async def main() -> None:
         applied = {
             r["name"] for r in await conn.fetch("SELECT name FROM schema_migrations")
         }
-        for f in sorted(MIGRATIONS_DIR.glob("*.sql")):
+        # *.rollback.sql — откаты, а не миграции: накатив их, мы бы удалили
+        # только что созданные таблицы (проверяет test_rollback_files_are_not_migrations).
+        for f in [
+            f for f in sorted(MIGRATIONS_DIR.glob("*.sql"))
+            if not f.name.endswith(".rollback.sql")
+        ]:
             if f.name in applied:
                 continue
             async with conn.transaction():
