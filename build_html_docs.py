@@ -443,12 +443,39 @@ def validate_page(page: str, md_tables: int, n_h2: int) -> list:
     return errs
 
 
+def doc_date(text: str) -> str:
+    """Дата документа берётся из самого Markdown, а не из «сегодня».
+
+    Иначе каждый запуск переписывает все HTML текущим числом: в CI сборка
+    падает на следующий день после того, как документ обновили, и «документ
+    изменён, а HTML нет» становится неразличимым от обычного шума.
+
+    Порядок: «Обновление», «Дата» в тексте, дата в скобках заголовка.
+    Если даты нет — честно пишем «дата не указана», а не подставляем сегодняшнюю:
+    выдуманная дата в шапке документа врёт читателю.
+    """
+    head = "\n".join(text.splitlines()[:14])
+    patterns = (
+        r"\*\*Обновление[:\s]*([0-3]?\d)\.([0-9]{2})\.([0-9]{4})",
+        r"\*\*Дата[:\s]*\*?\*?\s*([0-3]?\d)\.([0-9]{2})\.([0-9]{4})",
+        r"(?mi)^\W*Дата[:\s]+([0-3]?\d)\.([0-9]{2})\.([0-9]{4})",
+        r"(?i)[^\w]дата[:\s]+([0-3]?\d)\.([0-9]{2})\.([0-9]{4})",
+        r"обновл[её]н[оа]\s+([0-3]?\d)\.([0-9]{2})\.([0-9]{4})",
+        r"(?m)^#\s+[^\n]*\((\d{1,2})\.(\d{2})\.(\d{4})[^\)]*\)",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, head, re.IGNORECASE)
+        if match:
+            return f"{int(match.group(1)):02d}.{match.group(2)}.{match.group(3)}"
+    return "дата не указана"
+
+
 def main() -> None:
-    today = datetime.date.today().strftime("%d.%m.%Y")
     all_ok = True
     for md_name, (kicker, title, lead, dot, pill_text) in DOCS.items():
         md_path = ROOT / md_name
         text = md_path.read_text(encoding="utf-8-sig")
+        today = doc_date(text)
         body = md_to_body(text)
         h2_titles = re.findall(r"(?m)^##\s+(.+)$", text)
         toc_items, auto = [], 0
