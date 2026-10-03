@@ -1,11 +1,20 @@
 """Общие фикстуры pytest. Тесты требуют БД (docker compose up postgres)."""
 
+import sys
 import uuid
 from datetime import time
+from pathlib import Path
 
 import pytest
 from admin_core.crm.internal import InternalCRM
 from admin_core.db import get_pool, run_migrations
+
+# HTTP-слой панели лежит рядом с ядром, но в своём каталоге (services/web/app).
+# В контейнере он уже в /app/app, а вне контейнера — в каталоге репозитория,
+# поэтому без этой строки `import app.main` падал бы в CI, а не локально.
+_WEB_ROOT = Path(__file__).resolve().parents[2] / "services" / "web"
+if _WEB_ROOT.is_dir() and str(_WEB_ROOT) not in sys.path:
+    sys.path.insert(0, str(_WEB_ROOT))
 
 
 @pytest.fixture()
