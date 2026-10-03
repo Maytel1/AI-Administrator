@@ -697,10 +697,15 @@ def page_reports(
 
 def page_billing(
     status: dict[str, Any], salon: dict | None, salons: list[dict] | None,
-    history: list[dict[str, Any]], flash: str = "", flash_error: bool = False,
-    ctx: Any | None = None,
+    history: list[dict[str, Any]],
+    legal: dict[str, Any] | None = None, errors: list[str] | None = None,
+    flash: str = "", flash_error: bool = False, ctx: Any | None = None,
 ) -> str:
-    """Тариф и оплата: состояние, счёт, реквизиты и кнопки ручной работы."""
+    errors = list(errors or [])
+    csrf = ctx.get("csrf", "") if isinstance(ctx, dict) else ""
+    # Форму реквизитов показываем только своей команде: в ней названия полей,
+    # и владельцу салона они видеть незачем.
+    may_billing = _role(ctx) == "team"
     req = status.get("requisites") or {}
     paid_until = status.get("paid_until")
     expired = bool(status.get("expired"))
@@ -757,9 +762,97 @@ def page_billing(
             ["Период с", "Период по", "Сумма", "Статус", "Оплачен"], rows,
             "Платежей пока не было",
         ))
-        + requisites_block,
+        + requisites_block
+        + (_legal_card(legal, csrf, "/billing", errors) if may_billing else ""),
         salon=salon, salons=salons, role=_role(ctx),
     )
+
+
+def _legal_card(
+    legal: dict[str, Any] | None, csrf: str, back: str, errors: list[str],
+) -> str:
+
+    """Карточка плательщика: тип выбирается первым, поля — по типу.
+
+    Показ полей сделан на CSS ``:has()`` без JavaScript: при смене типа браузер
+    сам показывает нужный набор, а сервер всё равно проверяет только его — то
+    есть скрытие полей не является защитой, а лишь удобством.
+    """
+    from admin_core.billing_legal import CLIENT_TYPES, fields_of  # noqa: PLC0415
+
+    current = legal or {}
+    client_type = str(current.get("client_type") or "ip")
+    details = current.get("details") or {}
+    if not isinstance(details, dict):
+        details = {}
+    sid = esc(current.get("salon_id", ""))
+    types = "".join(
+        f'<label class="radio"><input type="radio" name="client_type" '
+        f'value="{esc(key)}"{" checked" if key == client_type else ""}> '
+        f'{esc(title)}</label>'
+        for key, title in CLIENT_TYPES.items()
+    )
+    blocks = []
+    for key in CLIENT_TYPES:
+        rows = []
+        if key == client_type:
+            rows.append(
+                f'<label class="field"><span>ИНН ('
+                f'{"10" if key == "llc" else "12"} цифр)</span>'
+                f'<input name="inn" value="{esc(current.get("inn", ""))}" required></label>'
+            )
+        for field_key, title, required, hint in fields_of(key):
+            rows.append(
+                f'<label class="field"><span>{esc(title)}'
+                f'{" *" if required else ""}</span>'
+                f'<input name="{esc(field_key)}[{esc(key)}]" '
+                f'value="{esc(str(details.get(field_key, "")))}"'
+                f'{" required" if required else ""}>'
+                + (f'<small>{esc(hint)}</small>' if hint else "")
+                + "</label>"
+            )
+        blocks.append(
+            f'<fieldset data-type="{esc(key)}">{"".join(rows)}</fieldset>'
+        )
+    return card(
+        "Карточка плательщика (нужна для счёта)",
+        (
+            (f'<div class="flash error">{esc("; ".join(errors))}</div>' if errors else "")
+            + '<p class="sub">Тип выбирается первым — дальше нужны только его поля. '
+              "ИНН, ОГРН и ОГРНИП проверяются по контрольной сумме: ошибку в цифре "
+              "банк отвергнет, и платёж потеряется.</p>"
+            + f'<form method="post" action="/actions" class="legal-form">{csrf_field(csrf)}'
+            + '<input type="hidden" name="action" value="legal_save">'
+            + f'<input type="hidden" name="back" value="{esc(back)}">'
+            + f'<input type="hidden" name="salon_id" value="{sid}">'
+            + f'<div class="radios">{types}</div>'
+            + "".join(blocks)
+            + '<label class="field"><span>Выставлять счёт автоматически '
+              f"каждый {esc(current.get('invoice_due_day', 1))} число</span>"
+              '<select name="invoice_due_day">'
+            + "".join(
+                f'<option value="{day}"'
+                f'{" selected" if int(current.get("invoice_due_day", 1)) == day else ""}>'
+                f"{day} числа</option>"
+                for day in (1, 5, 10, 15, 20, 25, 28)
+            )
+            + "</select></label>"
+            + '<label class="check"><input type="checkbox" name="auto_invoice" value="1"'
+            + (' checked' if current.get("auto_invoice", True) else "")
+            + "> включено</label>"
+            + '<label class="field"><span>Номер договора</span>'
+            + f'<input name="contract_no" value="{esc(current.get("contract_no") or "")}">'
+            + "</label>"
+            + '<button type="submit" class="btn">Сохранить карточку</button>'
+            + "</form>"
+        ),
+    )
+
+
+STATUS_RU = {
+    "issued": "выставлен", "paid": "оплачен",
+    "overdue": "просрочен", "void": "аннулирован",
+}
 
 
 STATUS_RU = {

@@ -56,6 +56,7 @@ ACTION_PERMISSION = {
     "client_create": P_CLIENT_CREATE,
     "booking_reschedule": P_BOOKING_STATUS,
     "prepayment_set": P_BOOKING_STATUS,
+    "legal_save": P_BILLING,
     "invoice_issue": P_BILLING,
     "payment_mark_paid": P_BILLING,
     "waitlist_add": P_CLIENT_CREATE,

@@ -255,6 +255,38 @@ async def apply_form(
         }
         return ok(labels.get(status, "Предоплата обновлена"))
 
+    if action == "legal_save":
+        from admin_core import billing_legal  # noqa: PLC0415
+
+        client_type = str(form.get("client_type") or "ip")
+        # Поля скрытых блоков тоже приходят в форму (display:none их не мешает),
+        # поэтому берём только блок выбранного типа — иначе в реквизиты попало бы
+        # то, что клиент заполнял для другого типа.
+        kind_of = {"ip": "ip", "llc": "llc", "self_employed": "self"}
+        wanted = kind_of.get(client_type, "ip")
+        details: dict[str, str] = {}
+        for key in form:
+            if not key.startswith("legal_"):
+                continue
+            name, _, kind = key[6:].rpartition("_")
+            if kind == wanted and name:
+                details[name] = str(form[key]).strip()
+        result = await billing_legal.save(
+            pool, salon_id,
+            client_type,
+            str(form.get("legal_name", "")),
+            str(form.get("inn", "")),
+            details,
+            due_day=form.get("invoice_due_day", 1),
+            auto_invoice=str(form.get("auto_invoice", "")) in ("1", "on", "true"),
+            contract_no=str(form.get("contract_no", "")),
+            contract_date=str(form.get("contract_date") or "").strip() or None,
+        )
+        if not result["ok"]:
+            # Все ошибки разом: править по одной — вернуться за второй разом.
+            return fail("legal_invalid", "; ".join(result["errors"]))
+        return ok("Карточка плательщика сохранена")
+
     if action == "invoice_issue":
         from admin_core import billing  # noqa: PLC0415
 

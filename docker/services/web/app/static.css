@@ -129,3 +129,18 @@ button:hover,.btn:hover{background:var(--accent-hover)}
   .grid2{grid-template-columns:1fr} main{padding:16px}
 }
 .row-end{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 2px;justify-content:flex-end}
+/* Карточка плательщика: показываем поля только выбранного типа.
+   Сделано на :has() без JavaScript — панель работает и без скриптов.
+   Это удобство, а не защита: сервер всё равно проверяет только поля типа. */
+.legal-form fieldset{display:none;border:0;padding:0;margin:0 0 4px}
+.legal-form:has(input[name="client_type"][value="ip"]:checked) fieldset[data-type="ip"],
+.legal-form:has(input[name="client_type"][value="llc"]:checked) fieldset[data-type="llc"],
+.legal-form:has(input[name="client_type"][value="self_employed"]:checked) fieldset[data-type="self_employed"]{display:block}
+.legal-form .radios{display:flex;flex-wrap:wrap;gap:16px;margin:10px 0 14px}
+.legal-form .radios label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.legal-form .field{display:grid;gap:4px;margin-bottom:10px;max-width:520px}
+.legal-form .field>span{font-size:12px;color:var(--muted)}
+.legal-form .field small{font-size:11px;color:var(--muted)}
+.legal-form input,.legal-form select{background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:7px 9px}
+.legal-form .check{display:flex;gap:6px;align-items:center;margin:10px 0}
+.tile.yellow b{color:var(--danger)}
