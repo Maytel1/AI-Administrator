@@ -15,7 +15,7 @@ import asyncio
 from admin_core.agent.agent import AgentSession
 from admin_core.config import get_settings
 from admin_core.crm import make_crm
-from admin_core.db import get_pool, run_migrations, rollback_migrations
+from admin_core.db import get_pool, rollback_migrations, run_migrations
 from admin_core.llm import make_provider
 from admin_core.web.auth import provisioning_uri
 

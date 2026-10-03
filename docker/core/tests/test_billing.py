@@ -8,7 +8,6 @@
 from datetime import date
 
 import pytest
-
 from admin_core.billing import (
     amount_to_words,
     billing_status,

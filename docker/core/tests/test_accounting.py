@@ -8,7 +8,6 @@ from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
-
 from admin_core.billing import issue_invoice, mark_paid
 from admin_core.exports import (
     clients_csv,

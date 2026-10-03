@@ -20,6 +20,9 @@ from typing import Any
 request_id: ContextVar[str] = ContextVar("request_id", default="")
 
 LOGGER_NAME = "ai"
+# Логгеры, уже переведённые на JSON: повторный setup_logging не должен
+# навешивать второй обработчик и дублировать каждую запись.
+_CONFIGURED: set[str] = set()
 
 
 class JsonFormatter(logging.Formatter):
@@ -49,14 +52,16 @@ class JsonFormatter(logging.Formatter):
 def setup_logging(service: str, *, level: str | None = None) -> logging.Logger:
     """Настроить JSON-логи для сервиса. Вызывается один раз при старте."""
     logger = logging.getLogger(LOGGER_NAME)
-    if getattr(logger, "_ai_configured", False):
+    if logger.name in _CONFIGURED:
         return logger
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(JsonFormatter(service))
     logger.handlers = [handler]
     logger.setLevel(str(level or os.getenv("LOG_LEVEL", "INFO")).upper())
     logger.propagate = False
-    setattr(logger, "_ai_configured", True)
+    # Флаг «уже настроен» держим в set: Logger не объявляет such атрибутов,
+    # а setattr по нему проходит молча — mypy был прав, это ошибка типов.
+    _CONFIGURED.add(logger.name)
     return logger
 
 
@@ -73,6 +78,5 @@ def log_event(logger: logging.Logger, level: int, message: str, **fields: Any) -
 def new_request_id() -> str:
     """Идентификатор запроса: время + случай — читаем в логах глазом."""
     import secrets  # noqa: PLC0415
-
     import time  # noqa: PLC0415
     return f"{int(time.time() * 1000):x}{secrets.token_hex(3)}"

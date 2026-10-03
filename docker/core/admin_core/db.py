@@ -6,9 +6,9 @@
 таблице schema_migrations.
 """
 
-from zoneinfo import ZoneInfo
 import os
 import pathlib
+from zoneinfo import ZoneInfo
 
 import asyncpg
 

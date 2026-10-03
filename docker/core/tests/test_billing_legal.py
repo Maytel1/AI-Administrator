@@ -7,7 +7,6 @@
 from datetime import date
 
 import pytest
-
 from admin_core.billing_legal import (
     CLIENT_TYPES,
     digits,

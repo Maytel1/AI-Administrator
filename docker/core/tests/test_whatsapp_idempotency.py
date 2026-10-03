@@ -6,7 +6,6 @@
 """
 
 import pytest
-
 from admin_core.channels.inbound import claim, link, seen
 from admin_core.channels.whatsapp_payload import extract, is_duplicate
 

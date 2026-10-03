@@ -6,7 +6,6 @@
 
 
 import pytest
-
 from admin_core.db import DB_TIMEZONE, db_timezone
 
 

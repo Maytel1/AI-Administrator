@@ -8,7 +8,6 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
-
 from admin_core.retention import (
     LOGIN_LOG_RETENTION_DAYS,
     RETENTION_DAYS,

@@ -9,7 +9,6 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
-
 from admin_core.bot_quality import bot_quality, looks_like_escalation
 from admin_core.crm.internal import InternalCRM
 

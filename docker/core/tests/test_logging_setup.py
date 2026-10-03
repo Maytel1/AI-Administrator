@@ -4,7 +4,6 @@ import json
 import logging
 
 import pytest
-
 from admin_core.logging_setup import (
     log_event,
     new_request_id,

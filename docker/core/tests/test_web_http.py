@@ -156,10 +156,9 @@ async def test_billing_page_is_hidden_from_owner(client):
 
 async def test_billing_page_opens_for_team(demo, pool):
     """У нашей команды раздел открывается и показывает реквизиты."""
-    from aiohttp.test_utils import TestClient, TestServer  # noqa: PLC0415
-
-    from app.main import build_app  # noqa: PLC0415
     from admin_core.web.session import Panel  # noqa: PLC0415
+    from aiohttp.test_utils import TestClient, TestServer  # noqa: PLC0415
+    from app.main import build_app  # noqa: PLC0415
 
     panel = Panel(pool, metrics=None)
     app = build_app(panel)

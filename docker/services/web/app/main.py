@@ -276,7 +276,10 @@ def build_app(
         import time  # noqa: PLC0415
 
         from admin_core.logging_setup import (  # noqa: PLC0415
-            log_event, new_request_id, request_id, setup_logging,
+            log_event,
+            new_request_id,
+            request_id,
+            setup_logging,
         )
 
         log = setup_logging("web")

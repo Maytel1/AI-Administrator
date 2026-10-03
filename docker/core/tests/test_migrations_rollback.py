@@ -6,9 +6,7 @@ schema_migrations, а повторный прогон миграций посл�
 """
 
 import pytest
-
 from admin_core.db import rollback_migrations, run_migrations
-
 
 
 async def test_rollback_migrations_reverts_and_reapplies(pool) -> None:

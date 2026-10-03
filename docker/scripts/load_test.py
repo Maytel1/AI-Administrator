@@ -8,8 +8,8 @@
 from __future__ import annotations
 
 import argparse
-import json
 import asyncio
+import json
 import pathlib
 import sys
 import time
@@ -203,7 +203,6 @@ async def run_webhook(
     import time  # noqa: PLC0415
 
     import aiohttp  # noqa: PLC0415
-
     from admin_core.channels.whatsapp_auth import sign_body  # noqa: PLC0415
 
     latencies: list[float] = []

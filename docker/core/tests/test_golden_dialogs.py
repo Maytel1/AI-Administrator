@@ -13,7 +13,6 @@ import json
 import pathlib
 
 import pytest
-
 from admin_core.agent.agent import AgentSession
 
 GOLDEN = pathlib.Path(__file__).parent / "golden" / "dialogs.json"

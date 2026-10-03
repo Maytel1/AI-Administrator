@@ -5,7 +5,6 @@
 """
 
 import pytest
-
 from admin_core.channels.whatsapp_auth import sign_body, verify_signature
 
 SECRET = "app-secret-тест"
