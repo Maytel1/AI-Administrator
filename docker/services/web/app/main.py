@@ -192,10 +192,15 @@ async def _billing(
     # Проверка здесь, а не только в меню: пункт скрыт, а URL открыт.
     if not can(role, "billing"):
         panel.metrics.errors.labels("forbidden").inc()
+        # Аргументы по именам: позиционно текст отказа уезжал в карточку
+        # плательщика, и человек видел пустую страницу без объяснения.
         return page_billing(
-            {"status_text": "Недостаточно прав: раздел для нашей команды", "price": 0,
-             "plan": "", "requisites": {}, "is_trial": False, "expired": False},
-            salon, salons, [], "Недостаточно прав на раздел «Тариф и оплата»", True, ctx,
+            {"status_text": "Недостаточно прав: раздел для нашей команды",
+             "price": 0, "plan": "", "requisites": {},
+             "is_trial": False, "expired": False},
+            salon, salons, [],
+            flash="Недостаточно прав на раздел «Тариф и оплата»",
+            flash_error=True, ctx=ctx,
         )
 
     salon_row = dict(await panel.pool.fetchrow(

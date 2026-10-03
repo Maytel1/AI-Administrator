@@ -16,6 +16,7 @@ import os
 import sys
 from datetime import datetime
 from urllib.parse import urlencode
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import asyncpg
@@ -128,6 +129,22 @@ async def process_salon(
     return stats
 
 
+async def process_auto_invoices(
+    pool: asyncpg.Pool, metrics: ServiceMetrics
+) -> dict[str, Any]:
+    """Счета по дате из карточки плательщика. Логика — в admin_core.billing,"""
+    from admin_core.billing import auto_invoice_tick  # noqa: PLC0415
+
+    result = await auto_invoice_tick(pool)
+    for payment_id in result["issued"]:
+        metrics.messages.labels("auto_invoice").inc()
+        print(f"[worker] счёт #{payment_id[:8]} выставлен", flush=True)
+    for problem in result["errors"]:
+        metrics.errors.labels("auto_invoice").inc()
+        print(f"[worker] счёт не выставлен: {problem}", flush=True)
+    return result
+
+
 async def process_alerts(
     pool: asyncpg.Pool, sender: TelegramSender, metrics: ServiceMetrics
 ) -> int:
@@ -203,6 +220,7 @@ async def main() -> None:
                     await process_salon(pool, dict(salon), sender, metrics)
                 await process_alerts(pool, sender, metrics)
                 await process_retention(pool, metrics)
+                await process_auto_invoices(pool, metrics)
             except Exception as exc:  # noqa: BLE001 — цикл не должен умирать
                 metrics.errors.labels("tick").inc()
                 print(f"[{name}] ошибка тика: {type(exc).__name__}: {exc}", flush=True)

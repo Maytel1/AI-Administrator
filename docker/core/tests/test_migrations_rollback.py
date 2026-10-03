@@ -15,22 +15,22 @@ async def test_rollback_migrations_reverts_and_reapplies(pool) -> None:
     """Откат убирает объекты миграции, повторный накат их возвращает."""
     await run_migrations(pool)
     assert await pool.fetchval(
-        "SELECT EXISTS (SELECT 1 FROM schema_migrations WHERE name = '008_billing.sql')"
+        "SELECT EXISTS (SELECT 1 FROM schema_migrations WHERE name = '009_legal.sql')"
     ) is True
 
     rolled = await rollback_migrations(pool, steps=1)
-    assert rolled == ["008_billing.sql"]
+    assert rolled == ["009_legal.sql"]
     assert await pool.fetchval(
-        "SELECT to_regclass('public.payments') IS NOT NULL"
+        "SELECT to_regclass('public.client_legal') IS NOT NULL"
     ) is False, "таблица платежей должна исчезнуть"
     assert await pool.fetchval(
         "SELECT to_regclass('public.reminders') IS NOT NULL"
     ) is True, "остальные миграции не трогаются"
 
     reapplied = await run_migrations(pool)
-    assert "008_billing.sql" in reapplied
+    assert "009_legal.sql" in reapplied
     assert await pool.fetchval(
-        "SELECT to_regclass('public.payments') IS NOT NULL"
+        "SELECT to_regclass('public.client_legal') IS NOT NULL"
     ) is True, "повторный накат обязан вернуть таблицу"
 
 
@@ -49,12 +49,12 @@ async def test_rollback_files_are_not_migrations(pool) -> None:
 async def test_rollback_keeps_baseline_intact(pool) -> None:
     """Базовые таблицы из initdb при откате остаются на месте."""
     rolled = await rollback_migrations(pool, steps=99)
-    assert rolled == ["008_billing.sql", "007_inbound.sql", "006_ops.sql", "005_panel_users.sql"]
+    assert rolled == ["009_legal.sql", "008_billing.sql", "007_inbound.sql", "006_ops.sql", "005_panel_users.sql"]
     assert await pool.fetchval("SELECT to_regclass('public.salons') IS NOT NULL") is True
     # возвращаем базу в рабочее состояние для следующих тестов
     await run_migrations(pool)
     assert await pool.fetchval(
-        "SELECT to_regclass('public.panel_users') IS NOT NULL"
+        "SELECT to_regclass('public.client_legal') IS NOT NULL"
     ) is True
 
 

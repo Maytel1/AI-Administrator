@@ -228,13 +228,17 @@ async def issue_invoice(
         "VALUES ($1, $2, $3, $4, $5, $6, $7, $8) "
         "ON CONFLICT (salon_id, period_start) DO UPDATE "
         "SET plan = EXCLUDED.plan, amount = EXCLUDED.amount, "
-        "invoice_no = EXCLUDED.invoice_no RETURNING id, status, amount",
+        "invoice_no = EXCLUDED.invoice_no "
+        # xmax = 0 бывает только у реально вставленной строки: так автосчёт
+        # отличает новый счёт от того же самого, найденного за период.
+        "RETURNING id, status, amount, (xmax = 0) AS created",
         salon_id, salon.get("plan"), period.start, period.end, amount,
         f"Оплата за {period.label}, счёт {number}", number, actor,
     )
     return {
         "ok": True,
         "payment_id": str(row["id"]),
+        "created": bool(row["created"]),
         "status": row["status"],
         "period": period,
         "amount": int(row["amount"]),
@@ -299,8 +303,48 @@ async def billing_status(pool: Any, salon: dict[str, Any]) -> dict[str, Any]:
         "status_text": _status_text(salon, paid_until_date, expired),
     }
 
+async def auto_invoice_tick(pool: Any, *, today_day: int | None = None) -> dict[str, Any]:
+
+    """Выставить счета салонам, у которых сегодня день выставления.
+
+    Дата берётся из карточки плательщика (``invoice_due_day``), а не «1-го
+    числа»: у салонов разный график оплаты, и счёт должен приходить в их
+    день. За один период счёт выставляется один раз — это гарантирует
+    уникальный индекс в ``payments``.
+
+    Логика живёт в ядре, а не в worker: её нужно тестировать и запускать из
+    CLI при ручной проверке.
+    """
+    day = today_day or date.today().day
+    rows = await pool.fetch(
+        "SELECT l.salon_id, l.invoice_due_day, s.name, s.plan, s.paid_until, "
+        "s.timezone FROM client_legal l JOIN salons s ON s.id = l.salon_id "
+        "WHERE l.auto_invoice AND s.is_active AND s.plan <> 'trial'"
+    )
+    issued: list[str] = []
+    errors: list[str] = []
+    for row in rows:
+        if day != int(row["invoice_due_day"]):
+            continue
+        salon = dict(row)
+        # issue_invoice ждёт salon["id"], а выборка отдаёт salon_id: без этой
+        # строки автосчёт падал бы с KeyError на каждом салоне.
+        salon["id"] = str(row["salon_id"])
+        salon["timezone"] = str(salon.get("timezone") or "UTC")
+        try:
+            invoice = await issue_invoice(pool, salon, actor="system:auto")
+        except Exception as exc:  # noqa: BLE001 — один салон не ломает цикл
+            errors.append(f"{salon.get('name')}: {type(exc).__name__}: {exc}")
+            continue
+        # Счёт за период может уже существовать: считаем только новые,
+        # иначе каждый тик worker'а «выставлял» бы один и тот же счёт.
+        if invoice.get("created"):
+            issued.append(str(invoice["payment_id"]))
+    return {"issued": issued, "errors": errors, "day": day}
+
 
 def _status_text(salon: dict[str, Any], paid_until: date | None, expired: bool) -> str:
+    """Человеческий текст состояния оплаты для панели и тревог."""
     plan = str(salon.get("plan") or "start")
     if plan == "trial":
         return "Пробный период: работает бесплатно"
