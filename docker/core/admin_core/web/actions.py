@@ -255,6 +255,28 @@ async def apply_form(
         }
         return ok(labels.get(status, "Предоплата обновлена"))
 
+    if action == "invoice_issue":
+        from admin_core import billing  # noqa: PLC0415
+
+        salon_row = dict(await pool.fetchrow(
+            "SELECT id, name, plan, paid_until, timezone FROM salons WHERE id = $1",
+            salon_id,
+        ))
+        invoice = await billing.issue_invoice(pool, salon_row, actor=actor)
+        return ok(f"Счёт {invoice['invoice_no']} на {invoice['amount']} руб. "
+                  f"выставлен за {invoice['period'].label}")
+
+    if action == "payment_mark_paid":
+        from admin_core import billing  # noqa: PLC0415
+
+        payment_id = _uuid(form.get("payment_id"))
+        if not payment_id:
+            return fail("bad_id", "Некорректный идентификатор платежа")
+        result = await billing.mark_paid(pool, salon_id, payment_id, actor=actor)
+        if not result["ok"]:
+            return fail(result["error"], "Счёт не найден или уже оплачен")
+        return ok(f"Оплата засчитана: до {result['period_end']}")
+
     if action == "waitlist_add":
         return await _waitlist_add(pool, salon_id, form, actor=actor)
 

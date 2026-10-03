@@ -21,6 +21,7 @@ NAV = [
     ("/dialogs", "Диалоги", "✉"),
     ("/reports", "Отчёты", "◷"),
     ("/network", "Сеть", "◈"),
+    ("/billing", "Тариф и оплата", "€"),
     ("/audit", "Аудит", "⚑"),
     ("/settings", "Настройки", "⚙"),
 ]
@@ -117,7 +118,9 @@ def layout(
     # чужую выручку незачем, а ссылка в меню была бы враньём в интерфейсе.
     nav_items = [
         item for item in NAV
-        if item[0] != "/network" or (role and role == "team")
+    # /network и /billing видны только нашей команне: счета и сводка по сети
+    # — не клиентские данные салона.
+    if item[0] not in ("/network", "/billing") or (role and role == "team")
     ]
     nav = "".join(
         f'<a href="{path}?salon={esc(sid)}" class="{"active" if path == active else ""}">'

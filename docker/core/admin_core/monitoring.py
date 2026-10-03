@@ -143,6 +143,20 @@ async def check_alerts(pool: Any, *, now: datetime | None = None) -> list[Alert]
             "critical",
         ))
 
+    unpaid = await pool.fetchrow(
+        "SELECT count(*) AS cnt, coalesce(sum(p.amount), 0) AS total FROM payments p "
+        "JOIN salons s ON s.id = p.salon_id "
+        "WHERE s.is_active AND s.plan <> 'trial' AND p.status = 'issued' "
+        "AND p.period_end < CURRENT_DATE"
+    )
+    if int(unpaid["cnt"]) > 0:
+        found.append(Alert(
+            "payments_overdue",
+            f"{unpaid['cnt']} счетов не оплачено на сумму "
+            f"{float(unpaid['total'] or 0):.0f} руб. — /billing",
+            "warning",
+        ))
+
     attacks = await login_failures_since(pool, since=moment - timedelta(hours=1))
     if attacks["fails"] >= 20:
         found.append(Alert(

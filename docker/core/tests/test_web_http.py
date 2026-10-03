@@ -142,5 +142,95 @@ async def test_owner_cannot_open_network(client):
     assert "Недостаточно прав" in await response.text()
 
 
+async def test_billing_page_is_hidden_from_owner(client):
+    """Счета и реквизиты видит только наша команда: владелец получает отказ."""
+    http, _panel, _token, _demo = client
+    response = await http.get("/billing")
+    assert response.status == 200
+    body = await response.text()
+    assert LOGIN_MARK not in body
+    assert "Недостаточно прав" in body
+    assert "БИК" not in body, "реквизиты не должны утекать владельцу"
+
+
+async def test_billing_page_opens_for_team(demo, pool):
+    """У нашей команды раздел открывается и показывает реквизиты."""
+    from aiohttp.test_utils import TestClient, TestServer  # noqa: PLC0415
+
+    from app.main import build_app  # noqa: PLC0415
+    from admin_core.web.session import Panel  # noqa: PLC0415
+
+    panel = Panel(pool, metrics=None)
+    app = build_app(panel)
+    http = TestClient(TestServer(app))
+    await http.start_server()
+    token = await panel.open_session(
+        role="team", login="admin@test.ru", salon_id=None
+    )
+    http.session.cookie_jar.update_cookies({"dz24_session": token})
+    try:
+        response = await http.get("/billing")
+        assert response.status == 200
+        body = await response.text()
+        assert LOGIN_MARK not in body
+        assert "Недостаточно прав" not in body
+        assert "Тариф и оплата" in body
+    finally:
+        await http.close()
+
+
+async def test_billing_actions_require_permission(demo, pool):
+    """Прямой POST от администратора не должен выставлять счёт."""
+    from admin_core.web.roles import can_action  # noqa: PLC0415
+
+    assert can_action("staff", "invoice_issue") is False
+    assert can_action("owner", "invoice_issue") is False
+    assert can_action("team", "invoice_issue") is True
+    assert can_action("team", "payment_mark_paid") is True
+
+
+async def test_issue_invoice_via_billing_table(demo, pool):
+    """Счёт из таблицы платежей попадает в историю панели."""
+    from admin_core import billing  # noqa: PLC0415
+
+    await pool.execute(
+        "UPDATE salons SET plan = 'standard' WHERE id = $1", demo["salon"]["id"]
+    )
+    salon = dict(await pool.fetchrow(
+        "SELECT id, name, plan, paid_until FROM salons WHERE id = $1", demo["salon"]["id"]
+    ))
+    invoice = await billing.issue_invoice(pool, salon)
+    history = await pool.fetch(
+        "SELECT period_start, amount, status FROM payments WHERE salon_id = $1",
+        salon["id"],
+    )
+    assert len(history) == 1
+    assert float(history[0]["amount"]) == invoice["amount"]
+
+
+async def test_overdue_payment_raises_alert(demo, pool):
+    """Просроченный счёт должен поднять тревогу, а не молчать."""
+    from admin_core.billing import issue_invoice  # noqa: PLC0415
+    from admin_core.monitoring import check_alerts  # noqa: PLC0415
+
+    await pool.execute(
+        "UPDATE salons SET plan = 'start', is_active = true WHERE id = $1",
+        demo["salon"]["id"],
+    )
+    salon = dict(await pool.fetchrow(
+        "SELECT id, name, plan, paid_until FROM salons WHERE id = $1", demo["salon"]["id"]
+    ))
+    await issue_invoice(pool, salon)
+    # Счёт за прошлый месяц: период уже истёк, оплаты нет.
+    await pool.execute(
+        "UPDATE payments SET period_start = CURRENT_DATE - 40, "
+        "period_end = CURRENT_DATE - 10 WHERE salon_id = $1",
+        salon["id"],
+    )
+    alerts = await check_alerts(pool)
+    kinds = {alert.kind for alert in alerts}
+    assert "payments_overdue" in kinds
+
+
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-v"]))

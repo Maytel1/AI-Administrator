@@ -29,7 +29,8 @@ P_USERS = "users"                    # учётные записи точки
 P_ALL_SALONS = "all_salons"          # видеть и переключать все точки
 P_CATALOG = "catalog"                # создание и архивация услуг и мастеров
 P_CLIENT_CREATE = "client_create"    # ручной ввод клиента (пришёл в салон)
-P_REPORTS = "reports"                # отчёты: выручка, загрузка, конверсия
+P_REPORTS = "reports"                # отчёты
+P_BILLING = "billing"               # счета и оплаты (ручной счёт + СБП): выручка, загрузка, конверсия
 
 ROLE_PERMISSIONS: dict[str, set[str]] = {
     "owner": {
@@ -40,7 +41,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
     "staff": {P_READ, P_BOOKING_STATUS, P_CLIENT_FLAGS, P_CLIENT_CREATE, P_REPORTS},
     "team": {
         P_READ, P_BOOKING_STATUS, P_PRICING, P_CATALOG, P_CLIENT_FLAGS,
-        P_CLIENT_CREATE, P_SCHEDULE, P_USERS, P_ALL_SALONS, P_REPORTS,
+        P_CLIENT_CREATE, P_SCHEDULE, P_USERS, P_ALL_SALONS, P_REPORTS, P_BILLING,
     },
 }
 
@@ -55,6 +56,8 @@ ACTION_PERMISSION = {
     "client_create": P_CLIENT_CREATE,
     "booking_reschedule": P_BOOKING_STATUS,
     "prepayment_set": P_BOOKING_STATUS,
+    "invoice_issue": P_BILLING,
+    "payment_mark_paid": P_BILLING,
     "waitlist_add": P_CLIENT_CREATE,
     "waitlist_drop": P_CLIENT_CREATE,
     "client_save": P_CLIENT_FLAGS,
@@ -96,6 +99,7 @@ def permissions_of(role: str) -> list[str]:
         P_CATALOG: "услуги и мастера",
         P_CLIENT_CREATE: "ручной ввод клиента",
         P_REPORTS: "отчёты",
+        P_BILLING: "счета и оплаты",
     }
     return sorted(names[p] for p in ROLE_PERMISSIONS.get(role, set()) if p in names)
 

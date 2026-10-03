@@ -156,6 +156,41 @@ async def _salon_id(pool, name: str | None) -> str | None:
     return str(row["id"]) if row else None
 
 
+async def do_billing(args: argparse.Namespace) -> None:
+    """--invoice <салон> | --mark-paid <salon_id> | --billing-status <салон>."""
+    from admin_core import billing  # noqa: PLC0415
+
+    pool = await get_pool()
+    try:
+        if args.mark_paid:
+            salon_id, _, payment_id = args.mark_paid.partition(":")
+            result = await billing.mark_paid(pool, salon_id.strip(), payment_id.strip())
+            if not result["ok"]:
+                print(f"Счёт не найден или уже оплачен: {payment_id}")
+                return
+            print(f"Оплачено до {result['period_end']} ({result['amount']:.0f} руб.)")
+            return
+        salon = await pool.fetchrow(
+            "SELECT id, name, plan, paid_until, timezone FROM salons WHERE id = $1",
+            args.invoice or args.billing_status,
+        )
+        if not salon:
+            print("Салон не найден по id")
+            return
+        if args.invoice:
+            invoice = await billing.issue_invoice(pool, dict(salon), actor="team:cli")
+            print(invoice["text"])
+            print(f"\npayment_id: {invoice['payment_id']}")
+            print("Отметить оплату: python cli.py --mark-paid "
+                  f"{salon['id']}:{invoice['payment_id']}")
+            return
+        status = await billing.billing_status(pool, dict(salon))
+        print(status["status_text"])
+        print(f"Тариф: {status['plan']}, сумма за месяц: {status['price']} руб.")
+    finally:
+        await pool.close()
+
+
 async def do_rollback(args: argparse.Namespace) -> None:
     """Откатить последние миграции: ``python cli.py --rollback [шагов]``."""
     pool = await get_pool()
@@ -279,6 +314,18 @@ def main() -> None:
         "--rollback", type=int, nargs="?", const=1, default=0,
         help="Откатить последние миграции из migrations/ (по умолчанию 1)",
     )
+    parser.add_argument(
+        "--invoice", metavar="SALON_ID",
+        help="Выставить помесячный счёт салону (текст с реквизитами)",
+    )
+    parser.add_argument(
+        "--mark-paid", metavar="SALON_ID:PAYMENT_ID",
+        help="Отметить счёт оплаченным",
+    )
+    parser.add_argument(
+        "--billing-status", metavar="SALON_ID",
+        help="Показать состояние оплаты салона",
+    )
     args = parser.parse_args()
     if args.seed:
         asyncio.run(do_seed())
@@ -288,6 +335,8 @@ def main() -> None:
         asyncio.run(do_forget(args))
     elif args.onboard:
         asyncio.run(do_onboard(args))
+    elif args.invoice or args.mark_paid or args.billing_status:
+        asyncio.run(do_billing(args))
     elif args.rollback:
         asyncio.run(do_rollback(args))
     else:

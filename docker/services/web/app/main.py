@@ -24,6 +24,7 @@ from admin_core.web import actions, dashboard, queries, reports, users
 from admin_core.web.pages_core import page_bookings, page_today
 from admin_core.web.pages_lists import (
     page_audit,
+    page_billing,
     page_clients,
     page_dialogs,
     page_masters,
@@ -178,6 +179,37 @@ async def _reports(
     data["bot_previous"] = previous_quality
     msg, err = _flash_from(request)
     return page_reports(data, salon, salons, msg, err, ctx)
+
+
+async def _billing(
+    panel: Panel, salon: dict, salons: list[dict], request: Any, ctx: PageCtx | None = None
+) -> str:
+    """Тариф и оплата: состояние подписки, счёт, реквизиты и история платежей."""
+    from admin_core import billing  # noqa: PLC0415
+
+    role = ctx.role if ctx else "guest"
+    # Реквизиты и платежи — не клиентские данные салона: только «наша команда».
+    # Проверка здесь, а не только в меню: пункт скрыт, а URL открыт.
+    if not can(role, "billing"):
+        panel.metrics.errors.labels("forbidden").inc()
+        return page_billing(
+            {"status_text": "Недостаточно прав: раздел для нашей команды", "price": 0,
+             "plan": "", "requisites": {}, "is_trial": False, "expired": False},
+            salon, salons, [], "Недостаточно прав на раздел «Тариф и оплата»", True, ctx,
+        )
+
+    salon_row = dict(await panel.pool.fetchrow(
+        "SELECT id, name, plan, paid_until, timezone FROM salons WHERE id = $1",
+        salon["id"],
+    ))
+    status = await billing.billing_status(panel.pool, salon_row)
+    history = await panel.pool.fetch(
+        "SELECT period_start, period_end, amount, status, paid_at, invoice_no "
+        "FROM payments WHERE salon_id = $1 ORDER BY period_start DESC LIMIT 24",
+        salon["id"],
+    )
+    msg, err = _flash_from(request)
+    return page_billing(status, salon, salons, history, msg, err, ctx)
 
 
 async def _network(
@@ -453,6 +485,7 @@ def build_app(
         "/today": _today, "/bookings": _bookings, "/clients": _clients,
         "/services": _services, "/masters": _masters, "/dialogs": _dialogs,
         "/audit": _audit, "/settings": _settings, "/reports": _reports,
+        "/billing": _billing,
         "/network": _network,
     }
     check_builder_signatures(sections)  # падаем на старте, а не в HTTP

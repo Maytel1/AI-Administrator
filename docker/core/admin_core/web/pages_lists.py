@@ -695,6 +695,79 @@ def page_reports(
     return layout("Отчёты", "/reports", content, salon=salon, salons=salons, role=_role(ctx))
 
 
+def page_billing(
+    status: dict[str, Any], salon: dict | None, salons: list[dict] | None,
+    history: list[dict[str, Any]], flash: str = "", flash_error: bool = False,
+    ctx: Any | None = None,
+) -> str:
+    """Тариф и оплата: состояние, счёт, реквизиты и кнопки ручной работы."""
+    req = status.get("requisites") or {}
+    paid_until = status.get("paid_until")
+    expired = bool(status.get("expired"))
+    tone = "yellow" if expired else ("accent" if status.get("is_trial") else "green")
+    head = (
+        f'<p class="sub">{esc(status.get("status_text") or "")}</p>'
+        + '<div class="tiles">'
+        + tile(f'{status.get("price", 0)} руб.', "в месяц", tone, "")
+        + tile(
+            f'{paid_until:%d.%m.%Y}' if paid_until else "—",
+            "оплачено до", "" if not expired else "yellow", "",
+        )
+        + tile(str(status.get("plan") or ""), "тариф", "", "")
+        + "</div>"
+    )
+    actions = (
+        action_form("invoice_issue", ctx.get("csrf", "") if isinstance(ctx, dict) else "",
+                    "/billing", "", "Выставить счёт")
+        if isinstance(ctx, dict) else ""
+    )
+    rows = [
+        [
+            esc(str(row["period_start"])),
+            f'{row["period_end"]}',
+            f'{float(row["amount"] or 0):.0f} руб.',
+            esc(STATUS_RU.get(str(row["status"]), str(row["status"]))),
+            esc(str(row["paid_at"])[:10]) if row.get("paid_at") else "—",
+        ]
+        for row in history
+    ]
+    requisites_block = card("Реквизиты для оплаты (СБП)", (
+        '<div class="empty">Задайте BILLING_* в docker/.env — реквизиты появятся здесь'
+        "</div>"
+        if not req.get("legal_name") else
+        '<table><tbody>'
+        + "".join(
+            f"<tr><th>{esc(title)}</th><td>{esc(str(req.get(key) or '—'))}</td></tr>"
+            for key, title in (
+                ("legal_name", "Получатель"), ("inn", "ИНН"), ("kpp", "КПП"),
+                ("bank", "Банк"), ("bik", "БИК"), ("account", "Р/с"),
+                ("tg", "Вопросы"),
+            )
+            if req.get(key)
+        )
+        + "</tbody></table>"
+        + '<p class="sub">Карты не храним, автосписания нет: салон платит переводом '
+        "раз в месяц, оплату подтверждает менеджер.</p>"
+    ))
+    return layout(
+        "Тариф и оплата", "/billing",
+        "<h1>Тариф и оплата</h1>" + flash_html(flash, flash_error) + head
+        + (f'<div class="row-end">{actions}</div>' if actions else "")
+        + card("История платежей", table(
+            ["Период с", "Период по", "Сумма", "Статус", "Оплачен"], rows,
+            "Платежей пока не было",
+        ))
+        + requisites_block,
+        salon=salon, salons=salons, role=_role(ctx),
+    )
+
+
+STATUS_RU = {
+    "issued": "выставлен", "paid": "оплачен",
+    "overdue": "просрочен", "void": "аннулирован",
+}
+
+
 def _period_tabs(periods: list[tuple[str, str, Any]], current: str, salon: dict | None) -> str:
     """Переключатель периода: ссылки, а не форма — период видно в адресной строке."""
     if not periods:
