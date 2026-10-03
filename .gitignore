@@ -30,3 +30,4 @@ docker/nginx/acme/
 # ������ ��: ������������ ������, � git �� �� �����
 docker/backups/
 docker/deploy-backup/
+docker/*.log
