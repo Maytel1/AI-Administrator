@@ -14,7 +14,7 @@ jobs:
     name: ruff + compileall
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -47,7 +47,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://aiadmin:aiadmin_dev@localhost:5432/aiadmin
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -66,7 +66,7 @@ jobs:
     name: алерты promtool (конфиг + правила)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: promtool check config
         run: |
           docker run --rm --entrypoint promtool \
@@ -113,7 +113,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: деплой
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
@@ -161,7 +161,7 @@ jobs:
     name: сборка и валидация документов
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
