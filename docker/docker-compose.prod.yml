@@ -66,9 +66,12 @@ services:
       # nginx — единственный, кто говорит панели «это https»
       WEB_TRUST_PROXY: "1"
       WEB_PUBLIC_HOST: ${WEB_PUBLIC_HOST:-}
-      # TLS терминирует nginx, самому вебу сертификат не нужен
-      WEB_TLS_CERT: ""
-      WEB_TLS_KEY: ""
+      # TLS терминирует nginx, самому вебу сертификат не нужен.
+      #
+      # Выключатель WEB_TLS=0, а не пустые WEB_TLS_CERT/KEY: переменные приходят
+      # ещё и из env_file (.env), и обычное переопределение их не перебивает —
+      # веб поднимался с TLS и отдавал 502 на plain HTTP от nginx.
+      WEB_TLS: "0"
     ports: !reset []
     expose:
       - "8080"

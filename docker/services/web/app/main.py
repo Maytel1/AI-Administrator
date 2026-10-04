@@ -639,7 +639,17 @@ async def main() -> None:
         )
 
     tls_cert, tls_key = os.getenv("WEB_TLS_CERT"), os.getenv("WEB_TLS_KEY")
-    tls_enabled = bool(tls_cert and tls_key)
+    trust_proxy = os.getenv("WEB_TRUST_PROXY", "") == "1"
+    # WEB_TRUST_PROXY=1 = перед панелью обратный прокси, и он же терминирует
+    # TLS. Значит, вебу собственный TLS не нужен, а нужен там, где прокси нет.
+    #
+    # Раньше решение принималось по наличию файлов сертификата, и в проде веб
+    # поднимался с TLS, откуда nginx (plain HTTP) получал 502. Переменными
+    # compose это не лечится: значения приходят ещё и из env_file, который
+    # перекрывает environment.
+    tls_enabled = bool(tls_cert and tls_key) and not trust_proxy
+    if tls_cert and tls_key and trust_proxy:
+        print("[web] TLS off: terminated by proxy (WEB_TRUST_PROXY=1)", flush=True)
     trust_proxy = os.getenv("WEB_TRUST_PROXY", "") == "1"
     if not trust_proxy:
         print("[web] WEB_TRUST_PROXY выключен: X-Forwarded-Proto игнорируется", flush=True)
