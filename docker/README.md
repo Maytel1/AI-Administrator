@@ -315,10 +315,58 @@ curl http://localhost:9090/api/v1/targets?state=active
 docker run --rm --entrypoint promtool -v %CD%\monitoring:/etc/prometheus prom/prometheus:latest check config /etc/prometheus/prometheus.yml
 ```
 
-Куда уходят уведомления — пока никуда: в `alerts.yml` заполняется
-`annotations.summary`, но без Alertmanager или Telegram-интеграции они
-видны только в интерфейсе Prometheus. Подключение уведомлений — задача
-фазы 4 (нужен канал, куда писать: Telegram-группа или почта).
+### Куда приходят алерты
+
+Схема доставки:
+
+```
+Prometheus → Alertmanager → alert-relay → Worker-прокси → Telegram
+```
+
+**Почему не `telegram_configs`:** прямой `api.telegram.org` с этой машины
+недоступен (провайдер блокирует TCP 443), весь Telegram ходит через
+Cloudflare Worker. Alertmanager про прокси не знает, поэтому между ним и
+Telegram стоит `alert-relay` — маленький сервис, который превращает webhook
+Alertmanager в сообщение и отправляет его через Worker.
+
+Настройки в `.env` (`docker/.env`, в git не попадают):
+
+```
+TG_ALERT_API_BASE=https://<worker>.workers.dev
+TG_ALERT_TOKEN=<токен бота>
+TG_ALERT_CHAT_ID=<id чата>
+```
+
+Пока стоит тот же бот и чат, что у `telegram-relay`. Когда появится
+отдельный бот для алертов — достаточно поменять три эти строки и сделать
+`docker compose --profile monitoring up -d alert-relay`; больше ничего
+трогать не нужно.
+
+Что придёт в сообщение: имя алерта, где сработал, текст аннотации и
+строка «что делать» со ссылкой на раздел runbook.
+
+Маршрутизация в `alertmanager.yml`:
+
+| Severity | Куда | Как часто повторять |
+|---|---|---|
+| `critical` | Telegram | каждый час, при устранении тоже сообщение |
+| `warning` | Telegram | при устранении молчит, повтор — раз в сутки |
+| остальное | в интерфейс Prometheus | — |
+
+Подавление: пока `DatabaseUnavailable` горит, сообщения `ServiceDown` не
+приходят — иначе в Telegram летел бы сам, следствие и следствие следствия.
+
+Проверить доставку, не дожидаясь аварии:
+
+```
+curl -X POST -H "Content-Type: application/json" \
+  --data-binary "@test-alert.json" http://localhost:9093/api/v2/alerts
+curl http://localhost:8087/health     # sent и failed
+```
+
+Состояние релея: `sent` — доставлено, `failed` — нет. Не доставленный
+алерт Alertmanager повторит сам, поэтому в `failed` смотреть надо с
+`last_error`.
 
 ---
 

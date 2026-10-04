@@ -14,5 +14,8 @@ COPY core/migrations /app/migrations
 # HTTP-слой панели нужен тестам маршрутов и CSRF. Копируем как app:
 # в cli-образе этого имени ещё нет, и тесты делают ровно import app.main.
 COPY services/web/app /app/app
+# Релей алертов: тесты форматирования берут его по пути файла, потому что
+# имя `app` уже занято веб-сервисом.
+COPY services/alert-relay /app/services/alert-relay
 COPY scripts /app/scripts
 CMD ["python", "cli.py"]

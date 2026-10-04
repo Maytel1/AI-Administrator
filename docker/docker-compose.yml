@@ -182,6 +182,43 @@ services:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.retention.time=${PROM_RETENTION:-15d}
 
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: ai-admin-alertmanager
+    # Вместе с Prometheus: без него правила срабатывают, но никому не сообщают.
+    profiles: ["monitoring"]
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertdata:/alertmanager
+    ports:
+      - "${ALERTMANAGER_PORT:-9093}:9093"
+    depends_on:
+      - alert-relay
+    restart: unless-stopped
+
+  alert-relay:
+    build:
+      context: .
+      dockerfile: services/alert-relay/Dockerfile
+    container_name: ai-admin-alert-relay
+    # Мост между Alertmanager и Telegram: сам Alertmanager в Telegram ходить
+    # не умеет (api.telegram.org с этой машины закрыт, есть только Worker).
+    profiles: ["monitoring"]
+    environment:
+      # Значения берутся из .env; сам токен в git не попадает.
+      TG_ALERT_API_BASE: ${TG_ALERT_API_BASE:-}
+      TG_ALERT_TOKEN: ${TG_ALERT_TOKEN:-}
+      TG_ALERT_CHAT_ID: ${TG_ALERT_CHAT_ID:-}
+      ALERT_RELAY_PORT: "8086"
+    ports:
+      # 8086 занят на машине разработчика, поэтому наружу отдаём 8087.
+      - "${ALERT_RELAY_PORT:-8087}:8086"
+    env_file:
+      - path: .env
+        required: false
+    restart: unless-stopped
+
 volumes:
   pgdata:
   promdata:
+  alertdata:

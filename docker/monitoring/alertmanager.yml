@@ -1,0 +1,56 @@
+# Alertmanager: принимает алерты от Prometheus и передаёт их в Telegram.
+#
+# Почему через webhook, а не telegram_configs: прямой api.telegram.org на этой
+# машине недоступен, весь Telegram ходит через Cloudflare Worker. Alertmanager
+# про прокси не знает, поэтому релеит наш alert-relay (docker/services/alert-relay).
+#
+# Маршрут: всё критичное → «telegram-alerts» с повтором 2 минуты и 5 попытками.
+# Второй receiver — «null»: он глушит предупреждения, чтобы ночью не прилетало
+# по три сообщения об одном и том же. Подробности остаются в интерфейсе Prometheus.
+
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: "null"
+  group_by: ["alertname", "service"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers:
+        - severity="critical"
+      receiver: "telegram-alerts"
+      group_wait: 10s
+      repeat_interval: 1h
+      continue: false
+
+    # Предупреждения о rate-limit и об ошибках полезны днём, но не ночью:
+    # отдельный receiver отправляет их сразу, повтор — раз в сутки.
+    - matchers:
+        - severity="warning"
+      receiver: "telegram-warnings"
+
+inhibit_rules:
+  # Пока БД лежит, «сервис не отвечает» — следствие того же, а не новая поломка:
+  # без подавления в Telegram придёт пачка почти одинаковых сообщений.
+  - source_matchers:
+      - alertname="DatabaseUnavailable"
+    target_matchers:
+      - alertname=~"ServiceDown|ServiceRestartedOften"
+    equal: []
+
+receivers:
+  - name: "null"
+
+  - name: "telegram-alerts"
+    webhook_configs:
+      - url: "http://alert-relay:8086/alerts"
+        send_resolved: true
+        max_alerts: 20
+
+  - name: "telegram-warnings"
+    webhook_configs:
+      - url: "http://alert-relay:8086/alerts"
+        send_resolved: false
+        max_alerts: 10

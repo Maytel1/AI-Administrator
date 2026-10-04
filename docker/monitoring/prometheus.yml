@@ -16,6 +16,14 @@ global:
 rule_files:
   - /etc/prometheus/alerts.yml
 
+# Alertmanager живёт на :9093: он и принимает алерты, и решает, что и когда
+# слать. Наш alert-relay — только транспорт до Telegram.
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+      timeout: 10s
+
 scrape_configs:
   - job_name: services
     metrics_path: /metrics
