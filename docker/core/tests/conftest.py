@@ -53,6 +53,19 @@ async def pool():
 
 
 @pytest.fixture()
+async def booking(demo):
+    """Ближайшая запись в демо-салоне: половина тестов панели работает с ней."""
+    slots = await demo["crm"].get_free_slots(demo["salon"]["id"], "Тест стрижка")
+    assert slots, "демо-салон должен иметь свободные слоты"
+    created = await demo["crm"].create_booking(
+        demo["salon"]["id"], demo["client"]["id"], "Тест стрижка",
+        slots[0]["start_text"], offered=slots, created_by="test:fixtures",
+    )
+    assert created["ok"], created
+    return {"id": created["booking_id"], "when": created["when"]}
+
+
+@pytest.fixture()
 async def demo(pool):
     """Тестовый салон + мастер + услуга + график + клиент. Каскадно чистится."""
     crm = InternalCRM(pool)
