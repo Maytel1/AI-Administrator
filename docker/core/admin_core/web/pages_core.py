@@ -93,14 +93,18 @@ def _period_picker(days: int, salon_id: str, status: str) -> str:
 
 
 def _action_menu(
-    booking_id: str, status: str, csrf: str, may_status: bool, back: str
+    booking_id: str, status: str, csrf: str, may_status: bool, back: str,
+    *, prepay_status: str = "not_required",
 ) -> str:
     """Меню действий по записи: одно мини-окно вместо россыпи кнопок.
 
-    Раньше в ячейке стояли три кнопки смены статуса плюс поле переноса — на
-    узком экране строка разъезжалась, а «перенести» без даты означало лишь
-    «куда?». Теперь одна кнопка открывает список: выполнена, отменена,
-    перенести. У переноса — второе мини-окно с датой и временем.
+    Раньше в ячейке стояли три кнопки смены статуса, отметка предоплаты и поле
+    переноса — строка разъезжалась, а в шапке таблицы для этих ячеек не было
+    даже заголовков. Теперь всё это живёт в одном меню: выполнена, отменена,
+    перенести (со вторым мини-окном на дату и время) и отметка предоплаты.
+
+    Предоплата уехала сюда же, а не исчезла: без неё администратор не смог
+    бы сказать «клиент оплатил вперёд», а это влияет на напоминания.
     """
     if not csrf or not may_status:
         return '<span class="muted-cell">—</span>'
@@ -138,10 +142,14 @@ def _action_menu(
         "</form>"
     )
 
+    # Предоплата: статусы те же, что были в отдельной ячейке (004),
+    # иначе пункт «в меню» оказался бы кнопкой в никуда.
+    prepay = _prepayment_buttons(booking_id, prepay_status, csrf, back)
+
     return (
         '<details class="menu">'
         '<summary class="menu-trigger" aria-label="Действия по записи">Действия</summary>'
-        f'<div class="menu-pop">{"".join(items)}{reschedule}</div>'
+        f'<div class="menu-pop">{"".join(items)}{prepay}{reschedule}</div>'
         "</details>"
     )
 
@@ -319,29 +327,34 @@ def page_bookings(
             money(b["price"]),
             esc(SOURCE_RU.get(b["source"], b["source"])),
             _status_badge(b["status"]),
-            _action_menu(str(b["id"]), b["status"], csrf, may_status, back),
-            _prepayment_buttons(
-                str(b["id"]), b.get("prepayment_status") or "not_required",
-                csrf, back, may_edit=may_status,
-            )
-            + _reschedule_form(str(b["id"]), csrf if may_status else "", back),
+            _action_menu(
+                str(b["id"]), b["status"], csrf, may_status, back,
+                prepay_status=b.get("prepayment_status") or "not_required",
+            ),
         ]
         for b in rows
     ]
     content = (
-        "<h1>Записи</h1>"
-        + flash_html(flash, flash_error)
-        + f'<div class="toolbar">{"".join(links)}{_period_picker(days, sid, status)}</div>'
-        + card(
-            f"Найдено: {len(rows)}",
-            '<div class="scroll-x">'
-            + table(
-                ["Когда", "Клиент", "Телефон", "Услуга", "Мастер", "Цена", "Источник",
-                 "Статус", "Действие"],
-                table_rows,
-                "Под выбранный фильтр записей нет.",
-            )
-            + "</div>",
+        flash_html(flash, flash_error)
+        + '<div class="panel">'
+        # Шапка таблицы: слева — сколько нашлось, справа — фильтры и период.
+        # Раньше фильтры стояли отдельной полосой над карточкой и висели
+        # в стороне от заголовков колонок; теперь это единая «шапка», и она
+        # прилипает к верху при прокрутке длинного списка.
+        + '<div class="panel-head">'
+        + '<div class="panel-title"><h1>Записи</h1>'
+        + f'<span class="count">Найдено: {len(rows)}</span></div>'
+        + '<div class="panel-filters">'
+        + "".join(links)
+        + _period_picker(days, sid, status)
+        + "</div></div>"
+        + '<div class="scroll-x">'
+        + table(
+            ["Когда", "Клиент", "Телефон", "Услуга", "Мастер", "Цена", "Источник",
+             "Статус", "Действие"],
+            table_rows,
+            "Под выбранный фильтр записей нет.",
         )
+        + "</div></div>"
     )
     return layout("Записи", "/bookings", content, salon=salon, salons=salons, role=_role(ctx))

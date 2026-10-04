@@ -37,7 +37,9 @@ aside nav a.active{
 }
 aside nav a i{font-style:normal;opacity:.75;width:16px;text-align:center}
 .foot{margin-top:auto;color:var(--subtle);font-size:12px;padding:10px}
-main{padding:22px 26px;max-width:1180px}
+/* Ширину не ограничиваем: таблица записей должна занять всё свободное
+   место, а не упираться в 1180px и оставлять пустое поле справа. */
+main{padding:22px 26px;min-width:0}
 h1{font-size:21px;margin:0 0 4px}
 .sub{color:var(--muted);margin:0 0 20px;font-size:13px}
 .top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
@@ -235,3 +237,28 @@ td:last-child,th:last-child{width:1%;white-space:nowrap}
    прокручиваться по горизонтали, а не ломать сетку. */
 .scroll-x{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .scroll-x table{min-width:860px}
+
+/* Панель таблицы: фильтры живут в шапке над колонками и липнут к верху,
+   поэтому при длинном списке заголовки не уезжают за экран. */
+.panel{
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--r-lg); overflow:visible; margin-bottom:16px;
+}
+.panel-head{
+  display:flex; flex-wrap:wrap; align-items:center; gap:12px;
+  padding:14px 18px; border-bottom:1px solid var(--border);
+  position:sticky; top:0; z-index:6;
+  background:var(--surface); border-radius:var(--r-lg) var(--r-lg) 0 0;
+}
+.panel-title{display:flex; align-items:baseline; gap:12px}
+.panel-title h1{margin:0}
+.panel-head .count{color:var(--muted);font-size:13px}
+/* Фильтры прижаты вправо; на узком экране переносятся под заголовок. */
+.panel-filters{
+  display:flex; flex-wrap:wrap; align-items:center; gap:8px;
+  margin-left:auto;
+}
+.panel-filters .picker{margin-left:0}
+.panel .scroll-x{border-radius:0 0 var(--r-lg) var(--r-lg)}
+/* Меню действий открывается вниз — не подрезаем его нижним скруглением. */
+.panel .scroll-x{padding-bottom:2px}

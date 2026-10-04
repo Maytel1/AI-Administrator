@@ -691,6 +691,30 @@ def test_period_picker_shows_chosen_window():
     )
 
 
+def test_bookings_table_has_no_stray_cells():
+    """В строке ровно столько ячеек, сколько заголовков.
+
+    Раньше строка выдавала ещё две ячейки — отметку предоплаты и форму
+    переноса, — на которые в шапке не было ни заголовка. Таблица от этого
+    разъезжалась, а перенос дублировал пункт «Действия».
+    """
+    html = page_bookings([dict(BOOKING)], TZ, "", SALON, [SALON], OWNER_CTX)
+    header_part, body_part = html.split("</thead>", 1)
+    headers = header_part.count("<th>")
+    first_row = body_part.split("<tr>", 1)[1].split("</tr>", 1)[0]
+    assert first_row.count("<td>") == headers
+
+
+def test_filters_are_in_table_header():
+    """Фильтры и выбор периода живут в шапке над колонками, а не отдельной полосой."""
+    html = page_bookings([dict(BOOKING)], TZ, "", SALON, [SALON], OWNER_CTX)
+    panel_head = html.split('class="panel-head"', 1)[1]
+    # Обе кнопки периода и статусных фильтров — внутри блока шапки.
+    assert 'class="picker"' in panel_head.split("</div></div>")[0]
+    assert "Период:" in panel_head
+    assert "Найдено: 1" in panel_head
+
+
 def test_flash_shown_after_action():
     html = page_services(
         [{"id": "s1", "title": "Маникюр", "duration_min": 120, "price": 2000, "is_active": True}],
