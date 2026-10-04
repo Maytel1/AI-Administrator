@@ -30,6 +30,9 @@ import time
 from typing import Any
 
 from aiohttp import ClientSession, web
+from prometheus_client import Counter as _Counter
+from prometheus_client import Gauge as _Gauge
+from prometheus_client import generate_latest
 
 # Telegram не принимает сообщения длиннее 4096 символов, а бой приходит
 # пачкой на все сработавшие алерты — режем по границе строки, чтобы не
@@ -57,6 +60,24 @@ STARTED = time.monotonic()
 SENT = 0
 FAILED = 0
 LAST_ERROR = ""
+# Метрики релея: без них поломку доставки нечем поймать. Если Worker или
+# Telegram лежат, единственный сигнал — рост failed и отсутствие sent.
+_METRICS = {
+    "alert_relay_sent_total": _Counter("alert_relay_sent_total", "Доставлено сообщений в Telegram"),
+    "alert_relay_failed_total": _Counter("alert_relay_failed_total", "Не удалось доставить"),
+    "alert_relay_alerts_total": _Counter(
+        "alert_relay_alerts_total", "Алертов в сообщениях"
+    ),
+    "alert_relay_last_success_timestamp": _Gauge(
+        "alert_relay_last_success_timestamp", "Когда последний раз доставили (unix-время)"
+    ),
+    "alert_relay_configured": _Gauge(
+        "alert_relay_configured", "Настроен ли канал (1 — да)", ["component"]
+    ),
+}
+LAST_SUCCESS = 0.0
+
+
 def esc(value: Any) -> str:
     """Экранирование HTML: имена сервисов и аннотации недоверенные."""
     return html.escape(str(value if value is not None else ""), quote=False)
@@ -132,29 +153,41 @@ def format_webhook(payload: dict[str, Any]) -> str:
 
 async def handle_alerts(request: web.Request) -> web.Response:
     """Webhook от Alertmanager: отправляем в Telegram, отвечаем по результату."""
-    global SENT, FAILED, LAST_ERROR  # noqa: PLW0603 — счётчики для /health
+    global SENT, FAILED, LAST_ERROR, LAST_SUCCESS  # noqa: PLW0603 — состояние для /health и /metrics
     try:
         payload = await request.json()
     except Exception:  # noqa: BLE001 — битое тело не повод ронять сервис
         return web.json_response({"error": "body is not json"}, status=400)
+    alerts = payload.get("alerts") or []
     try:
         await send_to_telegram(request.app["session"], format_webhook(payload))
     except Exception as exc:  # noqa: BLE001 — Alertmanager повторит при 500
         FAILED += 1
         LAST_ERROR = f"{type(exc).__name__}: {exc}"[:200]
+        _METRICS["alert_relay_failed_total"].inc()
         print(f"[alert-relay] отправка не удалась: {LAST_ERROR}", flush=True)
         return web.json_response({"error": LAST_ERROR}, status=500)
     SENT += 1
-    print(f"[alert-relay] отправлено ({len(payload.get('alerts') or [])} алертов)", flush=True)
+    LAST_SUCCESS = time.time()
+    _METRICS["alert_relay_sent_total"].inc()
+    _METRICS["alert_relay_last_success_timestamp"].set(LAST_SUCCESS)
+    if alerts:
+        _METRICS["alert_relay_alerts_total"].inc(len(alerts))
+    print(f"[alert-relay] отправлено ({len(alerts)} алертов)", flush=True)
     return web.json_response({"ok": True})
+
+
+def is_configured() -> bool:
+    """Заданы ли все три настройки доставки."""
+    return all(
+        os.getenv(name)
+        for name in ("TG_ALERT_API_BASE", "TG_ALERT_TOKEN", "TG_ALERT_CHAT_ID")
+    )
 
 
 async def handle_health(_request: web.Request) -> web.Response:
     """Health: видно, настроен ли релей и не сыплются ли ошибки отправки."""
-    configured = all(
-        os.getenv(name)
-        for name in ("TG_ALERT_API_BASE", "TG_ALERT_TOKEN", "TG_ALERT_CHAT_ID")
-    )
+    configured = is_configured()
     return web.json_response({
         "status": "ok" if configured else "degraded",
         "service": "alert-relay",
@@ -163,7 +196,23 @@ async def handle_health(_request: web.Request) -> web.Response:
         "sent": SENT,
         "failed": FAILED,
         "last_error": LAST_ERROR,
+        # Отдельно от last_error: время последней удачной доставки. Пока его
+        # нет, канал не проверен ни разу — молчание ещё не значит «всё хорошо».
+        "last_success_at": LAST_SUCCESS or None,
     }, status=200 if configured else 503)
+
+
+async def handle_metrics(_request: web.Request) -> web.Response:
+    """Prometheus-формат: релей сам должен быть виден в мониторинге.
+
+    Иначе поломку доставки нечем поймать: сервис молча стоит, алерты не уходят,
+    и система мониторинга об этом не знает.
+    """
+    _METRICS["alert_relay_configured"].labels("tg").set(1 if is_configured() else 0)
+    return web.Response(
+        body=generate_latest(),
+        headers={"Content-Type": "text/plain; version=0.0.4; charset=utf-8"},
+    )
 
 
 def main() -> None:
@@ -181,6 +230,7 @@ def main() -> None:
     app.on_cleanup.append(_cleanup)
     app.router.add_post("/alerts", handle_alerts)
     app.router.add_get("/health", handle_health)
+    app.router.add_get("/metrics", handle_metrics)
     app.router.add_get("/", handle_health)
     web.run_app(app, host="0.0.0.0", port=port)
 

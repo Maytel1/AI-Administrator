@@ -1,3 +1,4 @@
 # alert-relay: между Alertmanager и Telegram нужен только HTTP-клиент.
 # Ядро проекта не тянем — сервис ничего не знает про БД и admin_core.
 aiohttp>=3.9,<4
+prometheus-client>=0.20,<2   # /metrics релея: его поломку иначе нечем поймать

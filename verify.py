@@ -114,6 +114,21 @@ def report(steps: list[Step], verbose: bool) -> int:
     return 0
 
 
+def promtool_command(mount: str, *args: str) -> list[str]:
+    """Команда promtool в одноразовом контейнере.
+
+    Отдельный контейнер нужен, чтобы не тащить prom/prometheus к себе на
+    машину: образ весит сотни мегабайт и ради проверки конфигов не нужен.
+    """
+    return [
+        "docker", "run", "--rm",
+        "--entrypoint", "promtool",
+        "-v", f"{DOCKER_DIR}{os.sep}monitoring:/etc/prometheus",
+        "prom/prometheus:latest",
+        *args,
+    ]
+
+
 def steps_for(fast: bool) -> list[Step]:
     """Шаги в том же порядке, что в .github/workflows/ci.yml."""
     steps = [
@@ -140,6 +155,28 @@ def steps_for(fast: bool) -> list[Step]:
     ]
     if fast:
         return steps
+    # Правила алертов: без этой проверки молчащее правило выглядит как рабочее,
+    # а ошибочное выражение не срабатывает ровно тогда, когда всё сломалось.
+    steps.append(
+        Step(
+            "алерты: promtool check config",
+            promtool_command("", "check", "config", "/etc/prometheus/prometheus.yml"),
+            cwd=DOCKER_DIR,
+            docker=True,
+        )
+    )
+    steps.append(
+        Step(
+            "алерты: правила срабатывают (unit-тесты)",
+            promtool_command("", "test", "rules", "/etc/prometheus/alerts_test.yml"),
+            cwd=DOCKER_DIR,
+            docker=True,
+            hint=(
+                "Правило, которое не срабатывает, хуже ненаписанного: "
+                "оно молчит при аварии. Проверьте выражение и for: в alerts.yml."
+            ),
+        )
+    )
     steps.append(
         Step(
             "pytest: тесты с настоящей БД",

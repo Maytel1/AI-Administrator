@@ -71,3 +71,57 @@ groups:
         annotations:
           summary: "Полчаса нет ни одного сообщения"
           description: "Если это тестовый стенд — игнорируйте. На проде проверьте бота."
+
+  # --- Контур мониторинга ----------------------------------------------------
+  # Эти правила ловят худший отказ: тот, при котором никто не узнает, что
+  # система молчит. Пока Alertmanager или релей не попадают в сбор метрик,
+  # их поломку не видно — а значит, «всё спокойно» и «никто ничего не
+  # отправляет» выглядят одинаково.
+  - name: monitoring
+    rules:
+      - alert: MonitoringDead
+        expr: up{job="monitoring"} == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Контур мониторинга недоступен: {{ $labels.instance }}"
+          description: >-
+            Alertmanager или alert-relay не отвечают. Пока это так, алерты о
+            других поломках не придут в Telegram.
+
+      - alert: AlertRelayNotConfigured
+        expr: alert_relay_configured != 1
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "alert-relay не настроен"
+          description: >-
+            Не заданы TG_ALERT_API_BASE / TG_ALERT_TOKEN / TG_ALERT_CHAT_ID.
+            Алерты будут приниматься, но не уйдут.
+
+      - alert: AlertDeliveryFailed
+        # Релей отвечает 500, значит сообщение не доставлено. Важнее молчания:
+        # здесь мы точно знаем, что потеряли уведомление.
+        expr: increase(alert_relay_failed_total[10m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Не удалось доставить алерт в Telegram"
+          description: "Проверьте TG_ALERT_API_BASE, токен бота и живость Worker-прокси."
+
+      - alert: AlertRelayUntested
+        # Канал ни разу не проверен: last_success = 0 у нового релея. Само по
+        # себе это нормально, но вместе с другими тревогами означает, что при
+        # аварии уведомления могут не дойти вообще.
+        expr: alert_relay_last_success_timestamp == 0
+        for: 6h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Канал алертов ни разу не сработал"
+          description: >-
+            alert-relay жив, но ни одного успешного сообщения. Проверьте доставку
+            вручную: docker/scripts/check_alert_channel.py.

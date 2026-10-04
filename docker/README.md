@@ -359,14 +359,68 @@ TG_ALERT_CHAT_ID=<id чата>
 Проверить доставку, не дожидаясь аварии:
 
 ```
-curl -X POST -H "Content-Type: application/json" \
-  --data-binary "@test-alert.json" http://localhost:9093/api/v2/alerts
+curl -X POST -H "Content-Type: application/json" --data-binary "@test-alert.json" \
+  http://localhost:9093/api/v2/alerts
 curl http://localhost:8087/health     # sent и failed
 ```
+
+Готовый пример тела — `docker/test-alert.json`. Либо одной командой со
+сторожем доставки: `python scripts/check_alert_channel.py` (раздел ниже).
 
 Состояние релея: `sent` — доставлено, `failed` — нет. Не доставленный
 алерт Alertmanager повторит сам, поэтому в `failed` смотреть надо с
 `last_error`.
+
+### Контур мониторинга под наблюдением
+
+Метрики собираются не только с четырёх прикладных сервисов, но и с самого
+Alertmanager и релея (`job: monitoring`). Без этого «всё спокойно» и
+«никто ничего не отправляет» выглядели бы одинаково — а это худший вид
+отказа, потому что обнаруживается он постфактум.
+
+Метрики релея:
+
+| Метрика | Что показывает |
+|---|---|
+| `alert_relay_sent_total` | доставлено сообщений |
+| `alert_relay_failed_total` | не удалось доставить |
+| `alert_relay_last_success_timestamp` | когда последний раз доставили (0 = ни разу) |
+| `alert_relay_configured` | заданы ли `TG_ALERT_*` (1 — да) |
+
+Правила, которые ловят поломку самого мониторинга:
+
+| Алерт | Когда | Что делать |
+|---|---|---|
+| `MonitoringDead` | Alertmanager или релей недоступны 3 мин | `docker compose ps`, логи |
+| `AlertRelayNotConfigured` | нет `TG_ALERT_*` | заполнить `.env` |
+| `AlertDeliveryFailed` | релей ответил 500 — сообщение потеряно | токен, Worker, сеть |
+| `AlertRelayUntested` | 6 часов ни одной доставки | проверить канал вручную |
+
+### Проверка правил
+
+Правило с опечаткой в выражении молчит ровно тогда, когда всё сломалось,
+поэтому каждое проверяется unit-тестом на подставных рядах — без аварий
+в стенде (`docker/monitoring/alerts_test.yml`, 8 сценариев). Запуск:
+
+```
+docker run --rm --entrypoint promtool ^
+  -v %CD%\monitoring:/etc/prometheus prom/prometheus:latest ^
+  test rules /etc/prometheus/alerts_test.yml
+```
+
+Проверяется и то, что алерт **гаснет**, когда поломка ушла: вечно висящее
+правило перестают читать. Оба шага входят в `verify.py` и в CI.
+
+### Проверка канала вручную
+
+```
+python scripts/check_alert_channel.py
+```
+
+Скрипт отправляет служебный алерт через Alertmanager (то есть по всей
+цепочке, а не напрямую в релей) и ждёт подтверждения доставки. Код возврата:
+0 — работает, 1 — нет, 2 — не настроен. Годится для планировщика: молчаливый
+успех невозможен, задача завершится с ошибкой.
 
 ---
 

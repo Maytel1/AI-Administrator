@@ -37,3 +37,12 @@ scrape_configs:
   - job_name: prometheus
     static_configs:
       - targets: ["localhost:9090"]
+
+  # Контур мониторинга тоже должен быть в мониторинге: если Alertmanager или
+  # релей упали, алерты не уйдут — а без их метрик никто об этом не узнает,
+  # и тишина станет неотличима от «всё спокойно».
+  - job_name: monitoring
+    static_configs:
+      - targets: ["alertmanager:9093", "alert-relay:8086"]
+        labels:
+          stack: monitoring

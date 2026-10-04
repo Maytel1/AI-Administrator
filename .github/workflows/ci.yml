@@ -59,6 +59,27 @@ jobs:
         working-directory: docker/core
         run: python -m pytest -q
 
+  # Правила алертов: promtool без контейнера не запустить, поэтому шаг живёт
+  # здесь, а не в lint. Правило с неверным выражением молчит при аварии —
+  # и заметить это можно только post factum.
+  alerts:
+    name: алерты promtool (конфиг + правила)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: promtool check config
+        run: |
+          docker run --rm --entrypoint promtool \
+            -v "$PWD/docker/monitoring:/etc/prometheus" \
+            prom/prometheus:latest \
+            check config /etc/prometheus/prometheus.yml
+      - name: promtool test rules (правила должны срабатывать)
+        run: |
+          docker run --rm --entrypoint promtool \
+            -v "$PWD/docker/monitoring:/etc/prometheus" \
+            prom/prometheus:latest \
+            test rules /etc/prometheus/alerts_test.yml
+
   deploy_ready:
     name: готовность деплоя
     # Секреты GitHub недоступны в условии job, поэтому проверяем их отдельным
@@ -85,7 +106,7 @@ jobs:
     # Пока секреты деплоя не заведены, job пропускается: иначе каждый пуш в main
     # давал бы красный статус из-за отсутствия сервера, и статус CI перестал бы
     # что-то значить. Включается переменной окружения DEPLOY_ENABLED=true.
-    needs: [lint, test, docs, deploy_ready]
+    needs: [lint, test, docs, alerts, deploy_ready]
     if: >-
       github.ref == 'refs/heads/main' && github.event_name == 'push'
       && needs.deploy_ready.outputs.enabled == 'true'

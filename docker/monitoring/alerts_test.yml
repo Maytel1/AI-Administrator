@@ -1,0 +1,182 @@
+# Проверка правил promtool: unit-тесты для prometheus.
+#
+# Правило, которое не срабатывает на живых данных, хуже ненаписанного:
+# оно молчит при настоящей аварии, и это заметно только post factum.
+# promtool проверяет выражения на подставных рядах — без сбоев в стенде.
+#
+#     docker run --rm --entrypoint promtool ^
+#       -v %CD%\monitoring:/etc/prometheus prom/prometheus:latest ^
+#       test rules /etc/prometheus/alerts_test.yml
+#
+# Структура: `tests` — плоский список блоков, вложенных групп promtool не
+# понимает. `exp_annotations` сверяются полностью, поэтому тексты повторяют
+# alerts.yml: так тест ловит и сломанное правило, и опечатку в сообщении.
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+tests:
+  # Сервис упал и не поднялся.
+  - interval: 1m
+    input_series:
+      - series: 'up{job="services", instance="web:8081"}'
+        values: "1 1 1 1 0 0 0 0 0 0"
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: ServiceDown
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: ServiceDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              alertname: ServiceDown
+              job: services
+              instance: "web:8081"
+            exp_annotations:
+              summary: "Сервис не отвечает: web:8081"
+              description: >-
+                Метрики не собираются дольше 2 минут. Проверьте:
+                docker compose ps, docker compose logs --tail 50 web:8081
+
+  # Упал и вернулся: алерт гаснет, а не висит вечно.
+  - interval: 1m
+    input_series:
+      - series: 'up{job="services", instance="web:8081"}'
+        values: "1 0 0 0 0 1 1 1 1 1"
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: ServiceDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              alertname: ServiceDown
+              job: services
+              instance: "web:8081"
+            exp_annotations:
+              summary: "Сервис не отвечает: web:8081"
+              description: >-
+                Метрики не собираются дольше 2 минут. Проверьте:
+                docker compose ps, docker compose logs --tail 50 web:8081
+      - eval_time: 6m
+        alertname: ServiceDown
+        exp_alerts: []
+
+  # БД перестала отвечать.
+  - interval: 1m
+    input_series:
+      - series: 'service_db_up{service="web-service"}'
+        values: "1 1 0 0 0 0 0 0 0 0"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: DatabaseUnavailable
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: DatabaseUnavailable
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              alertname: DatabaseUnavailable
+              service: web-service
+            exp_annotations:
+              summary: "БД недоступна для web-service"
+              description: >-
+                Сервис жив, но SELECT 1 не проходит. Идём в runbook, раздел 1:
+                состояние контейнера postgres и место на диске.
+
+# Релей не настроен: алерты принимаются, но не уходят.
+  - interval: 1m
+    input_series:
+      - series: 'alert_relay_configured{component="tg"}'
+        values: "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: AlertRelayNotConfigured
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: AlertRelayNotConfigured
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              alertname: AlertRelayNotConfigured
+              component: tg
+            exp_annotations:
+              summary: "alert-relay не настроен"
+              description: >-
+                Не заданы TG_ALERT_API_BASE / TG_ALERT_TOKEN / TG_ALERT_CHAT_ID.
+                Алерты будут приниматься, но не уйдут.
+
+  # Доставка сорвалась: уведомление точно потеряно.
+  - interval: 1m
+    input_series:
+      - series: 'alert_relay_failed_total'
+        values: "0 0 0 1 2 3 3 3 3 3 3 3 3 3"
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: AlertDeliveryFailed
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: AlertDeliveryFailed
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              alertname: AlertDeliveryFailed
+            exp_annotations:
+              summary: "Не удалось доставить алерт в Telegram"
+              description: >-
+                Проверьте TG_ALERT_API_BASE, токен бота и живость Worker-прокси.
+
+  # Канал не проверен ни разу — но только спустя 6 часов, а не сразу.
+  # Запись "0+0x430" — это 430 нулей: данных нужно на все 7 часов, иначе
+  # правило ещё не «повысилось» из pending в firing.
+  - interval: 1m
+    input_series:
+      - series: 'alert_relay_last_success_timestamp'
+        values: "0+0x430"
+    alert_rule_test:
+      - eval_time: 1h
+        alertname: AlertRelayUntested
+        exp_alerts: []
+      - eval_time: 7h
+        alertname: AlertRelayUntested
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              alertname: AlertRelayUntested
+            exp_annotations:
+              summary: "Канал алертов ни разу не сработал"
+              description: >-
+                alert-relay жив, но ни одного успешного сообщения. Проверьте
+                доставку вручную: docker/scripts/check_alert_channel.py.
+
+  # Успешная доставка снимает тревогу «канал не проверен».
+  - interval: 1m
+    input_series:
+      - series: 'alert_relay_last_success_timestamp'
+        values: "0+0x400 1791109226+0x30"
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: AlertRelayUntested
+        exp_alerts: []
+  # Релей упал: молчание системы мониторинга не должно остаться незамеченным.
+  - interval: 1m
+    input_series:
+      - series: 'up{job="monitoring", instance="alert-relay:8086"}'
+        values: "1 1 0 0 0 0 0 0 0 0"
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: MonitoringDead
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: MonitoringDead
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              alertname: MonitoringDead
+              job: monitoring
+              instance: "alert-relay:8086"
+            exp_annotations:
+              summary: "Контур мониторинга недоступен: alert-relay:8086"
+              description: >-
+                Alertmanager или alert-relay не отвечают. Пока это так, алерты о
+                других поломках не придут в Telegram.

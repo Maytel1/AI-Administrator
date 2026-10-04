@@ -1,8 +1,14 @@
 [
  {
-  "labels": {"alertname": "ServiceDown", "severity": "critical", "service": "web-service"},
-  "annotations": {"summary": "Сервис не отвечает: web:8081"},
-  "startsAt": "2026-10-04T00:00:00Z",
+  "labels": {
+   "alertname": "ServiceDown",
+   "severity": "critical",
+   "service": "web-service"
+  },
+  "annotations": {
+   "summary": "Сервис не отвечает: web:8081"
+  },
+  "startsAt": "2026-01-01T00:00:00Z",
   "endsAt": "0001-01-01T00:00:00Z"
  }
 ]
