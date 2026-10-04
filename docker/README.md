@@ -189,6 +189,40 @@ powershell -ExecutionPolicy Bypass -File scripts\restore_db.ps1 -Dump "docker\ba
 docker compose exec -T postgres pg_restore --list < путь/дамп.dump
 ```
 
+### Копия в другом месте
+
+Копии на том же диске, что и сервер, — не резерв: погибнет диск, пропадут и
+они. Вынос в объектное хранилище — `scripts/upload_backup.py`
+(любое S3-совместимое: Yandex Object Storage, Selectel, Timeweb).
+
+```
+python scripts/upload_backup.py --dry-run   # показать план
+python scripts/upload_backup.py             # залить свежий дамп
+```
+
+Настройки в `docker/.env`:
+
+```
+S3_ENDPOINT=https://storage.yandexcloud.net
+S3_BUCKET=backups-aiadmin
+S3_REGION=ru-central1
+S3_ACCESS_KEY=...
+S3_SECRET_KEY=...
+S3_PREFIX=db          # по умолчанию db
+```
+
+Путь в бакете разложен по датам: `db/2026/10/04/aiadmin-20261004-0248.dump`.
+
+**Проверка после загрузки обязательна.** «Файл загрузился» не значит
+«файл читается»: скрипт сверяет размер и требует в начале объекта магию
+`PGDMP`. Если копия битая, он честно скажет об этом и вернёт ненулевой код —
+а не отрапортует об успехе. Копия, о которой думают, что она годная, хуже
+отсутствующей: поломка обнаружится в момент аварии.
+
+Код возврата: 0 — загружено и проверено, 1 — ошибка, **2 — хранилище не
+настроено**. Два означает «копия только на сервере», и это видно явно, а не
+подразумевается.
+
 > На Windows скрипты запускаются с `-ExecutionPolicy Bypass`: без него
 > PowerShell откажется выполнять неподписанный файл.
 
