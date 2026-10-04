@@ -288,4 +288,3 @@ docker compose run --rm cli python -m pytest -q
 Переменные окружения текстового контура: `TELEGRAM_BOT_TOKEN`, `TG_API_BASE` (прокси Cloudflare Worker), `LLM_PROVIDER`, `YC_API_KEY`, `YC_FOLDER_ID`, `POSTGRES_*`.
 
 Ссылки: wazzup24.ru/pricing · yandex.cloud/ru/docs/foundation-models/pricing · aistudio.yandex.ru/ru/docs/speechkit/pricing · pawetta.com/servisy/c/sintez-rechi · демо-бот @MemoryRestore_Bot.
-

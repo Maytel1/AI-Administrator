@@ -4,4 +4,3 @@ asyncpg>=0.30,<0.31
 prometheus-client>=0.20,<2   # /metrics в admin_core.health (GAP_ANALYSIS §6.4)
 httpx>=0.27,<0.30            # LLM_PROVIDER=openai → admin_core.llm.openai_compat
 # Фаза 2 (WhatsApp, через BSP): pywa + SDK провайдера
-

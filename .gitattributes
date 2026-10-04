@@ -1,0 +1,18 @@
+# Окончания строк: в репозитории всегда LF, независимо от операционной
+# системы. Без этого Windows-машина и CI дают разные файлы для одного
+# содержимого, и проверка «HTML совпадает с репозиторием» ловит пустоту.
+* text=auto eol=lf
+
+# Бинарные файлы: git не должен пытаться их нормализовать.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.dump binary
+
+# Дампы БД и бэкапы — всегда бинарные (и без сжатия в diff).
+docker/backups/** binary
+*.sql text eol=lf

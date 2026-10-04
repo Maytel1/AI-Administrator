@@ -1,0 +1,67 @@
+# Хуки, которые не дают плохому коду уйти в историю.
+#
+# Зачем при уже работающем CI: в прошлом пять коммитов подряд уехали с
+# красным статусом, потому что проверки запускались по-разному локально и в
+# GitHub. CI такие ошибки ловит через полчаса; хук — за секунду, до того как
+# код вообще стал историей.
+#
+# Что здесь НЕ стоит запускать: pytest и promtool. Они требуют БД и контейнер,
+# и на каждом коммите это минута ожидания. Ставится `python verify.py` перед
+# пушем.
+#
+# Установка:  python -m pip install pre-commit && python -m pre_commit install
+# Проверка:   python -m pre_commit run --all-files
+
+# Версия Python не задаётся намеренно: pre-commit берёт тот интерпретатор,
+# которым запущен сам. Жёсткое «3.12» ломало установку на машине с другой
+# версией — хук молча не ставился, а выглядело как «настроил и забыл».
+default_stages: [pre-commit]
+
+repos:
+  # --- ruff: стиль и реальные ошибки ---------------------------------------
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        # --fix сам чинит сортировку импортов и пробелы; неисправимое падает.
+        args: [--fix, --exit-non-zero-on-fix]
+        # Только код проекта. В корне лежат вспомогательные скрипты анализа
+        # (research_*.py), они пишутся под конкретный запуск и к сервису
+        # отношения не имеют; тянуть их в проверку — значит получить
+        # блокирующий коммит из-за чужого файла.
+        files: ^docker/
+
+  # --- конец файла, пробелы, UTF-8 -----------------------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-merge-conflict
+        # Артефакты прошлых правок PowerShell: «SQL-кортежи», попавшие в код.
+      - id: check-added-large-files
+        args: [--maxkb=512]
+      - id: detect-private-key
+      # mixed-line-ending здесь намеренно НЕ используется: на Windows он
+      # борется с git (autocrlf переписывает CRLF обратно) и даёт бесконечный
+      # «файл изменён» без единой правки. Окончания строк задаёт .gitattributes,
+      # это место для одного решения, а не для хука и настроек git одновременно.
+
+  # --- наши собственные проверки ------------------------------------------
+  - repo: local
+    hooks:
+      - id: verify-project
+        name: verify.py --fast (линтеры, типы, документы)
+        entry: python verify.py --fast
+        language: system
+        pass_filenames: false
+        # Коммит без проверок иногда нужен (исправление хука, откат).
+        # Тогда: git commit --no-verify
+        stages: [pre-commit]
+
+      - id: no-secret-in-git
+        name: токены не попадают в репозиторий
+        entry: python docker/scripts/check_secrets.py
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]

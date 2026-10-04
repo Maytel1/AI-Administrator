@@ -9,4 +9,3 @@ COPY core/admin_core /app/admin_core
 COPY core/migrations /app/migrations
 COPY services/bot-service/app /app/app
 CMD ["python", "-m", "app.main"]
-

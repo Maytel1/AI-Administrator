@@ -491,7 +491,10 @@ def main() -> None:
         toc = "".join(f'<a href="#s{i}">{esc(label)}</a>' for i, label in toc_items)
         page = page_html(kicker, title, lead, dot, pill_text, today, md_name, toc, body)
         html_path = md_path.with_suffix(".html")
-        html_path.write_text(page, encoding="utf-8")
+        # newline="\n" обязателен: на Windows write_text по умолчанию пишет CRLF,
+        # а .gitattributes требует LF. Без этого один и тот же документ
+        # выглядит изменённым при каждой пересборке на другой машине.
+        html_path.write_text(page, encoding="utf-8", newline="\n")
         errs = validate_page(page, md_table_count(text), len(h2_titles))
         status = "OK" if not errs else "FAIL: " + "; ".join(errs)
         print(f"{md_name:26s} -> {html_path.name:26s} {len(page):7d} chars  {status}")
@@ -502,7 +505,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-
-
