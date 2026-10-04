@@ -51,6 +51,17 @@ from admin_core.web.session import (
 
 STATIC_DIR = Path(__file__).parent
 
+# Варианты периода для ленты записей: (дней назад/вперёд, подпись).
+# Показываем столько же, сколько просматриваем, иначе подпись вводит в
+# заблуждение: «7 дней» при фильтре на 30 — это молчаливое враньё.
+PERIOD_CHOICES: tuple[tuple[int, str], ...] = (
+    (1, "Сегодня"),
+    (7, "Недеделя"),
+    (30, "Месяц"),
+    (90, "Квартал"),
+)
+PERIOD_DAYS = {days for days, _ in PERIOD_CHOICES}
+
 
 async def _today(
     panel: Panel, salon: dict, salons: list[dict], request: Any, ctx: PageCtx | None = None
@@ -73,15 +84,22 @@ def _flash_from(request: Any) -> tuple[str, bool]:
 async def _bookings(
     panel: Panel, salon: dict, salons: list[dict], request: Any, ctx: PageCtx | None = None
 ) -> str:
-    """Лента записей за ±30 дней вокруг «сейчас»; статус — из query."""
+    "ента записей вокруг «сей-now»; период — из query, статус — тоже."""
     tz = await queries.salon_tz(panel.pool, str(salon["id"]))
     now = datetime.now(tz)
-    start = (now - timedelta(days=30)).astimezone(ZoneInfo("UTC"))
-    end = (now + timedelta(days=30)).astimezone(ZoneInfo("UTC"))
+    # Период задаёт администратор: по умолчанию месяц в каждую сторону.
+    # Мусор в query не должен ломать страницу — молча берём значение по умолчанию.
+    try:
+        days = int(request.query.get("days", "30"))
+    except ValueError:
+        days = 30
+    days = days if days in PERIOD_DAYS else 30
+    start = (now - timedelta(days=days)).astimezone(ZoneInfo("UTC"))
+    end = (now + timedelta(days=days)).astimezone(ZoneInfo("UTC"))
     status = request.query.get("status", "")
     rows = await queries.bookings_between(panel.pool, str(salon["id"]), start, end, status)
     msg, err = _flash_from(request)
-    return page_bookings(rows, tz, status, salon, salons, ctx, msg, err)
+    return page_bookings(rows, tz, status, salon, salons, ctx, msg, err, days=days)
 
 
 async def _clients(
@@ -93,7 +111,7 @@ async def _clients(
     tz = await queries.salon_tz(panel.pool, str(salon["id"]))
     rows = await queries.clients_list(panel.pool, str(salon["id"]))
     queue = await list_waitlist(panel.pool, str(salon["id"]))
-    services = await queries.services(panel.pool, str(salon["id"]))
+    services = await queries.services_list(panel.pool, str(salon["id"]))
     msg, err = _flash_from(request)
     html = page_clients(rows, tz, salon, salons, ctx, msg, err)
     return html.replace("<!--WAITLIST-->", _waitlist_block(queue, services, ctx, salon))
@@ -130,7 +148,7 @@ async def _masters(
 async def _dialogs(
     panel: Panel, salon: dict, salons: list[dict], request: Any, ctx: PageCtx | None = None
 ) -> str:
-    """Лента диалогов; ``?id=<dialog_id>`` — раскрыть переписку."""
+    "ента диалогов; ``?id=<dialog_id>`` — раскрыть переписку."""
     tz = await queries.salon_tz(panel.pool, str(salon["id"]))
     rows = await queries.dialogs_list(panel.pool, str(salon["id"]))
     messages = None

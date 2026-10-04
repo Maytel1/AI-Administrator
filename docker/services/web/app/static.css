@@ -144,3 +144,94 @@ button:hover,.btn:hover{background:var(--accent-hover)}
 .legal-form input,.legal-form select{background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:7px 9px}
 .legal-form .check{display:flex;gap:6px;align-items:center;margin:10px 0}
 .tile.yellow b{color:var(--danger)}
+
+/* --- Панель управления лентой записей ---------------------------------------
+   Всё на `<details>`: CSP запрещает инлайновый JS, а открывающееся меню без
+   скрипта надёжнее и не требует обработчика на каждую строку таблицы.
+   Позиционирование вынесено в слой, чтобы выпадающий список не обрезался
+   родителем с overflow:hidden. */
+
+/* Одна строка: фильтры статуса слева, выбор периода справа. */
+.toolbar{
+  display:flex; flex-wrap:wrap; align-items:center; gap:8px;
+  margin:0 0 16px;
+}
+.toolbar .btn{margin-right:0}
+.picker{position:relative; margin-left:auto}
+.picker>summary{
+  list-style:none; cursor:pointer; user-select:none;
+  display:inline-flex; align-items:center; gap:8px;
+  background:var(--surface-2); border:1px solid var(--border-strong);
+  border-radius:var(--r-sm); padding:7px 12px; font-size:13px;
+}
+.picker>summary::-webkit-details-marker{display:none}
+.picker>summary:hover{border-color:var(--accent)}
+/* Каретка нарисована вёрсткой, а не символом: «▾» зависит от шрифта и на
+   некоторых машинах превращается в квадрат. */
+.picker .caret{
+  width:0; height:0; margin-left:2px;
+  border-left:4px solid transparent; border-right:4px solid transparent;
+  border-top:5px solid var(--muted); transition:transform .15s ease;
+}
+.picker[open] .caret{transform:rotate(180deg)}
+.picker-list{
+  position:absolute; z-index:40; right:0; top:calc(100% + 6px);
+  min-width:170px; margin:0; padding:5px; list-style:none;
+  background:var(--surface); border:1px solid var(--border-strong);
+  border-radius:var(--r-md); box-shadow:var(--shadow);
+}
+.picker-list a{
+  display:flex; align-items:center; gap:9px;
+  padding:7px 10px; border-radius:var(--r-sm); font-size:13px;
+}
+.picker-list a:hover{background:var(--hover)}
+.picker-list a[aria-current="true"]{color:var(--text);background:var(--accent-bg)}
+.picker-list .tick{width:12px;color:var(--accent)}
+.picker-list a[aria-current="true"] .tick::before{content:"✓"}
+
+/* Меню действий в строке таблицы. */
+.menu{position:relative}
+.menu-trigger{
+  list-style:none; cursor:pointer; display:inline-block;
+  background:var(--surface-2); border:1px solid var(--border-strong);
+  border-radius:var(--r-sm); padding:5px 11px; font-size:12px; white-space:nowrap;
+}
+.menu-trigger::-webkit-details-marker{display:none}
+.menu-trigger:hover{border-color:var(--accent);color:var(--text)}
+.menu-pop{
+  position:absolute; z-index:40; right:0; top:calc(100% + 6px);
+  min-width:230px; display:grid; gap:3px; padding:6px;
+  background:var(--surface); border:1px solid var(--border-strong);
+  border-radius:var(--r-md); box-shadow:var(--shadow);
+}
+.menu-item{display:contents}
+/* Форма — это строка пункта, а не отдельный блок: иначе между пунктами
+   появляются поля, и список выглядит разрежённым. */
+.menu-item button,.menu-input{
+  width:100%; text-align:left; cursor:pointer;
+  background:transparent; color:var(--text); border:1px solid transparent;
+  border-radius:var(--r-sm); padding:7px 10px; font-size:13px; font:inherit;
+}
+.menu-item button:hover{background:var(--hover);border-color:var(--border)}
+.menu-item button.ok:hover{color:var(--green)}
+.menu-item button.danger:hover{color:var(--red)}
+.menu-label{display:block;padding:8px 10px 2px;font-size:11px;color:var(--muted)}
+.menu-input{
+  background:var(--surface-2); border-color:var(--border);
+  margin:0 10px 6px; width:calc(100% - 20px); cursor:text;
+}
+.menu-input:focus{outline:none;border-color:var(--accent)}
+.menu-item button.primary{
+  margin:0 10px 4px; width:calc(100% - 20px); text-align:center;
+  background:var(--accent); color:#fff;
+}
+.menu-item button.primary:hover{background:var(--accent-hover)}
+.muted-cell{color:var(--subtle);font-size:12px}
+
+/* Узкая колонка действий не должна раздувать таблицу. */
+td:last-child,th:last-child{width:1%;white-space:nowrap}
+
+/* На ноутбуке панелью пользуются с узкого экрана: таблица записей должна
+   прокручиваться по горизонтали, а не ломать сетку. */
+.scroll-x{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.scroll-x table{min-width:860px}

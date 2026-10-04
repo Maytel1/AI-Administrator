@@ -51,6 +51,101 @@ def _status_badge(status: str) -> str:
     return badge(STATUS_RU.get(status, status), STATUS_TONE.get(status, "gray"))
 
 
+PERIOD_LABELS: tuple[tuple[int, str], ...] = (
+    (1, "Сегодня"),
+    (7, "Неделя"),
+    (30, "Месяц"),
+    (90, "Квартал"),
+)
+
+
+def _period_picker(days: int, salon_id: str, status: str) -> str:
+    """Выбор периода: одна кнопка, по клику — список.
+
+    Сделано на `<details>`: панель живёт под CSP с ``script-src 'self'``, то
+    есть инлайновый JavaScript там запрещён. `<details>` открывается без
+    единой строки скрипта и работает во всех браузерах, которыми пользуется
+    администратор салона.
+
+    Список подписан тем периодом, который реально выбран, а не «30 дней»:
+    расхождение между подписью и фильтром выглядит как ошибка программы.
+    """
+    label = next((name for value, name in PERIOD_LABELS if value == days), "Месяц")
+    items = []
+    for value, name in PERIOD_LABELS:
+        # & в атрибуте href обязан быть &amp;: без этого HTML валиден
+        # «почти всегда», а валидатор и часть браузеров ломают разметку.
+        url = (
+            f"/bookings?salon={esc(salon_id)}&amp;days={value}"
+            + (f"&amp;status={esc(status)}" if status else "")
+        )
+        mark = ' aria-current="true"' if value == days else ""
+        dot = '<span class="tick">✓</span>' if value == days else "<span></span>"
+        items.append(
+            f'<li><a href="{url}"{mark}>{dot}{esc(name)}</a></li>'
+        )
+    return (
+        '<details class="picker">'
+        f'<summary>Период: {esc(label)}<span class="caret"></span></summary>'
+        f'<ul class="picker-list">{"".join(items)}</ul>'
+        "</details>"
+    )
+
+
+def _action_menu(
+    booking_id: str, status: str, csrf: str, may_status: bool, back: str
+) -> str:
+    """Меню действий по записи: одно мини-окно вместо россыпи кнопок.
+
+    Раньше в ячейке стояли три кнопки смены статуса плюс поле переноса — на
+    узком экране строка разъезжалась, а «перенести» без даты означало лишь
+    «куда?». Теперь одна кнопка открывает список: выполнена, отменена,
+    перенести. У переноса — второе мини-окно с датой и временем.
+    """
+    if not csrf or not may_status:
+        return '<span class="muted-cell">—</span>'
+    if status in ("completed", "cancelled"):
+        return '<span class="muted-cell">закрыта</span>'
+
+    hidden = f'<input type="hidden" name="booking_id" value="{esc(booking_id)}">'
+    options = [
+        ("completed", "Выполнена", "ok"),
+        ("cancelled", "Отменена", "danger"),
+    ]
+    if status != "confirmed":
+        options.insert(0, ("confirmed", "Подтверждена", ""))
+    items = []
+    for code, name, kind in options:
+        form = (
+            f'<form method="post" action="/actions" class="menu-item">'
+            f'<input type="hidden" name="action" value="booking_status">'
+            f'{hidden}<input type="hidden" name="back" value="{esc(back)}">'
+            f'<input type="hidden" name="status" value="{code}">'
+            f"{csrf_field(csrf)}"
+            f'<button type="submit" class="{kind}">{esc(name)}</button>'
+            "</form>"
+        )
+        items.append(form)
+
+    reschedule = (
+        f'<form method="post" action="/actions" class="menu-item">'
+        f'<input type="hidden" name="action" value="booking_reschedule">'
+        f'{hidden}<input type="hidden" name="back" value="{esc(back)}">'
+        f"{csrf_field(csrf)}"
+        '<label class="menu-label">Перенести на</label>'
+        '<input type="datetime-local" name="new_start" required class="menu-input">'
+        '<button type="submit" class="primary">Перенести</button>'
+        "</form>"
+    )
+
+    return (
+        '<details class="menu">'
+        '<summary class="menu-trigger" aria-label="Действия по записи">Действия</summary>'
+        f'<div class="menu-pop">{"".join(items)}{reschedule}</div>'
+        "</details>"
+    )
+
+
 def _status_buttons(
     booking_id: str, status: str, csrf: str, may_status: bool, back: str
 ) -> str:
@@ -174,7 +269,7 @@ def page_today(
         + card(
             "Расписание на сегодня",
             table(
-                ["Время", "Клиент", "Телефон", "Услуга", "Мастер", "Цена", "Статус", "Действия"],
+                ["Время", "Клиент", "Телефон", "Услуга", "Мастер", "Цена", "Статус", "Действие"],
                 rows,
                 "На сегодня записей нет. Бот продолжает принимать заявки.",
             ),
@@ -192,8 +287,13 @@ def page_bookings(
     ctx: Any | None = None,
     flash: str = "",
     flash_error: bool = False,
+    days: int = 30,
 ) -> str:
-    """Лента записей за ±30 дней с фильтром по статусу (ссылками, без формы)."""
+    """Лента записей за выбранный период с фильтром по статусу.
+
+    Период приходит из query и в подписи, и в запрос к базе: подпись «Неделя»
+    при тридцатидневном фильтре была бы просто неправдой.
+    """
     from .queries import SOURCE_RU, STATUS_RU
 
     csrf, may_status = _ctx_parts(ctx, "booking_status")
@@ -219,7 +319,7 @@ def page_bookings(
             money(b["price"]),
             esc(SOURCE_RU.get(b["source"], b["source"])),
             _status_badge(b["status"]),
-            _status_buttons(str(b["id"]), b["status"], csrf, may_status, back),
+            _action_menu(str(b["id"]), b["status"], csrf, may_status, back),
             _prepayment_buttons(
                 str(b["id"]), b.get("prepayment_status") or "not_required",
                 csrf, back, may_edit=may_status,
@@ -230,17 +330,18 @@ def page_bookings(
     ]
     content = (
         "<h1>Записи</h1>"
-        '<p class="sub">Период: 30 дней назад и 30 дней вперёд</p>'
         + flash_html(flash, flash_error)
-        + f'<div class="row" style="margin-bottom:14px">{"".join(links)}</div>'
+        + f'<div class="toolbar">{"".join(links)}{_period_picker(days, sid, status)}</div>'
         + card(
             f"Найдено: {len(rows)}",
-            table(
+            '<div class="scroll-x">'
+            + table(
                 ["Когда", "Клиент", "Телефон", "Услуга", "Мастер", "Цена", "Источник",
-                 "Статус", "Действия"],
+                 "Статус", "Действие"],
                 table_rows,
                 "Под выбранный фильтр записей нет.",
-            ),
+            )
+            + "</div>",
         )
     )
     return layout("Записи", "/bookings", content, salon=salon, salons=salons, role=_role(ctx))
