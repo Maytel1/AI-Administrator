@@ -164,7 +164,10 @@ def layout(
         f"<nav>{nav}</nav>"
         '<div class="foot">MVP · read-only<br>фаза 4</div></aside>'
         f'<main class="{"inner" if inner_scroll else ""}">'
-        f'<div class="top">{content}{switch}</div></main>'
+        # Контент обязательно в своей обёртке: .top — flex, и без неё все
+        # блоки страницы становились его детьми и выстраивались в один ряд
+        # (расписание вставало справа от плиток вместо того, чтобы быть под ними).
+        f'<div class="top"><div class="content">{content}</div>{switch}</div></main>'
         "</div></body></html>"
     )
 

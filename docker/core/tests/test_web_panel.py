@@ -813,6 +813,34 @@ def test_today_dashboard_two_columns():
     assert html.count("salon-switch") == 1
 
 
+def test_layout_wraps_content_in_own_block():
+    """Контент лежит в своей обёртке — иначе он становится детьми flex-строки.
+
+    .top объявлен как flex, и без обёртки каждый блок страницы становился его
+    ребёнком: плитки и расписание вставали в один ряд вместо того, чтобы
+    идти сверху вниз. Обёртка обязана быть на каждой странице, поэтому
+    проверяем и обычную схему, и внутреннюю прокрутку.
+    """
+    today = page_today(dict(STATS), [dict(BOOKING)], TZ, SALON, [SALON], OWNER_CTX)
+    assert '<div class="top"><div class="content">' in today
+    # Шапка и расписание — внутри обёртки, то есть один поток, не два столбца.
+    inner = today.split('<div class="content">', 1)[1]
+    assert inner.index("dash-top") < inner.index("panel-tight")
+    # На странице с внутренней прокруткой обёртка тоже на месте.
+    reports = page_reports(
+        {
+            "funnel": {
+                "revenue": 1000.0, "bookings": 4, "dialogs": 9, "conversion": 44,
+                "avg_check": 250.0, "new_clients": 1, "llm_cost": 10.0,
+            },
+            "loss": {"lost_rate": 5, "total": 4, "cancelled": 1, "no_show": 0},
+            "load": [], "by_day": [], "bot": {},
+        },
+        SALON, [SALON], ctx=OWNER_CTX,
+    )
+    assert '<div class="content">' in reports
+
+
 def test_flash_shown_after_action():
     html = page_services(
         [{"id": "s1", "title": "Маникюр", "duration_min": 120, "price": 2000, "is_active": True}],
