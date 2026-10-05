@@ -772,21 +772,25 @@ def test_services_are_list_not_card_grid():
 
 
 def test_today_blocks_order():
-    """Порядок на «Сегодня»: заголовок, загрузка, сводка статусов, плитки, расписание.
+    """Порядок на «Сегодня»: заголовок, загрузка, плитки, расписание вплотную.
 
-    Полоса загрузки уехала из-под таблицы под заголовок, а плитки стали
-    одним рядом — иначе расписание не помещалось на экран.
+    Полоса загрузки уехала из-под таблицы под заголовок, плитки стали одним
+    рядом, а расписание прижато к ним. Сводку «подтверждено N, выполнено N»
+    убрали — она дублировала плитки и съедала высоту экрана.
     """
     html = page_today(dict(STATS), [dict(BOOKING)], TZ, SALON, [SALON], OWNER_CTX)
     assert 'class="load-line"' in html
     assert 'class="tiles tiles-row"' in html
     # Отдельной карточки «Загрузка» больше нет.
     assert "<h2>Загрузка</h2>" not in html
+    # Сводка-дубль убрана, и расписание идёт сразу за плитками.
+    assert "подтверждено" not in html
+    assert "panel-tight" in html
     i_load = html.index('class="load-line"')
-    i_sub = html.index('class="sub"')
     i_tiles = html.index('tiles tiles-row')
+    i_panel = html.index("panel-tight")
     i_table = html.index("<table>")
-    assert i_load < i_sub < i_tiles < i_table, "блоки идут не в том порядке"
+    assert i_load < i_tiles < i_panel < i_table, "блоки идут не в том порядке"
 
 
 def test_flash_shown_after_action():

@@ -297,7 +297,11 @@ form.stack .check-cell{justify-content:flex-end}
 /* «Сегодня»: плитки в один горизонтальный ряд. Шесть плиток по 168px в сетке
    auto-fit переносились на второй ряд и съедали высоту экрана, из-за чего
    расписание уезжало вниз. Ниже — явно шесть колонок с переносом по одной. */
-.tiles-row{grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px}
+/* «Сегодня»: расписание должно стоять сразу под плитками, без зазора.
+   Плитки отдавали вниз margin, а панель добавляла свой — между ними
+   появлялась пустая полоса, и таблица выглядела отдельным блоком ниже. */
+.tiles-row{grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:0}
+.panel-tight{margin-top:10px}
 .tiles-row .tile{padding:11px 13px}
 .tiles-row .tile b{font-size:20px}
 .tiles-row .tile span{font-size:11.5px;line-height:1.35;display:block;margin-top:2px}

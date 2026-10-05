@@ -266,15 +266,14 @@ def page_today(
     ]
     content = (
         "<h1>Сегодня</h1>"
-        # Порядок блоков — по просьбе: заголовок, под ним загрузка, под ней
-        # сводка по статусам, затем плитки в один ряд и расписание.
+        # Порядок блоков — по просьбе: заголовок, под ним загрузка, затем плитки
+        # в один ряд и сразу под ними расписание. Сводку «подтверждено N,
+        # выполнено N, отменено N» убрали: она дублировала плитки и съедала
+        # высоту, из-за которой таблица уезжала под экран.
         + load
-        + f'<p class="sub">{esc(salon["name"] if salon else "")} — '
-        f'подтверждено {stats["confirmed"]}, выполнено {stats["completed"]}, '
-        f'отменено {stats["cancelled"]}</p>'
         + flash_html(flash, flash_error)
         + f'<div class="tiles tiles-row">{tiles}</div>'
-        + '<div class="panel">'
+        + '<div class="panel panel-tight">'
         + '<div class="panel-head"><div class="panel-title"><h2 class="panel-h">'
         + "Расписание на сегодня</h2>"
         + f'<span class="count">Записей: {len(schedule)}</span></div></div>'
