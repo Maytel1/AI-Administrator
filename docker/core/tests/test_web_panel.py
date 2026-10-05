@@ -17,6 +17,7 @@ from admin_core.web.pages_lists import (
     page_clients,
     page_dialogs,
     page_masters,
+    page_reports,
     page_services,
     page_settings,
 )
@@ -713,6 +714,61 @@ def test_filters_are_in_table_header():
     assert 'class="picker"' in panel_head.split("</div></div>")[0]
     assert "Период:" in panel_head
     assert "Найдено: 1" in panel_head
+
+
+def test_today_schedule_uses_action_menu():
+    """В расписании на сегодня — то же меню действий, что и в «Записях».
+
+    Здесь была та же болезнь: строка выдавала больше ячеек, чем заголовков,
+    и отдельные поля с датой и кнопкой «Перенести» дублировали меню.
+    """
+    row = {**BOOKING, "status": "confirmed"}
+    html = page_today(dict(STATS), [row], TZ, SALON, [SALON], OWNER_CTX)
+    head, _, body = html.partition("</thead>")
+    first_row = body.split("<tr>", 1)[1].split("</tr>", 1)[0]
+    assert first_row.count("<td>") == head.count("<th>")
+    assert "menu-pop" in html and "booking_reschedule" in html
+    # Отдельных форм переноса в таблице быть не должно.
+    assert html.count('name="new_start"') == html.count("menu-pop")
+
+
+def test_reports_and_settings_scroll_inside():
+    """Отчёты и настройки не прокручиваются как страницу: шапка стоит, тело ездит."""
+    reports = page_reports(
+        {
+            "funnel": {
+                "revenue": 1000.0, "bookings": 4, "dialogs": 9, "conversion": 44,
+                "avg_check": 250.0, "new_clients": 1, "llm_cost": 10.0,
+            },
+            "loss": {"lost_rate": 5, "total": 4, "cancelled": 1, "no_show": 0},
+            "load": [
+                {"name": "Мария", "bookings": 2, "busy_hours": 3.5, "revenue": 500.0},
+            ],
+            "by_day": [], "bot": {},
+        },
+        SALON, [SALON], ctx=OWNER_CTX,
+    )
+    assert '<main class="inner">' in reports
+    assert 'class="page-head"' in reports and 'class="page-body"' in reports
+    settings = page_settings(SALON, [SALON], {"LLM_PROVIDER": "stub"})
+    assert '<main class="inner">' in settings
+    assert 'class="page-body"' in settings
+
+
+def test_services_are_list_not_card_grid():
+    """Прайс — ровный список позиций, а не сетка карточек.
+
+    В сетке поля «цена/длительность» сжимались до нечитаемых 120px,
+    и текст рядом с услугой рвался.
+    """
+    html = page_services(
+        [{"id": "s1", "title": "Маникюр", "duration_min": 120,
+          "price": 2000, "is_active": True}],
+        SALON, [SALON], OWNER_CTX,
+    )
+    assert "grid-cards" not in html
+    assert 'class="list-body"' in html
+    assert "item-head" in html
 
 
 def test_flash_shown_after_action():

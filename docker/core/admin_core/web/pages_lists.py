@@ -229,16 +229,17 @@ def page_services(
     back = f"/services?salon={sid}"
     cards = []
     for s in rows:
+        state = "в прайсе" if s["is_active"] else "в архиве"
         head = (
-            f'<div class="item"><b>{esc(s["title"])}</b>'
-            f'<span class="meta">{s["duration_min"]} мин · {money(s["price"])} · '
-            f'{"активна" if s["is_active"] else "в архиве"}</span>'
+            f'<div class="item-head"><b>{esc(s["title"])}</b>'
+            f'<span class="meta">{s["duration_min"]} мин · {money(s["price"])} · {state}</span>'
+            "</div>"
         )
         if not may_edit:
-            cards.append(head + "</div>")
+            cards.append(f'<div class="item">{head}</div>')
             continue
         active_checked = " checked" if s["is_active"] else ""
-        toggle = None
+        toggle = ""
         if may_add:
             toggle = action_form(
                 "service_archive", csrf, back,
@@ -251,40 +252,41 @@ def page_services(
             '<div class="cell"><span>Цена, ₽</span>'
             f'<input type="number" name="price" value="{int(s["price"] or 0)}" step="50" min="0">'
             "</div>"
-            '<div class="cell"><span>Минут</span>'
+            '<div class="cell"><span>Длительность, мин</span>'
             f'<input type="number" name="duration_min" value="{s["duration_min"]}" '
             'step="5" min="5" max="600"></div>'
-            '<div class="cell"><span>Активна</span>'
-            f'<label class="check"><input type="checkbox" name="is_active"{active_checked}>да</label>'
-            "</div>"
+            '<div class="cell check-cell"><span>&nbsp;</span>'
+            f'<label class="check"><input type="checkbox" name="is_active"{active_checked}>'
+            "в прайсе</label></div>"
+            '<div class="cell save-cell"><span>&nbsp;</span>'
+            '<button type="submit">Сохранить</button></div>'
         )
         form = (
             '<form method="post" action="/actions" class="stack">'
             '<input type="hidden" name="action" value="service_save">'
             f'<input type="hidden" name="back" value="{back}">'
             f"{csrf_field(csrf)}{fields}"
-            '<div class="cell"><span>&nbsp;</span><button type="submit">Сохранить</button></div>'
             "</form>"
         )
-        cards.append(head + form + (toggle or "") + "</div>")
+        cards.append(f'<div class="item">{head}{form}{toggle}</div>')
     body = "".join(cards) or (
         '<div class="empty">Прайс не загружен: docker compose run --rm cli python cli.py --seed</div>'
     )
     add_form = ""
     if may_add:
         add_form = (
-            '<form method="post" action="/actions" class="stack" style="margin-top:14px">'
+            '<form method="post" action="/actions" class="stack add-row">'
             '<input type="hidden" name="action" value="service_create">'
             f'<input type="hidden" name="back" value="{back}">'
             f"{csrf_field(csrf)}"
-            '<div class="cell"><span>Новая услуга</span>'
+            '<div class="cell wide"><span>Новая услуга</span>'
             '<input type="text" name="title" placeholder="название" required></div>'
             '<div class="cell"><span>Цена, ₽</span>'
             '<input type="number" name="price" min="0" step="50" required></div>'
-            '<div class="cell"><span>Минут</span>'
+            '<div class="cell"><span>Длительность, мин</span>'
             '<input type="number" name="duration_min" value="60" min="5" max="600" '
             'step="5" required></div>'
-            '<div class="cell"><span>&nbsp;</span>'
+            '<div class="cell save-cell"><span>&nbsp;</span>'
             '<button type="submit">Добавить</button></div>'
             "</form>"
         )
@@ -294,10 +296,13 @@ def page_services(
         f'<p class="sub">Услуг: {len(rows)}, сумма позиций: {money(revenue)}. '
         "Изменения сразу слышит бот в разговоре с клиентом</p>"
         + flash_html(flash, flash_error)
-        + card(
-            "Услуги",
-            (f'<div class="grid-cards">{body}</div>' if cards else body) + add_form,
-        )
+        + '<div class="panel">'
+        + '<div class="panel-head"><div class="panel-title">'
+        + '<h2 class="panel-h">Услуги</h2>'
+        + f'<span class="count">Позиций: {len(rows)} · сумма {money(revenue)}</span>'
+        + "</div></div>"
+        + f'<div class="list-body">{body}{add_form}</div>'
+        + "</div>"
     )
     return layout("Прайс", "/services", content, salon=salon, salons=salons, role=_role(ctx))
 
@@ -569,14 +574,22 @@ def page_settings(
         "</p></div>"
     )
     content = (
+        '<div class="page">'
+        '<div class="page-head">'
         "<h1>Настройки</h1>"
         '<p class="sub">Параметры точки и доступ в панель</p>'
+        "</div>"
+        '<div class="page-body">'
         + secrets_block
         + card("Точка и доступ", table(["Параметр", "Значение"], body))
         + people
         + note
+        + "</div></div>"
     )
-    return layout("Настройки", "/settings", content, salon=salon, salons=salons, role=_role(ctx))
+    return layout(
+        "Настройки", "/settings", content,
+        salon=salon, salons=salons, role=_role(ctx), inner_scroll=True,
+    )
 def _bar_chart(rows: list[dict[str, Any]], tz: ZoneInfo) -> str:
     """Столбики выручки по дням — без JS и внешних библиотек.
 
@@ -662,6 +675,8 @@ def page_reports(
          str(bot_prev.get("bookings_via_bot", 0))],
     ]
     content = (
+        '<div class="page">'
+        '<div class="page-head">'
         "<h1>Отчёты</h1>"
         + flash_html(flash, flash_error)
         + _period_tabs(data.get("periods") or [], data.get("period_key") or "30", salon)
@@ -673,6 +688,8 @@ def page_reports(
         + "</div>"
         + f'<p class="sub">{esc(label)} · сравнение с {esc(prev_label)}'
         + " · по факту записей и диалогов</p>"
+        "</div>"
+        '<div class="page-body">'
         + f'<div class="tiles">{tiles}</div>'
         + card("Выручка по дням", _bar_chart(data["by_day"], ZoneInfo("UTC")))
         + card(
@@ -688,11 +705,15 @@ def page_reports(
             f"Качество бота: {label} и {prev_label}",
             table(["Показатель", label, prev_label], bot_rows)
             if bot.get("dialogs") else
-            "<div class='empty'>За период диалогов не было — метрики появятся,"
             '<div class="empty">За период диалогов не было — метрики появятся,'
+            " когда бот отработает хотя бы один диалог</div>",
         )
+        + "</div></div>"
     )
-    return layout("Отчёты", "/reports", content, salon=salon, salons=salons, role=_role(ctx))
+    return layout(
+        "Отчёты", "/reports", content,
+        salon=salon, salons=salons, role=_role(ctx), inner_scroll=True,
+    )
 
 
 def page_billing(

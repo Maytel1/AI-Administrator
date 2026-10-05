@@ -111,8 +111,14 @@ def layout(
     salon: dict | None = None,
     salons: list[dict] | None = None,
     role: str = "",
+    inner_scroll: bool = False,
 ) -> str:
-    """Страница целиком: сайдбар с активным разделом и переключатель салона."""
+    """Страница целиком: сайдбар с активным разделом и переключатель салона.
+
+    `inner_scroll=True` запрещает прокрутку самой страницы: прокручивается
+    только содержимое внутри `.page-scroll`. Нужен там, где блоков много и
+    страницу иначе приходится катать колесом мимо шапки.
+    """
     sid = salon["id"] if salon else ""
     # «Сеть» видит только роль нашей команды: владельцу точки показывать
     # чужую выручку незачем, а ссылка в меню была бы враньём в интерфейсе.
@@ -146,7 +152,8 @@ def layout(
         '<div class="shell"><aside><div class="brand">Дежурный<span>24</span></div>'
         f"<nav>{nav}</nav>"
         '<div class="foot">MVP · read-only<br>фаза 4</div></aside>'
-        f'<main><div class="top">{content}{switch}</div></main>'
+        f'<main class="{"inner" if inner_scroll else ""}">'
+        f'<div class="top">{content}{switch}</div></main>'
         "</div></body></html>"
     )
 

@@ -262,3 +262,34 @@ td:last-child,th:last-child{width:1%;white-space:nowrap}
 .panel .scroll-x{border-radius:0 0 var(--r-lg) var(--r-lg)}
 /* Меню действий открывается вниз — не подрезаем его нижним скруглением. */
 .panel .scroll-x{padding-bottom:2px}
+.panel-h{font-size:14px;margin:0;font-weight:600}
+
+/* Внутренняя прокрутка: страница целиком не ездит, прокручивается тело.
+   Нужна там, где блоков много (отчёты, настройки): иначе заголовок и
+   переключатель периода уезжают за экран и страницу приходится катать
+   туда-обратно. Высота фиксируется только для main.inner — остальные
+   страницы продолжают прокручиваться как раньше. */
+main.inner{
+  height:100vh; overflow:hidden; padding:22px 26px;
+  display:flex; flex-direction:column;
+}
+main.inner .top{flex:1;min-height:0}
+.page{display:flex;flex-direction:column;height:100%;min-height:0;min-width:0}
+.page-head{flex:0 0 auto}
+.page-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding-right:8px}
+
+/* Прайс и мастера: список позиций, а не сетка карточек. В сетке поля
+   «цена/минуты» сжимались до нечитаемых 120px и текст рвался. */
+.list-body{padding:14px 18px 16px}
+.item{display:flex;flex-direction:column;gap:10px}
+.item-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.item-head b{font-size:14px}
+.item-head .meta{margin:0}
+.item form.stack{margin:0}
+.item .inline{margin:0}
+form.stack .cell.wide{grid-column:span 2}
+form.stack .cell.save-cell{min-width:96px}
+form.stack .check-cell{justify-content:flex-end}
+.add-row{
+  margin-top:12px; padding-top:14px; border-top:1px solid var(--border);
+}

@@ -257,12 +257,10 @@ def page_today(
             esc(b["master_name"]),
             money(b["price"]),
             _status_badge(b["status"]),
-            _status_buttons(str(b["id"]), b["status"], csrf, may_status, f"/today{sid}"),
-            _prepayment_buttons(
-                str(b["id"]), b.get("prepayment_status") or "not_required",
-                csrf, f"/today{sid}", may_edit=may_status,
-            )
-            + _reschedule_form(str(b["id"]), csrf if may_status else "", f"/today{sid}"),
+            _action_menu(
+                str(b["id"]), b["status"], csrf, may_status, f"/today{sid}",
+                prepay_status=b.get("prepayment_status") or "not_required",
+            ),
         ]
         for b in schedule
     ]
@@ -274,14 +272,18 @@ def page_today(
         + flash_html(flash, flash_error)
         + f'<div class="tiles">{tiles}</div>'
         + card("Загрузка", load)
-        + card(
-            "Расписание на сегодня",
-            table(
-                ["Время", "Клиент", "Телефон", "Услуга", "Мастер", "Цена", "Статус", "Действие"],
-                rows,
-                "На сегодня записей нет. Бот продолжает принимать заявки.",
-            ),
+        + '<div class="panel">'
+        + '<div class="panel-head"><div class="panel-title"><h2 class="panel-h">'
+        + "Расписание на сегодня</h2>"
+        + f'<span class="count">Записей: {len(schedule)}</span></div></div>'
+        + '<div class="scroll-x">'
+        + table(
+            ["Время", "Клиент", "Телефон", "Услуга", "Мастер", "Цена",
+             "Статус", "Действие"],
+            rows,
+            "На сегодня записей нет. Бот продолжает принимать заявки.",
         )
+        + "</div></div>"
     )
     return layout("Сегодня", "/today", content, salon=salon, salons=salons, role=_role(ctx))
 
