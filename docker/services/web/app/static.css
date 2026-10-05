@@ -293,3 +293,28 @@ form.stack .check-cell{justify-content:flex-end}
 .add-row{
   margin-top:12px; padding-top:14px; border-top:1px solid var(--border);
 }
+
+/* «Сегодня»: плитки в один горизонтальный ряд. Шесть плиток по 168px в сетке
+   auto-fit переносились на второй ряд и съедали высоту экрана, из-за чего
+   расписание уезжало вниз. Ниже — явно шесть колонок с переносом по одной. */
+.tiles-row{grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px}
+.tiles-row .tile{padding:11px 13px}
+.tiles-row .tile b{font-size:20px}
+.tiles-row .tile span{font-size:11.5px;line-height:1.35;display:block;margin-top:2px}
+/* Полоса загрузки мастеров: раньше это была отдельная карточка «Загрузка» с
+   заголовком и отступом — теперь одна строка под заголовком страницы. */
+.load-line{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  margin:0 0 8px;
+}
+.load-title{font-size:13px;color:var(--muted)}
+.load-count{font-size:13px;font-variant-numeric:tabular-nums}
+.load-line .bar{
+  flex:1 1 160px; min-width:140px; margin-top:0; height:5px;
+}
+@media (max-width:1100px){
+  .tiles-row{grid-template-columns:repeat(3,1fr)}
+}
+@media (max-width:680px){
+  .tiles-row{grid-template-columns:repeat(2,1fr)}
+}

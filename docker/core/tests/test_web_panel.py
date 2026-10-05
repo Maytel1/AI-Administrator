@@ -771,6 +771,24 @@ def test_services_are_list_not_card_grid():
     assert "item-head" in html
 
 
+def test_today_blocks_order():
+    """Порядок на «Сегодня»: заголовок, загрузка, сводка статусов, плитки, расписание.
+
+    Полоса загрузки уехала из-под таблицы под заголовок, а плитки стали
+    одним рядом — иначе расписание не помещалось на экран.
+    """
+    html = page_today(dict(STATS), [dict(BOOKING)], TZ, SALON, [SALON], OWNER_CTX)
+    assert 'class="load-line"' in html
+    assert 'class="tiles tiles-row"' in html
+    # Отдельной карточки «Загрузка» больше нет.
+    assert "<h2>Загрузка</h2>" not in html
+    i_load = html.index('class="load-line"')
+    i_sub = html.index('class="sub"')
+    i_tiles = html.index('tiles tiles-row')
+    i_table = html.index("<table>")
+    assert i_load < i_sub < i_tiles < i_table, "блоки идут не в том порядке"
+
+
 def test_flash_shown_after_action():
     html = page_services(
         [{"id": "s1", "title": "Маникюр", "duration_min": 120, "price": 2000, "is_active": True}],

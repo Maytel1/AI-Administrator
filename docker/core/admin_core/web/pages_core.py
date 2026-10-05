@@ -12,7 +12,6 @@ from zoneinfo import ZoneInfo
 from .render import (
     action_form,
     badge,
-    card,
     csrf_field,
     dt_local,
     esc,
@@ -242,10 +241,11 @@ def page_today(
         ]
     )
     load = (
-        f'<div class="row" style="justify-content:space-between">'
-        f'<span>Мастера в работе сегодня</span>'
-        f'<span>{stats["busy_masters"]} из {stats["masters_total"]}</span></div>'
+        f'<div class="load-line">'
+        f'<span class="load-title">Мастера в работе сегодня</span>'
+        f'<span class="load-count">{stats["busy_masters"]} из {stats["masters_total"]}</span>'
         f'<div class="bar"><div style="width:{load_pct}%"></div></div>'
+        f"</div>"
     )
     sid = f"?salon={esc(salon['id'])}" if salon else ""
     rows = [
@@ -265,13 +265,15 @@ def page_today(
         for b in schedule
     ]
     content = (
-        f"<h1>Сегодня</h1>"
-        f'<p class="sub">{esc(salon["name"] if salon else "")} — '
+        "<h1>Сегодня</h1>"
+        # Порядок блоков — по просьбе: заголовок, под ним загрузка, под ней
+        # сводка по статусам, затем плитки в один ряд и расписание.
+        + load
+        + f'<p class="sub">{esc(salon["name"] if salon else "")} — '
         f'подтверждено {stats["confirmed"]}, выполнено {stats["completed"]}, '
         f'отменено {stats["cancelled"]}</p>'
         + flash_html(flash, flash_error)
-        + f'<div class="tiles">{tiles}</div>'
-        + card("Загрузка", load)
+        + f'<div class="tiles tiles-row">{tiles}</div>'
         + '<div class="panel">'
         + '<div class="panel-head"><div class="panel-title"><h2 class="panel-h">'
         + "Расписание на сегодня</h2>"
