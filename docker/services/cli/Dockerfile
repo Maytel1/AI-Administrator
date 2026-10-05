@@ -9,6 +9,7 @@ COPY core/admin_core /app/admin_core
 COPY core/tests /app/tests
 COPY core/pytest.ini /app/pytest.ini
 COPY core/seed.py /app/seed.py
+COPY core/seed_demo.py /app/seed_demo.py
 COPY core/cli.py /app/cli.py
 COPY core/migrations /app/migrations
 # HTTP-слой панели нужен тестам маршрутов и CSRF. Копируем как app:
