@@ -306,6 +306,26 @@ form.stack .check-cell{justify-content:flex-end}
 .tiles-row{grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:0}
 .panel-tight{margin-top:10px}
 
+/* Единая шапка вкладки: заголовок с пояснением слева, переключатель салона
+   справа. Раньше переключатель рисовал layout рядом со всем содержимым, из-за
+   чего на разных вкладках он стоял в разных местах и отодвигал заголовки. */
+.page-head{
+  display:flex; align-items:flex-start; gap:16px; margin-bottom:16px;
+}
+.page-head-text{flex:1 1 auto;min-width:0}
+.page-head-text h1{margin-bottom:2px}
+.page-head-text .sub{margin-bottom:0}
+.page-head .salon-switch{flex:0 0 210px;margin-top:2px}
+/* Внутренний блок для страниц с прокруткой: шапка с фильтрами не уезжает,
+   тело ездит. Отдельный класс, потому что .page-head сам flex — вкладывать
+   в него ещё блоки нельзя, они стали бы его соседями по горизонтали. */
+.page-head-inner{flex:0 0 auto;min-width:0}
+.page-head-inner>.page-head{margin-bottom:10px}
+@media (max-width:760px){
+  .page-head{flex-direction:column;gap:10px}
+  .page-head .salon-switch{flex:1 1 auto;width:100%}
+}
+
 /* Шапка «Сегодня»: слева заголовок, полоса загрузки и переключатель салона,
    справа узкие плитки в один ряд. Плитки намеренно не растягиваются на всю
    ширину — иначе «4 000 ₽» растягивается на пол-экрана и цифры теряются. */
@@ -316,8 +336,8 @@ form.stack .check-cell{justify-content:flex-end}
   flex-direction:column; align-items:flex-start; gap:4px; margin:0 0 10px;
 }
 .dash-side .load-line .bar{width:100%;min-width:0}
-.salon-switch{width:100%}
-.salon-switch select{width:100%}
+.salon-switch{flex:0 0 auto}
+.dash-side .salon-switch{width:100%}
 .tiles-row{flex:1 1 auto;min-width:0}
 
 /* Плитка-столбик: число сверху крупно, подпись под ним мелким в несколько

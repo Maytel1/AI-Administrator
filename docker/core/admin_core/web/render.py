@@ -103,6 +103,29 @@ def action_form(
     )
 
 
+def page_head(
+    title: str,
+    sub: str = "",
+    salon: dict | None = None,
+    salons: list[dict] | None = None,
+) -> str:
+    """Единая шапка вкладки: заголовок с пояснением и переключатель салона.
+
+    Раньше каждая страница писала `<h1>` и `<p class=sub>` сама, а
+    переключатель салона рисовал layout справа от всего содержимого — из-за
+    чего шапки разъезжались, а на узких экранах переключатель уезжал вбок.
+    Теперь вид одинаковый везде, как на «Сегодня».
+    """
+    return (
+        '<div class="page-head">'
+        f'<div class="page-head-text"><h1>{esc(title)}</h1>'
+        + (f'<p class="sub">{sub}</p>' if sub else "")
+        + "</div>"
+        + salon_switch(salon, salons)
+        + "</div>"
+    )
+
+
 def salon_switch(salon: dict | None, salons: list[dict] | None) -> str:
     """Переключатель салона. Отдельная функция, а не кусок layout:
 
@@ -132,7 +155,7 @@ def layout(
     salons: list[dict] | None = None,
     role: str = "",
     inner_scroll: bool = False,
-    switch_inside: bool = False,
+    switch_inside: bool = True,
 ) -> str:
     """Страница целиком: сайдбар с активным разделом и переключатель салона.
 

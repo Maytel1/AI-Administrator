@@ -17,6 +17,7 @@ from .render import (
     esc,
     layout,
     money,
+    page_head,
     salon_switch,
     table,
     tile,
@@ -348,15 +349,15 @@ def page_bookings(
         for b in rows
     ]
     content = (
-        flash_html(flash, flash_error)
-        + '<div class="panel">'
-        # Шапка таблицы: слева — сколько нашлось, справа — фильтры и период.
-        # Раньше фильтры стояли отдельной полосой над карточкой и висели
-        # в стороне от заголовков колонок; теперь это единая «шапка», и она
-        # прилипает к верху при прокрутке длинного списка.
+        # Заголовок вкладки — общий для всех (page_head), а ниже панель с
+        # фильтрами и таблицей. Раньше «Записи» были единственной вкладкой
+        # с заголовком внутри панели — вид отличался от остальных.
+        page_head("Записи", "", salon, salons)
+        + flash_html(flash, flash_error)
+        + '<div class="panel panel-tight">'
         + '<div class="panel-head">'
-        + '<div class="panel-title"><h1>Записи</h1>'
-        + f'<span class="count">Найдено: {len(rows)}</span></div>'
+        + '<div class="panel-title"><span class="count">Найдено: '
+        + f"{len(rows)}</span></div>"
         + '<div class="panel-filters">'
         + "".join(links)
         + _period_picker(days, sid, status)

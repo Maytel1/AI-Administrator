@@ -28,6 +28,7 @@ from admin_core.web.render import (
     layout,
     login_page,
     money,
+    page_head,
     table,
     tile,
 )
@@ -79,11 +80,19 @@ def test_table_empty_shows_hint():
 
 
 def test_layout_marks_active_section():
-    html = layout("Сегодня", "/today", "<h1>Сегодня</h1>", salon=SALON, salons=[SALON])
+    """Активный раздел подсвечен, ссылки несут выбранный салон.
+
+    Переключатель салона теперь рисует не layout, а page_head: держать его
+    в layout было причиной того, что он всплывал рядом с любым блоком
+    страницы. Проверяем оба места.
+    """
+    html = layout("Сегодня", "/today", page_head("Сегодня", "", SALON, [SALON]))
     assert '<a href="/today?salon=' in html
     assert 'class="active"' in html
-    assert "Виктория" in html  # переключатель салона
     assert "<h1>Сегодня</h1>" in html
+    # Переключатель с именем салона — в шапке, а не болтается рядом.
+    assert "Виктория" in html
+    assert 'class="salon-switch"' in html
 
 
 def test_login_page_has_password_field():
@@ -839,6 +848,27 @@ def test_layout_wraps_content_in_own_block():
         SALON, [SALON], ctx=OWNER_CTX,
     )
     assert '<div class="content">' in reports
+
+
+def test_every_tab_uses_shared_header():
+    """Все вкладки рисуют шапку одним компонентом page_head.
+
+    Заголовок и переключатель салона раньше каждый раз писались вручную, а
+    layout рисовал переключатель рядом со всем содержимым — из-за чего вкладки
+    выглядели по-разному, а селект уезжал вбок. Теперь шапка одна.
+    """
+    clients = page_clients([], TZ, SALON, [SALON], OWNER_CTX)
+    services = page_services(
+        [{"id": "s1", "title": "Маникюр", "duration_min": 120,
+          "price": 2000, "is_active": True}],
+        SALON, [SALON], OWNER_CTX,
+    )
+    for html in (clients, services):
+        assert '<div class="page-head">' in html
+        assert 'class="salon-switch"' in html
+        # Переключатель внутри шапки, а не отдельным блоком рядом.
+        assert html.index("page-head") < html.index("salon-switch")
+        assert html.count('class="salon-switch"') == 1
 
 
 def test_flash_shown_after_action():

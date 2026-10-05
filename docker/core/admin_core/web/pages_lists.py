@@ -17,6 +17,7 @@ from .render import (
     esc,
     layout,
     money,
+    page_head,
     table,
     tile,
 )
@@ -126,8 +127,11 @@ def page_network(
         ]
     )
     content = (
-        "<h1>Сеть точек</h1>"
-        f'<p class="sub">Все точки, где мы работаем · период {days} дней</p>'
+        page_head(
+            "Сеть точек",
+            f"Все точки, где мы работаем · период {days} дней",
+            salon, salons,
+        )
         + flash_html(flash, flash_error)
         + f'<div class="tiles">{tiles}</div>'
         + card(
@@ -205,8 +209,11 @@ def page_clients(
             "</form>"
         )
     content = (
-        f"<h1>Клиенты</h1>"
-        f'<p class="sub">Карточек: {len(rows)}. Опознание «своих» — по номеру телефона</p>'
+        page_head(
+            "Клиенты",
+            f"Карточек: {len(rows)}. Опознание «своих» — по номеру телефона",
+            salon, salons,
+        )
         + flash_html(flash, flash_error)
         + card("Карточки клиентов", body + add_form)
         + "<!--WAITLIST-->"
@@ -292,9 +299,12 @@ def page_services(
         )
     revenue = sum(float(s["price"] or 0) for s in rows)
     content = (
-        "<h1>Прайс</h1>"
-        f'<p class="sub">Услуг: {len(rows)}, сумма позиций: {money(revenue)}. '
-        "Изменения сразу слышит бот в разговоре с клиентом</p>"
+        page_head(
+            "Прайс",
+            f"Услуг: {len(rows)}, сумма позиций: {money(revenue)}. "
+            "Изменения сразу слышит бот в разговоре с клиентом",
+            salon, salons,
+        )
         + flash_html(flash, flash_error)
         + '<div class="panel">'
         + '<div class="panel-head"><div class="panel-title">'
@@ -377,8 +387,11 @@ def page_masters(
             "</form>"
         )
     content = (
-        "<h1>Мастера</h1>"
-        '<p class="sub">График — источник слотов: сузили окно, время исчезло у клиентов</p>'
+        page_head(
+            "Мастера",
+            "График — источник слотов: сузили окно, время исчезло у клиентов",
+            salon, salons,
+        )
         + flash_html(flash, flash_error)
         + card("Команда и график", body + add_form)
     )
@@ -407,8 +420,11 @@ def page_dialogs(
         for d in rows
     ]
     content = (
-        "<h1>Диалоги</h1>"
-        '<p class="sub">Что бот отвечает клиентам — источник для контроля качества</p>'
+        page_head(
+            "Диалоги",
+            "Что бот отвечает клиентам — источник для контроля качества",
+            salon, salons,
+        )
         + card(
             "Лента диалогов",
             table(
@@ -454,8 +470,11 @@ def page_audit(
             ]
         )
     content = (
-        "<h1>Аудит</h1>"
-        '<p class="sub">Каждое значимое действие пишется сюда — бот, человек или система</p>'
+        page_head(
+            "Аудит",
+            "Каждое значимое действие пишется сюда — бот, человек или система",
+            salon, salons,
+        )
         + card(
             "Журнал действий",
             table(["Когда", "Кто", "Действие", "Детали"], body, "Журнал пуст."),
@@ -575,10 +594,9 @@ def page_settings(
     )
     content = (
         '<div class="page">'
-        '<div class="page-head">'
-        "<h1>Настройки</h1>"
-        '<p class="sub">Параметры точки и доступ в панель</p>'
-        "</div>"
+        '<div class="page-head-inner">'
+        + page_head("Настройки", "Параметры точки и доступ в панель", salon, salons)
+        + "</div>"
         '<div class="page-body">'
         + secrets_block
         + card("Точка и доступ", table(["Параметр", "Значение"], body))
@@ -676,8 +694,8 @@ def page_reports(
     ]
     content = (
         '<div class="page">'
-        '<div class="page-head">'
-        "<h1>Отчёты</h1>"
+        '<div class="page-head-inner">'
+        + page_head("Отчёты", "", salon, salons)
         + flash_html(flash, flash_error)
         + _period_tabs(data.get("periods") or [], data.get("period_key") or "30", salon)
         + '<div class="row-end">'
@@ -688,7 +706,7 @@ def page_reports(
         + "</div>"
         + f'<p class="sub">{esc(label)} · сравнение с {esc(prev_label)}'
         + " · по факту записей и диалогов</p>"
-        "</div>"
+        + "</div>"
         '<div class="page-body">'
         + f'<div class="tiles">{tiles}</div>'
         + card("Выручка по дням", _bar_chart(data["by_day"], ZoneInfo("UTC")))
@@ -785,7 +803,7 @@ def page_billing(
     ))
     return layout(
         "Тариф и оплата", "/billing",
-        "<h1>Тариф и оплата</h1>" + flash_html(flash, flash_error) + head
+        page_head("Тариф и оплата", "", salon, salons) + flash_html(flash, flash_error) + head
         + (
             '<div class="row-end">'
             + '<a class="tab" href="/accounting.csv?kind=payments">Счета (CSV)</a> '
