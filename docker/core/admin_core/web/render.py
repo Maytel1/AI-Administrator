@@ -103,6 +103,26 @@ def action_form(
     )
 
 
+def salon_switch(salon: dict | None, salons: list[dict] | None) -> str:
+    """Переключатель салона. Отдельная функция, а не кусок layout:
+
+    на «Сегодня» он должен стоять под заголовком и полосой загрузки, а не
+    справа от всего содержимого.
+    """
+    if not salons:
+        return ""
+    sid = salon["id"] if salon else ""
+    opts = "".join(
+        f'<option value="{esc(s["id"])}"{" selected" if sid == str(s["id"]) else ""}>'
+        f'{esc(s["name"])}</option>'
+        for s in salons
+    )
+    return (
+        '<form method="get" action="/salon" class="salon-switch">'
+        f'<select name="id" onchange="this.form.submit()">{opts}</select></form>'
+    )
+
+
 def layout(
     title: str,
     active: str,
@@ -112,6 +132,7 @@ def layout(
     salons: list[dict] | None = None,
     role: str = "",
     inner_scroll: bool = False,
+    switch_inside: bool = False,
 ) -> str:
     """Страница целиком: сайдбар с активным разделом и переключатель салона.
 
@@ -133,17 +154,7 @@ def layout(
         f"<i>{icon}</i>{esc(name)}</a>"
         for path, name, icon in nav_items
     )
-    switch = ""
-    if salons:
-        opts = "".join(
-            f'<option value="{esc(s["id"])}"{" selected" if sid == str(s["id"]) else ""}>'
-            f'{esc(s["name"])}</option>'
-            for s in salons
-        )
-        switch = (
-            '<form method="get" action="/salon" style="min-width:210px">'
-            f'<select name="id" onchange="this.form.submit()">{opts}</select></form>'
-        )
+    switch = salon_switch(salon, salons) if not switch_inside else ""
     return (
         '<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'

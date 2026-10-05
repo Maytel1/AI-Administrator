@@ -17,6 +17,7 @@ from .render import (
     esc,
     layout,
     money,
+    salon_switch,
     table,
     tile,
 )
@@ -265,14 +266,20 @@ def page_today(
         for b in schedule
     ]
     content = (
+        # Слева заголовок, полоса загрузки и переключатель салона, справа —
+        # узкие плитки в один ряд. Раньше плитки шли во всю ширину, а
+        # переключатель салона висел справа от всего содержимого.
+        '<div class="dash-top">'
+        '<div class="dash-side">'
         "<h1>Сегодня</h1>"
-        # Порядок блоков — по просьбе: заголовок, под ним загрузка, затем плитки
-        # в один ряд и сразу под ними расписание. Сводку «подтверждено N,
-        # выполнено N, отменено N» убрали: она дублировала плитки и съедала
-        # высоту, из-за которой таблица уезжала под экран.
+        # Сводку «подтверждено N, выполнено N, отменено N» убрали: она
+        # дублировала плитки и съедала высоту экрана.
         + load
-        + flash_html(flash, flash_error)
+        + salon_switch(salon, salons)
+        + "</div>"
         + f'<div class="tiles tiles-row">{tiles}</div>'
+        "</div>"
+        + flash_html(flash, flash_error)
         + '<div class="panel panel-tight">'
         + '<div class="panel-head"><div class="panel-title"><h2 class="panel-h">'
         + "Расписание на сегодня</h2>"
@@ -286,7 +293,10 @@ def page_today(
         )
         + "</div></div>"
     )
-    return layout("Сегодня", "/today", content, salon=salon, salons=salons, role=_role(ctx))
+    return layout(
+        "Сегодня", "/today", content, salon=salon, salons=salons,
+        role=_role(ctx), switch_inside=True,
+    )
 
 
 def page_bookings(

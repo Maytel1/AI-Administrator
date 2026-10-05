@@ -793,6 +793,26 @@ def test_today_blocks_order():
     assert i_load < i_tiles < i_panel < i_table, "блоки идут не в том порядке"
 
 
+def test_today_dashboard_two_columns():
+    """Шапка «Сегодня» двумя колонками: слева заголовок, загрузка и салон.
+
+    Переключатель салона раньше висел справа от всего содержимого (его
+    рисовал layout), из-за чего шапка разъезжалась. Теперь он внутри
+    левой колонки, а плитки стоят рядом с ним.
+    """
+    html = page_today(dict(STATS), [dict(BOOKING)], TZ, SALON, [SALON], OWNER_CTX)
+    assert 'class="dash-top"' in html and 'class="dash-side"' in html
+    assert 'class="salon-switch"' in html
+    # Переключатель стоит внутри левой колонки, до плиток. Считаем по
+    # индексам: вложенные div внутри колонки не дают разбирать её по </div>.
+    i_side = html.index('class="dash-side"')
+    i_switch = html.index("salon-switch")
+    i_tiles = html.index("tiles tiles-row")
+    assert i_side < i_switch < i_tiles
+    # И ровно один переключатель на страницу — дубль был бы некрасив.
+    assert html.count("salon-switch") == 1
+
+
 def test_flash_shown_after_action():
     html = page_services(
         [{"id": "s1", "title": "Маникюр", "duration_min": 120, "price": 2000, "is_active": True}],
