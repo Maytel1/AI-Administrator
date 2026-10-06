@@ -447,6 +447,15 @@ form.stack .check-cell{justify-content:flex-end}
   color:var(--muted);
 }
 .btn.ghost:hover{background:var(--hover);color:var(--text)}
+/* Карточка клиента в окне: строки статистики и поле заметок. */
+.modal-body .meta{
+  display:block;color:var(--muted);font-size:12.5px
+}
+.modal-body .field{
+  display:grid;gap:4px
+}
+.modal-body .field>span{font-size:11px;color:var(--subtle)}
+.modal-body .field input{width:100%}
 @media (max-width:680px){
   .m-grid{grid-template-columns:1fr}
   .modal-card{margin-top:3vh}

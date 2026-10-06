@@ -145,6 +145,50 @@ def page_network(
     return layout("Сеть", "/network", content, salon=salon, salons=salons, role=_role(ctx))
 
 
+def _client_window(
+    c: dict[str, Any],
+    cid: str,
+    csrf: str,
+    back: str,
+    tz: ZoneInfo,
+) -> str:
+    """Окно карточки клиента: визиты — строками, правка — формой под ними.
+
+    Тот же приём, что у мастеров: чекбокс-тумблер и sibling-селектор,
+    JS в панели нет. Кнопка — label на тумблере, штора и «✕» закрывают.
+    """
+    prepay = " checked" if c.get("requires_prepayment") else ""
+    stats = (
+        f'<span class="meta">Телефон: {esc(c.get("phone") or "")}</span>'
+        f'<span class="meta">Визитов: {int(c.get("completed_visits") or 0)} · '
+        f'в очереди: {int(c.get("upcoming") or 0)} · был(а): '
+        f'{esc(dt_local(c.get("last_visit"), tz, "%d.%m.%Y"))}</span>'
+        f'<span class="meta">Клиент с: {esc(dt_local(c.get("created_at"), tz, "%d.%m.%Y"))}</span>'
+    )
+    return (
+        '<div class="modal">'
+        f'<label class="modal-veil" for="ck-{cid}"></label>'
+        '<form method="post" action="/actions" class="modal-card">'
+        '<div class="modal-head">'
+        f'<b>Карточка — {esc(c.get("name") or "Без имени")}</b>'
+        f'<label class="modal-x" for="ck-{cid}">✕</label></div>'
+        f'<div class="modal-body stack">{stats}'
+        '<label class="check">'
+        f'<input type="checkbox" name="requires_prepayment"{prepay}>требует предоплаты</label>'
+        '<label class="field"><span>Заметки (аллергии, пожелания)</span>'
+        f'<input type="text" name="notes" value="{esc(c.get("notes") or "")}" '
+        'placeholder="например: аллергия на латекс"></label>'
+        "</div>"
+        '<div class="modal-foot">'
+        '<input type="hidden" name="action" value="client_save">'
+        f'<input type="hidden" name="client_id" value="{cid}">'
+        f'<input type="hidden" name="back" value="{back}">'
+        f"{csrf_field(csrf)}"
+        f'<label class="btn ghost" for="ck-{cid}">Отмена</label>'
+        '<button type="submit">Сохранить</button></div></form></div>'
+    )
+
+
 def page_clients(
     rows: list[dict[str, Any]],
     tz: ZoneInfo,
@@ -154,43 +198,42 @@ def page_clients(
     flash: str = "",
     flash_error: bool = False,
 ) -> str:
-    """Клиенты точки: предоплата и заметки правятся прямо здесь — бот читает их в диалоге."""
+    """Клиенты плитками: на карточке — кратко, правка — окном поверх.
+
+    Карточка говорит, кто это и сколько раз приходил; предоплата и заметки
+    открываются окном на чистом CSS — как у мастеров, JS в панели нет.
+    Бот читает эти же данные в диалоге.
+    """
     csrf, may_edit = _ctx_parts(ctx, "client_flags")
     _, may_add = _ctx_parts(ctx, "client_create")
     sid = esc(salon["id"]) if salon else ""
     back = f"/clients?salon={sid}"
     cards = []
     for c in rows:
-        head = (
-            f'<div class="item"><b>{esc(c["name"] or "Без имени")}</b> '
-            f'<span class="meta">{esc(c["phone"])} · визитов: {c["completed_visits"]} · '
-            f'в очереди: {c["upcoming"]} · был(а): '
-            f'{esc(dt_local(c["last_visit"], tz, "%d.%m.%Y"))}</span>'
+        cid = esc(c["id"])
+        name = esc(c["name"] or "Без имени")
+        phone = esc(c["phone"])
+        visits = int(c["completed_visits"] or 0)
+        queued = int(c["upcoming"] or 0)
+        prepay_badge = badge("предоплата", "yellow") if c["requires_prepayment"] else ""
+        # ── кратко на плитке: кто, когда был, ждёт ли записи ────────────
+        buttons, windows = "", ""
+        if may_edit:
+            buttons = f'<label class="btn" for="ck-{cid}">Карточка</label>'
+            windows = f'<input type="checkbox" id="ck-{cid}" class="modal-toggle">'
+            windows += _client_window(c, cid, csrf, back, tz)
+        actions = f'<div class="m-actions">{buttons}</div>' if buttons else ""
+        cards.append(
+            '<div class="m-card">'
+            f'<div class="m-top"><b>{name}</b>{prepay_badge}</div>'
+            f'<span class="meta">{phone} · визитов: {visits} · в очереди: {queued}</span>'
+            f'<span class="meta">Был(а): {esc(dt_local(c["last_visit"], tz, "%d.%m.%Y"))}</span>'
+            f"{actions}{windows}</div>"
         )
-        if not may_edit:
-            cards.append(head + "</div>")
-            continue
-        prepay_checked = ' checked' if c["requires_prepayment"] else ""
-        form = (
-            '<form method="post" action="/actions" class="stack">'
-            '<input type="hidden" name="action" value="client_save">'
-            f'<input type="hidden" name="back" value="{back}">'
-            f'<input type="hidden" name="client_id" value="{esc(c["id"])}">'
-            f"{csrf_field(csrf)}"
-            '<div class="cell"><span>Предоплата</span>'
-            f'<label class="check"><input type="checkbox" name="requires_prepayment"{prepay_checked}>'
-            "требует</label></div>"
-            '<div class="cell"><span>Заметки (аллергии, пожелания)</span>'
-            f'<input type="text" name="notes" value="{esc(c["notes"] or "")}" '
-            'placeholder="например: аллергия на латекс"></div>'
-            '<div class="cell"><span>&nbsp;</span>'
-            "<button type=\"submit\">Сохранить</button></div>"
-            "</form>"
-        )
-        cards.append(head + form + "</div>")
-    body = "".join(cards) or (
-        '<div class="empty">Клиентов пока нет — они появятся после первых заявок.</div>'
-    )
+    if cards:
+        body = '<div class="m-grid">' + "".join(cards) + "</div>"
+    else:
+        body = '<div class="empty">Клиентов пока нет — они появятся после первых заявок.</div>'
     add_form = ""
     if may_add:
         add_form = (
@@ -215,7 +258,8 @@ def page_clients(
             salon, salons,
         )
         + flash_html(flash, flash_error)
-        + card("Карточки клиентов", body + add_form)
+        + body
+        + add_form
         + "<!--WAITLIST-->"
     )
     return layout("Клиенты", "/clients", content, salon=salon, salons=salons, role=_role(ctx))

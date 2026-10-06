@@ -195,6 +195,45 @@ def test_masters_page_shows_tiles_and_windows():
     assert "Делает: Маникюр, Педикюр" in guest
 
 
+def test_clients_page_shows_cards_and_window():
+    """Клиенты плитками: на карточке — кратко, правка — в окне поверх.
+
+    Тот же приём чистого CSS, что у мастеров: тумблер-чекбокс и
+    sibling-селектор, кнопка — label на чекбоксе, штора закрывает окно.
+    """
+    rows = [{
+        "id": "c1", "name": "Иван", "phone": "+79001234567",
+        "completed_visits": 3, "upcoming": 1,
+        "last_visit": datetime(2026, 9, 1, tzinfo=ZoneInfo("UTC")),
+        "created_at": datetime(2026, 5, 1, tzinfo=ZoneInfo("UTC")),
+        "requires_prepayment": True, "notes": "аллергия на латекс",
+    }]
+    html = page_clients(rows, TZ, SALON, [SALON], OWNER_CTX)
+
+    # Кратко на самой карточке.
+    assert '<div class="m-grid">' in html
+    assert "+79001234567 · визитов: 3 · в очереди: 1" in html
+    assert "предоплата" in html  # бейдж предоплаты на карточке
+
+    # Кнопка и связанное с ним окно (чистый CSS, без JS).
+    assert 'for="ck-c1">Карточка' in html
+    assert 'id="ck-c1" class="modal-toggle"' in html
+    assert 'value="client_save"' in html
+    assert 'name="requires_prepayment"' in html and "checked" in html
+    assert 'value="аллергия на латекс"' in html  # заметки правятся в окне
+    # Окно открывается кнопкой и закрывается шторой/крестиком.
+    assert 'modal-veil" for="ck-c1"' in html
+    assert 'modal-x" for="ck-c1"' in html
+
+    # Без права правки — карточка краткая, окна и кнопки нет.
+    ro = page_clients(rows, TZ, SALON, [SALON], PageCtx(csrf="", role="guest"))
+    assert "client_save" not in ro and "modal-toggle" not in ro
+    assert "+79001234567 · визитов: 3" in ro  # просмотр не заблокирован
+
+    # Пустая вкладка — не ошибка: подсказка вместо пустой сетки.
+    assert "<!--WAITLIST-->" in page_clients([], TZ, SALON, [SALON], OWNER_CTX)
+
+
 def test_page_dialogs_renders_transcript():
     rows = [{"id": "d1", "channel": "telegram",
              "started_at": datetime(2026, 10, 3, 6, 0, tzinfo=ZoneInfo("UTC")),
