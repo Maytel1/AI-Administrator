@@ -324,55 +324,61 @@ def page_masters(
     ctx: Any | None = None,
     flash: str = "",
     flash_error: bool = False,
+    services: list[dict[str, Any]] | None = None,
 ) -> str:
-    """Мастера и их график: слоты нарезаются из него — правка окна меняет доступное время."""
+    """Мастера плитками: что делает, когда работает, и две кнопки — график и услуги.
+
+    Обе настройки открываются окном поверх страницы (чистый CSS, JS в панели
+    нет): плитка остаётся краткой, а не семью строками формы, как было.
+    """
     from .queries import WEEKDAY_RU
 
     csrf, may_edit = _ctx_parts(ctx, "schedule")
     _, may_add = _ctx_parts(ctx, "catalog")
     sid = esc(salon["id"]) if salon else ""
     back = f"/masters?salon={sid}"
+    services = services or []
     cards = []
     for m in rows:
+        mid = esc(m["id"])
         hours_raw = m["hours"]
         if isinstance(hours_raw, str):
             hours_raw = json.loads(hours_raw or "[]")
-        by_day = {int(h["weekday"]): h for h in hours_raw}
-        days = []
-        for wd in range(7) if may_edit else ():
-            h = by_day.get(wd)
-            enabled = h is not None
-            start = str((h or {}).get("start", "10:00:00"))[:5]
-            end = str((h or {}).get("end", "20:00:00"))[:5]
-            checked = " checked" if enabled else ""
-            fields = (
-                f'<input type="hidden" name="master_id" value="{esc(m["id"])}">'
-                f'<input type="hidden" name="weekday" value="{wd}">'
-                f'<div class="cell"><span>{WEEKDAY_RU[wd]}</span>'
-                f'<label class="check"><input type="checkbox" name="enabled"{checked}>работает</label>'
-                "</div>"
-                '<div class="cell"><span>с</span>'
-                f'<input type="time" name="start" value="{start}"></div>'
-                '<div class="cell"><span>по</span>'
-                f'<input type="time" name="end" value="{end}"></div>'
-                '<div class="cell"><span>&nbsp;</span><button type="submit">Ок</button></div>'
-            )
-            days.append(
-                '<form method="post" action="/actions" class="stack">'
-                '<input type="hidden" name="action" value="hours_save">'
-                f'<input type="hidden" name="back" value="{back}">'
-                f"{csrf_field(csrf)}{fields}</form>"
-            )
+        svc_raw = m.get("services") or []
+        if isinstance(svc_raw, str):
+            svc_raw = json.loads(svc_raw or "[]")
+        # ── кратко на плитке: чем занимается и когда работает ──────────
+        titles = [str(s["title"]) for s in svc_raw]
+        work = ", ".join(titles[:3])
+        if len(titles) > 3:
+            work += f" +{len(titles) - 3}"
         summary = ", ".join(
             f"{WEEKDAY_RU[int(h['weekday'])]} {str(h['start'])[:5]}–{str(h['end'])[:5]}"
             for h in sorted(hours_raw, key=lambda x: int(x["weekday"]))
         )
+        # ── кнопки и окна настроек (только у роли с правом) ────────────
+        buttons, windows = "", ""
+        if may_edit:
+            buttons += f'<label class="btn" for="mh-{mid}">График работы</label>'
+            windows += f'<input type="checkbox" id="mh-{mid}" class="modal-toggle">'
+            windows += _hours_window(m, hours_raw, mid, csrf, back)
+        if may_add:
+            buttons += f'<label class="btn" for="ms-{mid}">Услуги мастера</label>'
+            windows += f'<input type="checkbox" id="ms-{mid}" class="modal-toggle">'
+            windows += _services_window(m, svc_raw, services, mid, csrf, back)
+        actions = f'<div class="m-actions">{buttons}</div>' if buttons else ""
+        off = "" if m.get("is_active", True) else '<span class="badge b-gray">отключён</span>'
         cards.append(
-            f'<div class="item"><b>{esc(m["name"])}</b>'
-            f'<span class="meta">умений: {m["services_count"]} · {esc(summary or "график не задан")}</span>'
-            f'<div style="display:grid;gap:8px">{"".join(days)}</div></div>'
+            '<div class="m-card">'
+            f'<div class="m-top"><b>{esc(m["name"])}</b>{off}</div>'
+            f'<span class="meta">Делает: {esc(work or "услуги не назначены")}</span>'
+            f'<span class="meta">Когда: {esc(summary or "график не задан")}</span>'
+            f"{actions}{windows}</div>"
         )
-    body = "".join(cards) or '<div class="empty">Мастера не заведены.</div>'
+    if cards:
+        body = '<div class="m-grid">' + "".join(cards) + "</div>"
+    else:
+        body = '<div class="empty">Мастера не заведены.</div>'
     add_form = ""
     if may_add:
         add_form = (
@@ -393,9 +399,104 @@ def page_masters(
             salon, salons,
         )
         + flash_html(flash, flash_error)
-        + card("Команда и график", body + add_form)
+        + body
+        + add_form
     )
     return layout("Мастера", "/masters", content, salon=salon, salons=salons, role=_role(ctx))
+
+
+def _hours_window(
+    m: dict[str, Any],
+    hours_raw: list[dict[str, Any]],
+    mid: str,
+    csrf: str,
+    back: str,
+) -> str:
+    """Окно графика: вся неделя одной формой, одна кнопка «Сохранить».
+
+    Чекбокс дня выключен → день нерабочий (время в форме всё равно стоит
+    по умолчанию — пригодится, когда включат обратно).
+    """
+    from .queries import WEEKDAY_RU
+
+    by_day = {int(h["weekday"]): h for h in hours_raw}
+    rows = []
+    for wd in range(7):
+        h = by_day.get(wd)
+        checked = " checked" if h else ""
+        start = str((h or {}).get("start", "10:00:00"))[:5]
+        end = str((h or {}).get("end", "20:00:00"))[:5]
+        rows.append(
+            '<div class="wh-row">'
+            f'<label class="check"><input type="checkbox" name="d{wd}" value="1"{checked}>'
+            f"{WEEKDAY_RU[wd]}</label>"
+            f'<input type="time" name="s{wd}" value="{start}">'
+            f'<input type="time" name="e{wd}" value="{end}">'
+            "</div>"
+        )
+    return (
+        '<div class="modal">'
+        f'<label class="modal-veil" for="mh-{mid}"></label>'
+        '<form method="post" action="/actions" class="modal-card">'
+        '<div class="modal-head">'
+        f"<b>График — {esc(m['name'])}</b>"
+        f'<label class="modal-x" for="mh-{mid}">✕</label></div>'
+        '<div class="modal-body stack">'
+        '<div class="wh-head"><span>День</span><span>с</span><span>по</span></div>'
+        + "".join(rows)
+        + "</div>"
+        '<div class="modal-foot">'
+        '<input type="hidden" name="action" value="hours_save_week">'
+        f'<input type="hidden" name="master_id" value="{mid}">'
+        f'<input type="hidden" name="back" value="{back}">'
+        f"{csrf_field(csrf)}"
+        f'<label class="btn ghost" for="mh-{mid}">Отмена</label>'
+        '<button type="submit">Сохранить</button></div></form></div>'
+    )
+
+
+def _services_window(
+    m: dict[str, Any],
+    svc_raw: list[dict[str, Any]],
+    services: list[dict[str, Any]],
+    mid: str,
+    csrf: str,
+    back: str,
+) -> str:
+    """Окно услуг мастера: чекбоксы прайса, отмечено — то, что делает."""
+    mine = {str(s["id"]) for s in svc_raw}
+    items = []
+    for s in services:
+        checked = " checked" if str(s["id"]) in mine else ""
+        title = esc(s["title"])
+        if not s.get("is_active", True):
+            title += ' <span class="badge b-gray">в архиве</span>'
+        items.append(
+            '<label class="check big">'
+            f'<input type="checkbox" name="service_id" value="{esc(s["id"])}"{checked}>'
+            f"{title}</label>"
+        )
+    body = (
+        "".join(items)
+        if items
+        else '<div class="empty">В прайсе нет услуг — сначала добавьте их во вкладке «Прайс».</div>'
+    )
+    return (
+        '<div class="modal">'
+        f'<label class="modal-veil" for="ms-{mid}"></label>'
+        '<form method="post" action="/actions" class="modal-card">'
+        '<div class="modal-head">'
+        f"<b>Услуги — {esc(m['name'])}</b>"
+        f'<label class="modal-x" for="ms-{mid}">✕</label></div>'
+        f'<div class="modal-body stack">{body}</div>'
+        '<div class="modal-foot">'
+        '<input type="hidden" name="action" value="master_services_save">'
+        f'<input type="hidden" name="master_id" value="{mid}">'
+        f'<input type="hidden" name="back" value="{back}">'
+        f"{csrf_field(csrf)}"
+        f'<label class="btn ghost" for="ms-{mid}">Отмена</label>'
+        '<button type="submit">Сохранить</button></div></form></div>'
+    )
 def page_dialogs(
     rows: list[dict[str, Any]],
     messages: list[dict[str, Any]] | None,

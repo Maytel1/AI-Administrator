@@ -7,6 +7,7 @@ SlotTakenError). Каждый значимый шаг пишется в audit_lo
 
 import json
 import re
+import uuid
 from datetime import datetime, time, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -570,6 +571,59 @@ class InternalCRM(CRMProvider):
             {"master": row["name"], "is_active": active},
         )
         return {"ok": True, "name": row["name"], "is_active": active}
+
+    async def set_master_services(
+        self, salon_id: str, master_id: str, service_ids: list[str],
+        actor: str = "owner:panel",
+    ) -> dict:
+        """Какие услуги мастер исполняет: полная замена набора одним действием.
+
+        Принадлежность проверяем по salons-связи: чужие услуги подставить
+        нельзя (иначе мастер одной точки «умел бы» делать прайс другой).
+        Ссылки из bookings не рвём — состав услуг на прошлых записях лежит
+        в них самих, таблица master_services отражает только настоящее.
+        """
+        row = await self.pool.fetchval(
+            "SELECT name FROM masters WHERE id = $1 AND salon_id = $2",
+            master_id, salon_id,
+        )
+        if not row:
+            return {"ok": False, "error": "not_found"}
+        ids = [str(s).strip() for s in service_ids if str(s).strip()]
+        # Мусор вроде «System.Object[]» не должен ронять запрос: невалидный
+        # UUID отбрасываем до похода в БД (asyncpg на этом падает DataError).
+        valid = []
+        for s in ids:
+            try:
+                valid.append(str(uuid.UUID(s)))
+            except (ValueError, AttributeError, TypeError):
+                continue
+        ids = valid
+        if len(ids) != len(set(ids)):
+            ids = sorted(set(ids))  # дубль из формы — не ошибка, просто убираем
+        owned: list[str] = []
+        if ids:
+            rows = await self.pool.fetch(
+                "SELECT id::text AS id FROM services "
+                "WHERE salon_id = $1 AND id = ANY($2::uuid[])",
+                salon_id, ids,
+            )
+            owned = [r["id"] for r in rows]
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                "DELETE FROM master_services WHERE master_id = $1", master_id
+            )
+            for sid in owned:
+                await conn.execute(
+                    "INSERT INTO master_services (master_id, service_id) VALUES ($1, $2)",
+                    master_id, sid,
+                )
+        await self._audit(
+            salon_id, actor, "set_master_services",
+            {"master": row, "count": len(owned),
+             "rejected": len(ids) - len(owned)},
+        )
+        return {"ok": True, "master": row, "count": len(owned)}
 
     async def create_client_manual(
         self, salon_id: str, *, phone: str, name: str | None = None,

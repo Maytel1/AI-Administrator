@@ -124,7 +124,11 @@ async def services_list(pool: Any, salon_id: str) -> list[dict[str, Any]]:
 
 
 async def masters_list(pool: Any, salon_id: str) -> list[dict[str, Any]]:
-    """Мастера с их графиком — из него нарезаются слоты для записей."""
+    """Мастера с их графиком — из него нарезаются слоты для записей.
+
+    Заодно тянем список услуг мастера (json): по нему на плитке видно, что
+    человек делает, а в окне правки услуги отмечены галочками.
+    """
     rows = await pool.fetch(
         """
         SELECT m.id, m.name, m.is_active,
@@ -133,7 +137,13 @@ async def masters_list(pool: Any, salon_id: str) -> list[dict[str, Any]]:
                ) ORDER BY w.weekday) FILTER (WHERE w.weekday IS NOT NULL), '[]') AS hours,
                (SELECT count(*) FROM services s
                   JOIN master_services ms ON ms.service_id = s.id
-                 WHERE ms.master_id = m.id)                                       AS services_count
+                 WHERE ms.master_id = m.id)                                       AS services_count,
+               (SELECT json_agg(json_build_object(
+                       'id', s.id, 'title', s.title, 'active', s.is_active
+                    ) ORDER BY s.title)
+                  FROM services s
+                  JOIN master_services ms ON ms.service_id = s.id
+                 WHERE ms.master_id = m.id)                                       AS services
         FROM masters m LEFT JOIN working_hours w ON w.master_id = m.id
         WHERE m.salon_id = $1
         GROUP BY m.id ORDER BY m.name

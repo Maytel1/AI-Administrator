@@ -141,8 +141,10 @@ async def _masters(
     panel: Panel, salon: dict, salons: list[dict], request: Any, ctx: PageCtx | None = None
 ) -> str:
     rows = await queries.masters_list(panel.pool, str(salon["id"]))
+    # Прайс нужен окну «Услуги мастера»: чекбоксы — весь прайс салона.
+    price = await queries.services_list(panel.pool, str(salon["id"]))
     msg, err = _flash_from(request)
-    return page_masters(rows, salon, salons, ctx, msg, err)
+    return page_masters(rows, salon, salons, ctx, msg, err, price)
 
 
 async def _dialogs(

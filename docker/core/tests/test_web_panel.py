@@ -149,6 +149,52 @@ def test_page_services_and_masters():
     assert "Ср 10:00–20:00" in masters
 
 
+def test_masters_page_shows_tiles_and_windows():
+    """Плитка мастера кратко: кто, что делает, когда; настройки — в окнах.
+
+    Окна на чистом CSS (тумблер + sibling-селектор): JS в панели нет,
+    поэтому кнопка — label на чекбоксе, а фон закрывает то же окно.
+    """
+    rows = [{
+        "id": "m1", "name": "Мария", "is_active": True, "services_count": 2,
+        "hours": '[{"weekday": 2, "start": "10:00:00", "end": "20:00:00"}]',
+        "services": '[{"id": "s1", "title": "Маникюр", "active": true},'
+                    ' {"id": "s2", "title": "Педикюр", "active": true}]',
+    }]
+    price = [
+        {"id": "s1", "title": "Маникюр", "is_active": True},
+        {"id": "s3", "title": "Массаж", "is_active": False},
+    ]
+    html = page_masters(rows, SALON, [SALON], OWNER_CTX, services=price)
+
+    # Кратко на самой плитке.
+    assert '<div class="m-grid">' in html
+    assert "Делает: Маникюр, Педикюр" in html
+    assert "Когда: Ср 10:00–20:00" in html
+
+    # Кнопки и связанные с ними окна.
+    assert 'for="mh-m1">График работы' in html
+    assert 'for="ms-m1">Услуги мастера' in html
+    assert 'value="hours_save_week"' in html
+    assert 'value="master_services_save"' in html
+    # Неделя: 7 дней, отмечен только работающий вторник (weekday 2).
+    assert html.count("wh-row") == 7
+    assert 'name="d2" value="1" checked' in html
+    assert 'name="d0" value="1"' in html.replace('name="d0" value="1" checked', "")
+
+    # Услуги: чекбоксы прайса, отмечено своё, архивная — с пометкой.
+    assert 'name="service_id" value="s1" checked' in html
+    assert "Массаж" in html and "в архиве" in html
+    # Закрыть можно и крестиком, и кликом по фону (штора — label окна).
+    assert 'class="modal-veil" for="mh-m1"' in html
+
+    # Без прав кнопок и окон нет вовсе — нечего показывать «мёртвым».
+    guest = page_masters(rows, SALON, [SALON], None, services=price)
+    assert "m-actions" not in guest and "modal-veil" not in guest
+    # Но краткую информацию плитка всё равно несёт — это справочник.
+    assert "Делает: Маникюр, Педикюр" in guest
+
+
 def test_page_dialogs_renders_transcript():
     rows = [{"id": "d1", "channel": "telegram",
              "started_at": datetime(2026, 10, 3, 6, 0, tzinfo=ZoneInfo("UTC")),
@@ -484,8 +530,8 @@ def test_pages_carry_csrf_token_into_forms():
           "hours": '[{"weekday": 1, "start": "10:00:00", "end": "18:00:00"}]'}],
         SALON, [SALON], ctx,
     )
-    assert 'value="hours_save"' in masters
-    assert masters.count('name="weekday"') == 7  # все дни недели редактируются
+    assert 'value="hours_save_week"' in masters
+    assert masters.count("wh-row") == 7  # все дни недели в одном окне
     assert token in masters
 
 
@@ -657,9 +703,12 @@ def test_pages_render_edit_forms_only_with_permission():
          "hours": '[{"weekday": 1, "start": "10:00:00", "end": "18:00:00"}]'},
     ]
     owner_masters = page_masters(masters, SALON, [SALON], OWNER_CTX)
-    assert owner_masters.count('name="weekday"') == 7  # 7 дней редактируются
+    # Окно графика: 7 дней одной формой, открытым — только у роли с правом.
+    assert owner_masters.count('name="d') >= 7  # 7 дней редактируются
+    assert 'value="hours_save_week"' in owner_masters
     staff_masters = page_masters(masters, SALON, [SALON], STAFF_CTX)
-    assert 'name="weekday"' not in staff_masters  # расписание администратор не правит
+    assert "hours_save_week" not in staff_masters  # расписание администратор не правит
+    assert "График работы" not in staff_masters  # и кнопки-то нет — окно не откроешь
     assert "Вт 10:00–18:00" in staff_masters  # но график видит (weekday 1 = вторник)
 
 

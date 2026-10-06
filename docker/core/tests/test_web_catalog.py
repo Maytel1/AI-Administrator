@@ -145,6 +145,9 @@ def test_role_permissions_for_catalog():
     assert can_action("staff", "master_create") is False
     assert can_action("staff", "client_create") is True   # это его рутина
     assert can_action("staff", "hours_save") is False
+    assert can_action("staff", "hours_save_week") is False   # окно графика — не его роль
+    assert can_action("staff", "master_services_save") is False  # как и услуги мастера
+    assert can_action("owner", "master_services_save") is True
 
 
 async def test_reports_count_revenue_and_funnel(demo, pool):

@@ -195,6 +195,66 @@ async def apply_form(
             text += f". Внимание: {outside} записей выпадут из окна"
         return ok(text)
 
+    if action == "hours_save_week":
+        # Окно настройки графика шлёт неделю целиком: 7 дней одной формой,
+        # одна кнопка. Отказ — на всю неделю разом, иначе «частично
+        # сохранилось» выглядело бы как сохранение со смещением дней.
+        master_id = _uuid(form.get("master_id"))
+        if not master_id:
+            return fail("bad_id", "Некорректный идентификатор мастера")
+        days: list[tuple[int, bool, time | None, time | None]] = []
+        for wd in range(7):
+            enabled = str(form.get(f"d{wd}", "")) == "1"
+            start, end = _hhmm(form, f"s{wd}"), _hhmm(form, f"e{wd}")
+            if enabled and (start is None or end is None):
+                return fail("bad_time", f"{WEEKDAY_RU[wd]}: укажите время с и по")
+            if enabled and start and end and start >= end:
+                return fail("bad_time", f"{WEEKDAY_RU[wd]}: начало должно быть раньше конца")
+            days.append((wd, enabled, start, end))
+        master_name = ""
+        warnings: list[str] = []
+        for wd, enabled, start, end in days:
+            outside = 0
+            if enabled and start and end:
+                outside = await crm.count_bookings_outside_hours(
+                    salon_id, master_id, wd, start, end
+                )
+                if outside:
+                    warnings.append(f"{WEEKDAY_RU[wd]} — {outside}")
+            result = await crm.set_working_hours(
+                salon_id, master_id, wd, start=start, end=end,
+                enabled=enabled, actor=actor,
+            )
+            if not result["ok"]:
+                return fail(result.get("error", "save_failed"))
+            master_name = result["master"]
+        working = sum(1 for _, on, _, _ in days if on)
+        text = f"{master_name}: график сохранён, рабочих дней — {working} из 7"
+        if warnings:
+            text += ". Внимание, вне окна: " + ", ".join(warnings) + " записей"
+        return ok(text)
+
+    if action == "master_services_save":
+        master_id = _uuid(form.get("master_id"))
+        if not master_id:
+            return fail("bad_id", "Некорректный идентификатор мастера")
+        # Чекбоксы приходят повторяющимися полями: у FormData это getlist,
+        # в тестах — обычный dict со списком или строкой через запятую.
+        if hasattr(form, "getall"):
+            raw = form.getall("service_id", [])
+        elif hasattr(form, "getlist"):
+            raw = form.getlist("service_id")
+        else:
+            raw = form.get("service_id", [])
+        # Запятая — на случай ручной отправки «id1,id2» одной строкой.
+        ids = [v for item in raw for v in str(item).split(",") if v]
+        result = await crm.set_master_services(
+            salon_id, master_id, ids, actor=actor
+        )
+        if not result["ok"]:
+            return fail(result.get("error", "save_failed"))
+        return ok(f"{result['master']}: назначено услуг — {result['count']}")
+
     if action == "service_create":
         return await _service_create(pool, salon_id, form, actor=actor)
 

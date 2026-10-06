@@ -406,3 +406,89 @@ async def test_hours_save_disables_day(demo, pool) -> None:
         "SELECT count(*) FROM working_hours WHERE master_id = $1 AND weekday = 6",
         master_id,
     ) == 0
+
+
+async def test_hours_save_week_saves_all_days_at_once(demo, pool) -> None:
+    """Окно графика шлёт неделю целиком: рабочие включены, выходные — нет.
+
+    Валидация срабатывает до первой записи в БД: перевёрнутый интервал в
+    любом из дней отклоняет всю неделю, а не половину.
+    """
+    salon = str(demo["salon"]["id"])
+    master_id = str(demo["master"]["id"])
+
+    form = {"action": "hours_save_week", "master_id": master_id}
+    for wd in range(5):  # Пн–Пт 09:00–18:00, Сб–Вс выключены
+        form |= {f"d{wd}": "1", f"s{wd}": "09:00", f"e{wd}": "18:00"}
+    form |= {"s5": "10:00", "e5": "20:00", "s6": "10:00", "e6": "20:00"}
+
+    bad = await actions.apply_form(pool, salon, {**form, "e2": "08:00"}, actor="owner:panel")
+    assert bad["error"] == "bad_time" and "Ср" in bad["message"]
+    assert await pool.fetchval(
+        "SELECT start_time::text FROM working_hours WHERE master_id = $1 AND weekday = 2",
+        master_id,
+    ) == "10:00:00", "неделя не сохранилась частично"
+
+    good = await actions.apply_form(pool, salon, form, actor="owner:panel")
+    assert good["ok"] is True and "рабочих дней — 5 из 7" in good["message"]
+    rows = await pool.fetch(
+        "SELECT weekday, start_time::text AS start FROM working_hours "
+        "WHERE master_id = $1 ORDER BY weekday", master_id,
+    )
+    assert [r["weekday"] for r in rows] == [0, 1, 2, 3, 4]
+    assert rows[0]["start"] == "09:00:00"
+
+
+async def test_master_services_save_replaces_and_rejects_foreign(demo, pool) -> None:
+    """Услуги мастера — полная замена набора; чужую услугу подставить нельзя."""
+    salon = str(demo["salon"]["id"])
+    master_id = str(demo["master"]["id"])
+    own = str(demo["service"]["id"])
+
+    # Чужой салон со своей услугой: id валиден, но принадлежит не этому салону.
+    other = await pool.fetchrow(
+        "INSERT INTO salons (name, timezone) VALUES ('other-x', 'Asia/Yekaterinburg') RETURNING id"
+    )
+    foreign = await pool.fetchval(
+        "INSERT INTO services (salon_id, title, duration_min, price) "
+        "VALUES ($1, 'Чужая', 30, 500) RETURNING id", other["id"],
+    )
+
+    added = await actions.apply_form(
+        pool, salon,
+        {"action": "master_services_save", "master_id": master_id,
+         "service_id": [own, str(foreign)]},
+        actor="owner:panel",
+    )
+    assert added["ok"] is True and "услуг — 1" in added["message"], added
+    mine = await pool.fetch(
+        "SELECT service_id::text AS id FROM master_services WHERE master_id = $1", master_id,
+    )
+    assert [r["id"] for r in mine] == [own], "чужая услуга не должна была встать"
+
+    cleared = await actions.apply_form(
+        pool, salon,
+        {"action": "master_services_save", "master_id": master_id, "service_id": []},
+        actor="owner:panel",
+    )
+    assert cleared["ok"] is True and "услуг — 0" in cleared["message"]
+    assert not await pool.fetchval(
+        "SELECT count(*) FROM master_services WHERE master_id = $1", master_id
+    )
+
+    unknown = await actions.apply_form(
+        pool, salon,
+        {"action": "master_services_save", "master_id": str(other["id"]),
+         "service_id": [own]},
+        actor="owner:panel",
+    )
+    assert unknown["error"] == "not_found"
+
+    # Мусор вместо id — не 500, а просто ничего не назначено.
+    junk = await actions.apply_form(
+        pool, salon,
+        {"action": "master_services_save", "master_id": master_id,
+         "service_id": ["System.Object[]", "'; DROP TABLE masters;--"]},
+        actor="owner:panel",
+    )
+    assert junk["ok"] is True and "услуг — 0" in junk["message"]

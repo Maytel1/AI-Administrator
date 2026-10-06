@@ -132,6 +132,8 @@ def test_action_permission_mapping():
     assert can_action("staff", "service_save") is False
     assert can_action("staff", "booking_status") is True
     assert can_action("staff", "hours_save") is False
+    assert can_action("staff", "hours_save_week") is False
+    assert can_action("staff", "master_services_save") is False
     assert can_action("staff", "client_save") is True
     assert can_action("staff", "unknown_action") is False
 

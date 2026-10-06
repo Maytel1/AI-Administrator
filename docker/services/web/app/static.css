@@ -382,3 +382,72 @@ form.stack .check-cell{justify-content:flex-end}
 @media (max-width:680px){
   .tiles-row{grid-template-columns:repeat(2,1fr)}
 }
+
+/* ── Мастера: плитки и окна настроек (чистый CSS, без JS) ─────────────
+   Плитка кратко говорит, кто этот человек и чем занимается; кнопка
+   раскрывает окно поверх страницы: чекбокс-тумблер + sibling-селектор. */
+.m-grid{
+  display:grid; gap:14px;
+  grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+}
+.m-card{
+  position:relative;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--r-lg); padding:16px 18px;
+}
+.m-top{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap}
+.m-top b{font-size:15px}
+.m-card .meta{display:block;color:var(--muted);font-size:12.5px;margin-top:3px}
+.m-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.m-actions .btn{cursor:pointer}
+/* Тумблер невидим, но остаётся в потоке рядом со своим окном. */
+.modal-toggle{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.modal{display:none}
+.modal-toggle:checked + .modal{
+  display:block;position:fixed;inset:0;z-index:60;
+}
+/* Штора: клик по фону закрывает окно (label для тумблера). */
+.modal-veil{
+  position:absolute;inset:0;background:rgba(0,0,0,.55);
+  display:block;cursor:pointer;
+}
+.modal-card{
+  position:relative;z-index:1;
+  width:min(460px,calc(100vw - 32px));
+  max-height:calc(100vh - 60px);overflow:auto;
+  margin:5vh auto 0;
+  background:var(--surface);border:1px solid var(--border-strong);
+  border-radius:var(--r-lg);box-shadow:var(--shadow);
+}
+.modal-head{
+  display:flex;justify-content:space-between;align-items:center;gap:10px;
+  padding:14px 16px;border-bottom:1px solid var(--border);
+}
+.modal-head b{font-size:14px}
+.modal-x{cursor:pointer;color:var(--muted);font-size:16px;padding:2px 6px}
+.modal-x:hover{color:var(--text)}
+.modal-body{padding:14px 16px}
+.modal-body.stack{display:grid;gap:8px}
+.modal-foot{
+  display:flex;justify-content:flex-end;gap:8px;align-items:center;
+  padding:12px 16px;border-top:1px solid var(--border);
+}
+/* Неделя в окне графика: день + два времени в одну строку. */
+.wh-head,.wh-row{
+  display:grid;grid-template-columns:1fr 92px 92px;gap:8px;align-items:center;
+}
+.wh-head span{color:var(--subtle);font-size:11px;text-transform:uppercase}
+.wh-row .check{color:var(--text);font-size:13px}
+.wh-row input[type=time]{
+  width:100%;padding:6px 8px;font-size:13px;
+}
+.check.big{color:var(--text);font-size:13.5px;padding:5px 0}
+.btn.ghost{
+  background:transparent;border:1px solid var(--border-strong);
+  color:var(--muted);
+}
+.btn.ghost:hover{background:var(--hover);color:var(--text)}
+@media (max-width:680px){
+  .m-grid{grid-template-columns:1fr}
+  .modal-card{margin-top:3vh}
+}

@@ -63,6 +63,8 @@ ACTION_PERMISSION = {
     "waitlist_drop": P_CLIENT_CREATE,
     "client_save": P_CLIENT_FLAGS,
     "hours_save": P_SCHEDULE,
+    "hours_save_week": P_SCHEDULE,
+    "master_services_save": P_CATALOG,
     "user_create": P_USERS,
     "user_totp": P_USERS,
     "user_disable": P_USERS,
