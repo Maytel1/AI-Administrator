@@ -160,8 +160,13 @@ async def test_reports_count_revenue_and_funnel(demo, pool):
     now = datetime.now(TZ)
     start = (now - timedelta(days=30)).astimezone(ZoneInfo("UTC"))
     end = (now + timedelta(days=1)).astimezone(ZoneInfo("UTC"))
+    # Первый свободный слот — не фиксированные «11:00»: после ~11:10
+    # сегодняшний слот уходит в прошлое и create_booking отказывает.
+    slots = await crm.get_free_slots(salon_id, "Тест стрижка")
+    assert slots, "должен быть хоть один свободный слот"
     await crm.create_booking(
-        salon_id, str(demo["client"]["id"]), "Тест стрижка", time_text="11:00", created_by="t"
+        salon_id, str(demo["client"]["id"]), "Тест стрижка",
+        time_text=slots[0]["start_text"][-5:], offered=[slots[0]], created_by="t",
     )
     by_day = await reports.revenue_by_day(pool, salon_id, start, end)
     assert by_day and float(by_day[0]["revenue"]) >= 1000
@@ -213,8 +218,13 @@ async def test_master_with_future_bookings_cannot_be_archived(demo, pool):
 
     crm = InternalCRM(pool)
     salon_id = str(demo["salon"]["id"])
+    # Берём первый свободный слот: фиксированные «11:00» после ~11:10
+    # уходят в прошлое, и бронь не создаётся.
+    slots = await crm.get_free_slots(salon_id, "Тест стрижка")
+    assert slots, "должен быть хоть один свободный слот"
     await crm.create_booking(
-        salon_id, str(demo["client"]["id"]), "Тест стрижка", time_text="11:00", created_by="t"
+        salon_id, str(demo["client"]["id"]), "Тест стрижка",
+        time_text=slots[0]["start_text"][-5:], offered=[slots[0]], created_by="t",
     )
     master_id = str(demo["master"]["id"])
     result = await _apply(

@@ -496,8 +496,13 @@ async def test_booking_status_change_and_slot_release(demo, pool):
     """Отмена освобождает слот: exclusion-констрейнт больше не мешает."""
     crm = InternalCRM(pool)
     salon_id, client_id = str(demo["salon"]["id"]), str(demo["client"]["id"])
+    # Первый свободный слот вместо фиксированных «11:00»: после ~11:10
+    # сегодняшний слот в прошлом, и create_booking вернёт slot_taken.
+    slots = await crm.get_free_slots(salon_id, "Тест стрижка")
+    assert slots, "должен быть хоть один свободный слот"
     created = await crm.create_booking(
-        salon_id, client_id, "Тест стрижка", time_text="11:00", created_by="test"
+        salon_id, client_id, "Тест стрижка",
+        time_text=slots[0]["start_text"][-5:], offered=[slots[0]], created_by="test",
     )
     assert created["ok"] is True
     result = await apply_form(pool, salon_id, {
@@ -852,20 +857,40 @@ def test_reports_and_settings_scroll_inside():
     assert 'class="page-body"' in settings
 
 
-def test_services_are_list_not_card_grid():
-    """Прайс — ровный список позиций, а не сетка карточек.
+def test_services_are_cards_with_edit_window():
+    """Прайс — плитки, правка цены — окном поверх (как у мастеров).
 
-    В сетке поля «цена/длительность» сжимались до нечитаемых 120px,
-    и текст рядом с услугой рвался.
+    Раньше поля «цена/длительность» лежали прямо в строке списка и в
+    сетке сжимались до нечитаемых 120px. Теперь на плитке только текст,
+    а поля уехали в окно на чистом CSS.
     """
     html = page_services(
         [{"id": "s1", "title": "Маникюр", "duration_min": 120,
           "price": 2000, "is_active": True}],
         SALON, [SALON], OWNER_CTX,
     )
-    assert "grid-cards" not in html
-    assert 'class="list-body"' in html
-    assert "item-head" in html
+    assert '<div class="m-grid">' in html
+    assert 'class="m-card"' in html
+    # Кнопка — label на тумблере, окно содержит форму service_save.
+    assert '<label class="btn" for="sv-s1">Правка</label>' in html
+    assert 'id="sv-s1" class="modal-toggle"' in html
+    assert 'value="service_save"' in html
+    assert 'name="price"' in html and 'name="duration_min"' in html
+    # Без права редактирования — только плитка, без кнопки и окна.
+    ro = page_services(
+        [{"id": "s1", "title": "Маникюр", "duration_min": 120,
+          "price": 2000, "is_active": True}],
+        SALON, [SALON], STAFF_CTX,
+    )
+    assert 'value="service_save"' not in ro
+    assert "modal-toggle" not in ro
+    # В архиве — серый бейдж на плитке.
+    arc = page_services(
+        [{"id": "s1", "title": "Маникюр", "duration_min": 120,
+          "price": 2000, "is_active": False}],
+        SALON, [SALON], STAFF_CTX,
+    )
+    assert "в архиве" in arc
 
 
 def test_today_blocks_order():

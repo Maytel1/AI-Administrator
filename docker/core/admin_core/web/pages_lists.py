@@ -273,56 +273,46 @@ def page_services(
     flash: str = "",
     flash_error: bool = False,
 ) -> str:
-    """Прайс с правкой цены/длительности/активности — бот читает эти данные в диалоге."""
+    """Прайс плитками: кратко на карточке, правка — окном поверх.
+
+    Карточка говорит, что за услуга и сколько стоит; цена, длительность
+    и «в прайсе» меняются окном на чистом CSS — как у мастеров и клиентов,
+    JS в панели нет. Бот читает эти же данные в диалоге.
+    """
     csrf, may_edit = _ctx_parts(ctx, "pricing")
     _, may_add = _ctx_parts(ctx, "catalog")
     sid = esc(salon["id"]) if salon else ""
     back = f"/services?salon={sid}"
     cards = []
     for s in rows:
-        state = "в прайсе" if s["is_active"] else "в архиве"
-        head = (
-            f'<div class="item-head"><b>{esc(s["title"])}</b>'
-            f'<span class="meta">{s["duration_min"]} мин · {money(s["price"])} · {state}</span>'
-            "</div>"
-        )
-        if not may_edit:
-            cards.append(f'<div class="item">{head}</div>')
-            continue
-        active_checked = " checked" if s["is_active"] else ""
-        toggle = ""
+        sv = esc(s["id"])
+        # ── кратко на плитке: название, цена, длительность ───────────────
+        off = "" if s["is_active"] else badge("в архиве", "gray")
+        buttons, windows = "", ""
+        if may_edit:
+            buttons = f'<label class="btn" for="sv-{sv}">Правка</label>'
+            windows = f'<input type="checkbox" id="sv-{sv}" class="modal-toggle">'
+            windows += _service_window(s, sv, csrf, back)
         if may_add:
-            toggle = action_form(
+            buttons += action_form(
                 "service_archive", csrf, back,
-                f'<input type="hidden" name="service_id" value="{esc(s["id"])}">'
+                f'<input type="hidden" name="service_id" value="{sv}">'
                 f'<input type="hidden" name="active" value="{"0" if s["is_active"] else "1"}">',
                 "Вернуть в прайс" if not s["is_active"] else "В архив",
             )
-        fields = (
-            f'<input type="hidden" name="service_id" value="{esc(s["id"])}">'
-            '<div class="cell"><span>Цена, ₽</span>'
-            f'<input type="number" name="price" value="{int(s["price"] or 0)}" step="50" min="0">'
-            "</div>"
-            '<div class="cell"><span>Длительность, мин</span>'
-            f'<input type="number" name="duration_min" value="{s["duration_min"]}" '
-            'step="5" min="5" max="600"></div>'
-            '<div class="cell check-cell"><span>&nbsp;</span>'
-            f'<label class="check"><input type="checkbox" name="is_active"{active_checked}>'
-            "в прайсе</label></div>"
-            '<div class="cell save-cell"><span>&nbsp;</span>'
-            '<button type="submit">Сохранить</button></div>'
+        actions = f'<div class="m-actions">{buttons}</div>' if buttons else ""
+        cards.append(
+            '<div class="m-card">'
+            f'<div class="m-top"><b>{esc(s["title"])}</b>{off}</div>'
+            f'<span class="meta">{s["duration_min"]} мин · {money(s["price"])}'
+            + (" · в прайсе" if s["is_active"] else "")
+            + "</span>"
+            f"{actions}{windows}</div>"
         )
-        form = (
-            '<form method="post" action="/actions" class="stack">'
-            '<input type="hidden" name="action" value="service_save">'
-            f'<input type="hidden" name="back" value="{back}">'
-            f"{csrf_field(csrf)}{fields}"
-            "</form>"
-        )
-        cards.append(f'<div class="item">{head}{form}{toggle}</div>')
-    body = "".join(cards) or (
-        '<div class="empty">Прайс не загружен: docker compose run --rm cli python cli.py --seed</div>'
-    )
+    if cards:
+        body = '<div class="m-grid">' + "".join(cards) + "</div>"
+    else:
+        body = '<div class="empty">Прайс не загружен: docker compose run --rm cli python cli.py --seed</div>'
     add_form = ""
     if may_add:
         add_form = (
@@ -350,15 +340,50 @@ def page_services(
             salon, salons,
         )
         + flash_html(flash, flash_error)
-        + '<div class="panel">'
-        + '<div class="panel-head"><div class="panel-title">'
-        + '<h2 class="panel-h">Услуги</h2>'
-        + f'<span class="count">Позиций: {len(rows)} · сумма {money(revenue)}</span>'
-        + "</div></div>"
-        + f'<div class="list-body">{body}{add_form}</div>'
-        + "</div>"
+        + body
+        + add_form
     )
     return layout("Прайс", "/services", content, salon=salon, salons=salons, role=_role(ctx))
+
+
+def _service_window(
+    s: dict[str, Any],
+    sv: str,
+    csrf: str,
+    back: str,
+) -> str:
+    """Окно правки услуги: цена, длительность и «в прайсе» — одной формой.
+
+    Тот же приём, что у мастеров и клиентов: чекбокс-тумблер и
+    sibling-селектор, JS в панели нет. «В архив» — отдельная кнопка
+    на плитке (право catalog, не pricing).
+    """
+    checked = " checked" if s["is_active"] else ""
+    return (
+        '<div class="modal">'
+        f'<label class="modal-veil" for="sv-{sv}"></label>'
+        '<form method="post" action="/actions" class="modal-card">'
+        '<div class="modal-head">'
+        f'<b>Услуга — {esc(s["title"])}</b>'
+        f'<label class="modal-x" for="sv-{sv}">✕</label></div>'
+        '<div class="modal-body stack">'
+        '<label class="field"><span>Цена, ₽</span>'
+        f'<input type="number" name="price" value="{int(s["price"] or 0)}" '
+        'step="50" min="0"></label>'
+        '<label class="field"><span>Длительность, мин</span>'
+        f'<input type="number" name="duration_min" value="{s["duration_min"]}" '
+        'step="5" min="5" max="600"></label>'
+        '<label class="check">'
+        f'<input type="checkbox" name="is_active"{checked}>в прайсе</label>'
+        "</div>"
+        '<div class="modal-foot">'
+        '<input type="hidden" name="action" value="service_save">'
+        f'<input type="hidden" name="service_id" value="{sv}">'
+        f'<input type="hidden" name="back" value="{back}">'
+        f"{csrf_field(csrf)}"
+        f'<label class="btn ghost" for="sv-{sv}">Отмена</label>'
+        '<button type="submit">Сохранить</button></div></form></div>'
+    )
 
 
 def page_masters(
@@ -709,19 +734,29 @@ def page_settings(
         add_form = ""
         if may_edit:
             add_form = (
-                '<form method="post" action="/actions" class="stack" '
-                'style="margin-top:12px">'
+                f'<label class="btn" for="us-new" style="margin-top:12px">'
+                "Добавить сотрудника</label>"
+                '<input type="checkbox" id="us-new" class="modal-toggle">'
+                '<div class="modal">'
+                '<label class="modal-veil" for="us-new"></label>'
+                '<form method="post" action="/actions" class="modal-card">'
+                '<div class="modal-head"><b>Новый сотрудник</b>'
+                '<label class="modal-x" for="us-new">✕</label></div>'
+                '<div class="modal-body stack">'
                 '<input type="hidden" name="action" value="user_create">'
                 f'<input type="hidden" name="back" value="{back}">'
                 f"{csrf_field(csrf)}"
-                '<div class="cell"><span>Логин (e-mail)</span>'
-                '<input type="email" name="login" placeholder="recept@salon.ru" required></div>'
-                '<div class="cell"><span>Имя</span>'
-                '<input type="text" name="name" placeholder="Как обращаться"></div>'
-                f'<div class="cell"><span>Роль</span><select name="role">{options}</select></div>'
-                '<div class="cell"><span>&nbsp;</span>'
-                "<button type=\"submit\">Создать</button></div>"
-                "</form>"
+                '<label class="field"><span>Логин (e-mail)</span>'
+                '<input type="email" name="login" placeholder="recept@salon.ru" '
+                "required></label>"
+                '<label class="field"><span>Имя</span>'
+                '<input type="text" name="name" placeholder="Как обращаться"></label>'
+                f'<label class="field"><span>Роль</span><select name="role">{options}'
+                "</select></label>"
+                "</div>"
+                '<div class="modal-foot">'
+                '<label class="btn ghost" for="us-new">Отмена</label>'
+                "<button type=\"submit\">Создать</button></div></form></div>"
             )
         people = card(
             "Команда точки",

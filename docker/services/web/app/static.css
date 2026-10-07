@@ -455,7 +455,7 @@ form.stack .check-cell{justify-content:flex-end}
   display:grid;gap:4px
 }
 .modal-body .field>span{font-size:11px;color:var(--subtle)}
-.modal-body .field input{width:100%}
+.modal-body .field input,.modal-body .field select{width:100%}
 @media (max-width:680px){
   .m-grid{grid-template-columns:1fr}
   .modal-card{margin-top:3vh}
