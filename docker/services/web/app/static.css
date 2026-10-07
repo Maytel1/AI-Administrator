@@ -398,8 +398,11 @@ form.stack .check-cell{justify-content:flex-end}
 .m-top{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap}
 .m-top b{font-size:15px}
 .m-card .meta{display:block;color:var(--muted);font-size:12.5px;margin-top:3px}
-.m-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
-.m-actions .btn{cursor:pointer}
+/* label «Правка» наследует margin:12px от глобального label{...} — без
+   сброса кнопки вразнобой; align-items центрирует кнопку формы и label. */
+.m-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center}
+.m-actions .btn{cursor:pointer;margin:0}
+.m-actions form.inline{align-self:center}
 /* Тумблер невидим, но остаётся в потоке рядом со своим окном. */
 .modal-toggle{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 .modal{display:none}
