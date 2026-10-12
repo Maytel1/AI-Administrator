@@ -60,7 +60,11 @@ async def login(session: aiohttp.ClientSession, base: str, user: str, password: 
     """
     async with session.post(
         f"{base}/login",
-        data={"login": user, "password": password},
+        # Оферта и согласие на ПДн обязательны — без них login_post отдаёт 400.
+        data={
+            "login": user, "password": password,
+            "agree_oferta": "1", "agree_pdn": "1",
+        },
         allow_redirects=False,
         ssl=False,
     ) as response:
