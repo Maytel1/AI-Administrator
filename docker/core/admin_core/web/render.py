@@ -21,7 +21,8 @@ NAV = [
     ("/dialogs", "Диалоги", "✉"),
     ("/reports", "Отчёты", "◷"),
     ("/network", "Сеть", "◈"),
-    ("/billing", "Тариф и оплата", "€"),
+    ("/pay", "Оплата", "Ⓢ"),
+    ("/billing", "Счета (команда)", "€"),
     ("/audit", "Аудит", "⚑"),
     ("/settings", "Настройки", "⚙"),
 ]
@@ -61,6 +62,29 @@ def tile(value: str, label: str, tone: str = "", extra: str = "") -> str:
     return (
         f'<div class="tile"><b{style}>{esc(value)}</b><span>{esc(label)}</span>'
         f"{foot}</div>"
+    )
+
+
+def usage_bar(used: int, limit: int | None, percent: int | None) -> str:
+    """Индикатор использования лимита ресурса: полоска + «занято из максимума».
+
+    Цвет полоски: зелёный в норме, жёлтый с 80% (WARN_PERCENT — предупреждение),
+    красный при исчерпании. Без лимита (None) — просто «занято, без ограничений».
+    """
+    if limit is None or percent is None:
+        return f'<span class="sub">{int(used)} без ограничений</span>'
+    tone = "accent"
+    if percent >= 100:
+        tone = "red"
+    elif percent >= 80:  # порог предупреждения — держим рядом с plans.WARN_PERCENT
+        tone = "yellow"
+    width = min(100, max(0, percent))
+    return (
+        '<div class="usage">'
+        f'<div class="usage-track"><div class="usage-fill u-{tone}" '
+        f'style="width:{width}%"></div></div>'
+        f'<span class="usage-text">{int(used)} из {int(limit)} ({percent}%)</span>'
+        "</div>"
     )
 
 
@@ -170,7 +194,11 @@ def layout(
         item for item in NAV
     # /network и /billing видны только нашей команне: счета и сводка по сети
     # — не клиентские данные салона.
-    if item[0] not in ("/network", "/billing") or (role and role == "team")
+    if (
+        (item[0] in ("/network", "/billing") and role == "team")
+        or (item[0] == "/pay" and role in ("owner", "team"))
+        or item[0] not in ("/network", "/billing", "/pay")
+    )
     ]
     nav = "".join(
         f'<a href="{path}?salon={esc(sid)}" class="{"active" if path == active else ""}">'
@@ -195,8 +223,25 @@ def layout(
     )
 
 
-def login_page(error: str = "", *, login: str = "", need_totp: bool = False) -> str:
-    """Вход в панель: логин + пароль (+ код 2FA, если у пользователя включена)."""
+def login_page(
+    error: str = "",
+    *,
+    login: str = "",
+    need_totp: bool = False,
+    agreed: bool = False,
+    remember: bool = False,
+) -> str:
+    """Вход в панель: логин + пароль (+ код 2FA, если у пользователя включена).
+
+    Вход загорожен двумя обязательными согласиями — офертой и обработкой ПДн:
+    сервер отклоняет POST без них, а кнопка неактивна, пока не отмечены обе
+    галочки (CSS :has(), как и в остальной панели — без JavaScript).
+
+    ``agreed=True`` — согласия уже получены в этом же POST (шаг ввода 2FA или
+    повтор после ошибки): рендерим их скрытыми полями, чтобы следующий POST
+    прошёл серверную проверку без повторных кликов. ``remember`` — состояние
+    галочки «Запомнить меня» (долгая сессия + сохранение пароля браузером).
+    """
     msg = f'<div class="flash err">{esc(error)}</div>' if error else ""
     totp_field = ""
     if need_totp:
@@ -204,6 +249,32 @@ def login_page(error: str = "", *, login: str = "", need_totp: bool = False) -> 
             '<label for="code">Код из приложения (6 цифр)</label>'
             '<input id="code" name="code" type="text" inputmode="numeric" '
             'pattern="[0-9]{6}" maxlength="6" autofocus required>'
+        )
+    remember_checked = " checked" if remember else ""
+    if agreed:
+        # Согласие уже дано в этом POST — пробрасываем дальше скрытыми полями.
+        consent = (
+            '<input type="hidden" name="agree_oferta" value="1">'
+            '<input type="hidden" name="agree_pdn" value="1">'
+            + (
+                '<input type="hidden" name="remember" value="1">'
+                if remember
+                else ""
+            )
+        )
+    else:
+        consent = (
+            '<div class="agree">'
+            '<label class="chk"><input type="checkbox" name="agree_oferta" '
+            'required> <span>Я принимаю <a href="/oferta" target="_blank" '
+            'rel="noopener">условия публичной оферты</a></span></label>'
+            '<label class="chk"><input type="checkbox" name="agree_pdn" '
+            'required> <span>Я согласен на <a href="/pdn" target="_blank" '
+            'rel="noopener">обработку персональных данных</a></span></label>'
+            '<label class="chk"><input type="checkbox" name="remember" '
+            f'id="remember" value="1"{remember_checked}> '
+            "<span>Запомнить меня</span></label>"
+            "</div>"
         )
     return (
         '<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8">'
@@ -215,11 +286,21 @@ def login_page(error: str = "", *, login: str = "", need_totp: bool = False) -> 
         '<div class="sub">Панель управления точкой</div>'
         f"{msg}"
         '<label for="login">Логин (e-mail)</label>'
-        f'<input id="login" name="login" type="email" value="{esc(login)}" '
+        f'<input id="login" name="login" type="email" autocomplete="username" '
+        f'value="{esc(login)}" '
         f"{'autofocus' if not need_totp else ''} required>"
         '<label for="pwd">Пароль</label>'
-        '<input id="pwd" name="password" type="password" required>'
+        # autocomplete="off" по умолчанию: пароль не сохраняется, пока пользователь
+        # не поставил «Запомнить меня» (login.js включает сохранение на submit).
+        '<input id="pwd" name="password" type="password" autocomplete="off" required>'
         f"{totp_field}"
+        f"{consent}"
         '<div style="margin-top:18px"><button type="submit" style="width:100%">Войти</button></div>'
-        "</form></div></body></html>"
+        '<div class="sub" style="margin-top:12px;text-align:center">'
+        '<a href="/oferta" target="_blank" rel="noopener">Оферта</a> · '
+        '<a href="/pdn" target="_blank" rel="noopener">Обработка ПДн</a>'
+        "</div>"
+        "</form>"
+        '<script src="/login.js" defer></script>'
+        "</div></body></html>"
     )

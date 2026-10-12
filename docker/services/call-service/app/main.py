@@ -30,15 +30,41 @@ CONFIG_KEYS = {
     "CALL_API_TOKEN": "токен для вызовов /call/* (обязателен)",
 }
 
+# Уведомление о записи разговора — первое, что слышит клиент (ст.9 152-ФЗ:
+# согласие на обработку ПДн должно быть конкретным, информированным и
+# сознательным). «Продолжая, вы соглашаетесь» псевдосогласием не является:
+# у клиента не было реальной возможности отказаться, не положив трубку. Поэтому
+# текст называет факт записи, ИИ и — главное — даёт явный выход: нажмите «0»,
+# и разговор не будет записан, звонок уйдёт оператору. Состояние согласия
+# фиксируем в сессии (consent), чтобы запись велась только при согласии.
 DISCLOSURE = (
     "Здравствуйте! Ваш звонок принимает искусственный интеллект. "
-    "Разговор может быть записан. Продолжая, вы соглашаетесь на обработку."
+    "Разговор может быть записан для улучшения качества обслуживания. "
+    "Если вы не хотите, чтобы звонок записывался, нажмите 0 — мы переключим "
+    "звонок на оператора. Подробнее о защите данных — в политике обработки "
+    "персональных данных на нашем сайте."
+)
+# Фраза отказа от записи: клиент явно просит не записывать / зовёт оператора.
+DECLINE_WORDS = ("0", "ноль", "оператор", "человек", "не записывай", "без записи")
+# Что говорим, когда клиент отказался: подтверждаем и переключаем на человека.
+NO_RECORD_REPLY = (
+    "Понял вас. Запись этого разговора выключена. Соединяю с оператором салона."
 )
 ANSWER_MACHINE = (
     "Здравствуйте! Салон временно не может ответить. Оставьте имя и телефон — "
     "мы перезвоним в рабочее время."
 )
 FAILOVER_REASON = "llm_unavailable"
+
+
+def is_decline(text: str) -> bool:
+    """Клиент отказался от записи (нажал «0» или попросил оператора).
+
+    Простое вхождение подстроки, а не NLU: сервис пока без STT/LLM, и точнее
+    тут не нужно — важна сама возможность отказа, а не её качество.
+    """
+    lowered = (text or "").strip().lower()
+    return any(word in lowered for word in DECLINE_WORDS)
 
 
 def cfg_report() -> str:
@@ -91,6 +117,9 @@ class CallSession:
         self.sessions[call_id] = {
             "dialog_id": dialog_id, "client_id": str(client["id"]),
             "started_at": datetime.now(ZoneInfo("UTC")),
+            # Согласие на запись: по умолчанию предполагаем, но гасим сразу,
+            # как только клиент отказался (см. answer). Нужен для честного 152-ФЗ.
+            "consent": True, "recording": True,
         }
         return {
             "call_id": call_id,
@@ -103,10 +132,23 @@ class CallSession:
         session = self.sessions.get(call_id)
         if not session:
             return {"ok": False, "error": "unknown_call"}
-        await self.pool.execute(
-            "INSERT INTO dialog_messages (dialog_id, role, content) VALUES ($1, $2, $3)",
-            session["dialog_id"], "user", (text or "")[:4000],
-        )
+        # Клиент отказался от записи (152-ФЗ): гасим согласие и больше не
+        # сохраняем его реплики — иначе «возможность отказа» была бы фикцией,
+        # а текст разговора всё равно осел бы в БД как персональные данные.
+        if session.get("recording") and is_decline(text):
+            session["consent"] = False
+            session["recording"] = False
+        if session.get("recording"):
+            await self.pool.execute(
+                "INSERT INTO dialog_messages (dialog_id, role, content) VALUES ($1, $2, $3)",
+                session["dialog_id"], "user", (text or "")[:4000],
+            )
+        # Отказ — переключаем на оператора и прекращаем запись этого звонка.
+        if not session.get("consent"):
+            return {
+                "ok": True, "text": NO_RECORD_REPLY, "mode": "operator",
+                "recording": False, "consent": False,
+            }
         if voice_ready():
             return {"ok": True, "text": "", "note": "диалог ведёт LLM"}
         return {"ok": True, "text": ANSWER_MACHINE, "mode": "answer_machine"}
@@ -115,6 +157,15 @@ class CallSession:
         session = self.sessions.pop(call_id, None)
         if not session:
             return {"ok": False, "error": "unknown_call"}
+        # Если клиент отказался от записи — убираем всё, что успели сохранить
+        # до отказа: реплики до момента отказа — тоже персональные данные, и
+        # «возможность отказа» обязана стирать их, а не оставлять в БД.
+        if not session.get("consent", True):
+            await self.pool.execute(
+                "DELETE FROM dialog_messages WHERE dialog_id = $1",
+                session["dialog_id"],
+            )
+            outcome = outcome if outcome != "completed" else "no_consent"
         await self.pool.execute(
             "UPDATE dialogs SET ended_at = now(), outcome = $2 WHERE id = $1",
             session["dialog_id"], outcome,

@@ -31,17 +31,19 @@ P_CATALOG = "catalog"                # создание и архивация у
 P_CLIENT_CREATE = "client_create"    # ручной ввод клиента (пришёл в салон)
 P_REPORTS = "reports"                # отчёты
 P_BILLING = "billing"               # счета и оплаты (ручной счёт + СБП): выручка, загрузка, конверсия
+P_PAY = "pay"                        # оплата своего тарифа: профиль плательщика точки (ИНН и т.п.)
 
 ROLE_PERMISSIONS: dict[str, set[str]] = {
     "owner": {
         P_READ, P_BOOKING_STATUS, P_PRICING, P_CATALOG, P_CLIENT_FLAGS,
-        P_CLIENT_CREATE, P_SCHEDULE, P_USERS, P_REPORTS,
+        P_CLIENT_CREATE, P_SCHEDULE, P_USERS, P_REPORTS, P_PAY,
     },
     # администратор ведёт рутину на фронте: статусы, карточки клиентов, отчёты
     "staff": {P_READ, P_BOOKING_STATUS, P_CLIENT_FLAGS, P_CLIENT_CREATE, P_REPORTS},
     "team": {
         P_READ, P_BOOKING_STATUS, P_PRICING, P_CATALOG, P_CLIENT_FLAGS,
         P_CLIENT_CREATE, P_SCHEDULE, P_USERS, P_ALL_SALONS, P_REPORTS, P_BILLING,
+        P_PAY,
     },
 }
 
@@ -56,7 +58,9 @@ ACTION_PERMISSION = {
     "client_create": P_CLIENT_CREATE,
     "booking_reschedule": P_BOOKING_STATUS,
     "prepayment_set": P_BOOKING_STATUS,
-    "legal_save": P_BILLING,
+    # профиль плательщика владелец правит сам (свой салон, action изолирован
+    # по salon_id сессии); staff по-прежнему не достаётся.
+    "legal_save": P_PAY,
     "invoice_issue": P_BILLING,
     "payment_mark_paid": P_BILLING,
     "waitlist_add": P_CLIENT_CREATE,
@@ -103,6 +107,7 @@ def permissions_of(role: str) -> list[str]:
         P_CLIENT_CREATE: "ручной ввод клиента",
         P_REPORTS: "отчёты",
         P_BILLING: "счета и оплаты",
+        P_PAY: "оплата своего тарифа",
     }
     return sorted(names[p] for p in ROLE_PERMISSIONS.get(role, set()) if p in names)
 

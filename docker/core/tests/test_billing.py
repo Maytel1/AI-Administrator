@@ -62,6 +62,12 @@ def test_next_period_without_payment_starts_this_month() -> None:
         (1990, "одна тысяча девятьсот девяносто рублей"),
         (3990, "три тысячи девятьсот девяносто рублей"),
         (7990, "семь тысяч девятьсот девяносто рублей"),
+        # Актуальный прайс (TARIFFS.md, вариант B): 5000/12000/15000.
+        (5000, "пять тысяч рублей"),
+        # 12/13/14 тысяч склоняются как «тысяч», а не «тысячи» — регрессия.
+        (12000, "двенадцать тысяч рублей"),
+        (15000, "пятнадцать тысяч рублей"),
+        (21000, "двадцать одна тысяча рублей"),
     ],
 )
 def test_amount_to_words(amount: int, expected: str) -> None:
@@ -72,6 +78,19 @@ def test_amount_to_words(amount: int, expected: str) -> None:
 def test_price_of_unknown_plan_is_zero_not_crash() -> None:
     """Неизвестный тариф не должен ронять выставление счёта."""
     assert price_of("нет-такого") >= 0
+
+
+def test_default_prices_match_tariffs(monkeypatch) -> None:
+    """Дефолт цен = согласованный прайс TARIFFS.md (вариант B).
+
+    При пустом BILLING_PRICES панель берёт цены отсюда. Если они разойдутся с
+    прайсом, на встрече с клиентом всплывёт вторая цифра — фиксируем.
+    """
+    monkeypatch.delenv("BILLING_PRICES", raising=False)
+    assert price_of("start") == 5000
+    assert price_of("standard") == 12000
+    assert price_of("pro") == 15000
+    assert price_of("trial") == 0
 
 
 def test_invoice_text_mentions_period_and_requisites(monkeypatch) -> None:

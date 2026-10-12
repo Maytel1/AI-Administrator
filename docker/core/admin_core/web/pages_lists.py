@@ -20,6 +20,7 @@ from .render import (
     page_head,
     table,
     tile,
+    usage_bar,
 )
 from .render import (
     flash as flash_html,
@@ -106,17 +107,21 @@ def page_network(
     Владелец точки сюда не попадает: функция вызывается только при ``all_salons``,
     а лишняя навигация у него была бы враньём в интерфейсе.
     """
-    table_rows = [
-        [
-            esc(row["salon"]),
-            badge(str(row.get("plan") or "—"), "accent"),
-            str(row["bookings"]),
-            money(row["revenue"]),
-            str(row["no_shows"]),
-            str(row["clients"]),
-        ]
-        for row in rows
-    ]
+    cards = []
+    for row in rows:
+        cards.append(
+            '<div class="m-card">'
+            f'<div class="m-top"><b>{esc(row["salon"])}</b>'
+            + badge(str(row.get("plan") or "—"), "accent") + "</div>"
+            f'<span class="meta">Записей: {row["bookings"]} · '
+            f"Выручка: {money(row['revenue'])} · Неявок: {row['no_shows']}</span>"
+            f'<span class="meta">Клиентов: {row["clients"]}</span>'
+            "</div>"
+        )
+    feed = (
+        f'<div class="m-grid">{"".join(cards)}</div>'
+        if cards else '<div class="empty">Активных точек нет</div>'
+    )
     tiles = "".join(
         [
             tile(str(totals.get("salons", 0)), "точек в сети"),
@@ -134,13 +139,7 @@ def page_network(
         )
         + flash_html(flash, flash_error)
         + f'<div class="tiles">{tiles}</div>'
-        + card(
-            "Точки",
-            table(
-                ["Точка", "Тариф", "Записей", "Выручка", "Неявок", "Клиентов"],
-                table_rows, "Активных точек нет",
-            ),
-        )
+        + card("Точки", feed)
     )
     return layout("Сеть", "/network", content, salon=salon, salons=salons, role=_role(ctx))
 
@@ -578,31 +577,31 @@ def page_dialogs(
     from .queries import CHANNEL_RU
 
     sid = salon["id"] if salon else ""
-    body = [
-        [
-            dt_local(d["started_at"], tz, "%d.%m %H:%M"),
-            esc(d["client_name"] or d["client_phone"] or "аноним"),
-            esc(CHANNEL_RU.get(d["channel"], d["channel"] or "—")),
-            str(d["messages"]),
-            esc(d["outcome"] or "—"),
-            f'<a class="btn" href="/dialogs?salon={esc(sid)}&id={esc(d["id"])}">Открыть</a>',
-        ]
-        for d in rows
-    ]
+    cards = []
+    for d in rows:
+        cards.append(
+            '<div class="m-card">'
+            f'<div class="m-top"><b>{esc(d["client_name"] or d["client_phone"] or "аноним")}</b>'
+            + badge(esc(CHANNEL_RU.get(d["channel"], d["channel"] or "—")), "accent")
+            + "</div>"
+            f'<span class="meta">{esc(dt_local(d["started_at"], tz, "%d.%m %H:%M"))} · '
+            f'реплик: {d["messages"]}</span>'
+            f'<span class="meta">Итог: {esc(d["outcome"] or "—")}</span>'
+            f'<div class="m-actions">'
+            f'<a class="btn" href="/dialogs?salon={esc(sid)}&id={esc(d["id"])}">Открыть</a>'
+            "</div></div>"
+        )
+    if cards:
+        feed = f'<div class="m-grid">{"".join(cards)}</div>'
+    else:
+        feed = '<div class="empty">Диалогов пока нет — бот ещё не общался с клиентами.</div>'
     content = (
         page_head(
             "Диалоги",
             "Что бот отвечает клиентам — источник для контроля качества",
             salon, salons,
         )
-        + card(
-            "Лента диалогов",
-            table(
-                ["Когда", "Клиент", "Канал", "Реплик", "Итог", ""],
-                body,
-                "Диалогов пока нет — бот ещё не общался с клиентами.",
-            ),
-        )
+        + card("Лента диалогов", feed)
     )
     if messages is not None:
         bubbles = []
@@ -626,29 +625,29 @@ def page_audit(
     ctx: Any | None = None,
 ) -> str:
     """Журнал аудита: кто и что сделал — основа для разбора споров."""
-    body = []
+    cards = []
     for a in rows:
         details = a["details"]
         if isinstance(details, str):
             details = json.loads(details or "{}")
-        body.append(
-            [
-                dt_local(a["ts"], tz, "%d.%m.%Y %H:%M"),
-                esc(a["actor"]),
-                esc(a["action"]),
-                esc(json.dumps(details, ensure_ascii=False)[:160]),
-            ]
+        cards.append(
+            '<div class="m-card">'
+            f'<div class="m-top"><b>{esc(a["action"])}</b>{badge(str(a["actor"]), "accent")}</div>'
+            f'<span class="meta">{esc(dt_local(a["ts"], tz, "%d.%m.%Y %H:%M"))}</span>'
+            f'<span class="meta">{esc(json.dumps(details, ensure_ascii=False)[:160])}</span>'
+            "</div>"
         )
+    feed = (
+        f'<div class="m-grid">{"".join(cards)}</div>'
+        if cards else '<div class="empty">Журнал пуст.</div>'
+    )
     content = (
         page_head(
             "Аудит",
             "Каждое значимое действие пишется сюда — бот, человек или система",
             salon, salons,
         )
-        + card(
-            "Журнал действий",
-            table(["Когда", "Кто", "Действие", "Детали"], body, "Журнал пуст."),
-        )
+        + card("Журнал действий", feed)
     )
     return layout("Аудит", "/audit", content, salon=salon, salons=salons, role=_role(ctx))
 
@@ -691,17 +690,21 @@ def page_settings(
         parts = []
         for item in once:
             fields = "".join(
-                f'<div class="meta">{esc(k)}: <b>{esc(str(v))}</b></div>'
+                f'<span class="meta">{esc(k)}: <b>{esc(str(v))}</b></span>'
                 for k, v in item.items()
                 if k != "note" and v
             )
             parts.append(
-                f'<div class="item">{fields}'
-                f'<div class="meta">{esc(item.get("note", ""))}</div></div>'
+                '<div class="m-card">'
+                '<div class="m-top"><b>Новый доступ</b>'
+                + badge("показать один раз", "yellow") + "</div>"
+                + fields
+                + f'<span class="meta">{esc(item.get("note", ""))}</span>'
+                + "</div>"
             )
         secrets_block = card(
             "Показываем один раз — запишите или передайте сотруднику сейчас",
-            "".join(parts),
+            f'<div class="m-grid">{"".join(parts)}</div>',
         )
 
     people = ""
@@ -809,6 +812,93 @@ def _bar_chart(rows: list[dict[str, Any]], tz: ZoneInfo) -> str:
     return f'<div class="chart">{"".join(bars)}</div>'
 
 
+def _trend(diff: dict[str, Any] | None, good_down: bool = False) -> str:
+    """Изменение к прошлому периоду под плиткой: «+100.0 % к прошлому».
+
+    ``good_down=True`` — для показателей, где спад это хорошо (отмены, долг).
+    Без ненулевой базы (было 0) процента нет — пишем «не с чем сравнить»,
+    а не «+∞»: деление на ноль это не рост.
+    """
+    if not isinstance(diff, dict):
+        return ""
+    percent = diff.get("percent")
+    if percent is None:
+        return '<i class="trend flat">не с чем сравнить</i>'
+    if percent == 0:
+        return '<i class="trend flat">0.0 % к прошлому</i>'
+    up = percent > 0
+    good = up != good_down
+    return (
+        f'<i class="trend {"up" if good else "down"}">'
+        f"{percent:+.1f} % к прошлому</i>"
+    )
+
+
+def _period_tabs(
+    periods: list[tuple[str, str, int | None]], period_key: str, salon: dict | None,
+) -> str:
+    """Вкладки выбора периода отчёта: /reports?period=7 | 30 | 90 | month.
+
+    Точка в ссылке сохраняется явно: у нашей команды салон переключается,
+    и без ``salon=`` вкладка открыла бы прежнюю точку.
+    """
+    if not periods:
+        return ""
+    salon_id = str((salon or {}).get("id") or "")
+    tabs = "".join(
+        f'<a class="tab{" tab-active" if key == period_key else ""}" '
+        f'href="/reports?period={esc(key)}'
+        f'{"&amp;salon=" + esc(salon_id) if salon_id else ""}">{esc(label)}</a>'
+        for key, label, _days in periods
+    )
+    return f'<div class="tabs">{tabs}</div>'
+
+
+def _compare_table(
+    diff: dict[str, Any], prev_label: str, prev_days: int | None = None,
+) -> str:
+    """Таблица «сейчас / было / изменение» по воронке и потерям.
+
+    Колонка «Изменение» — абсолютные цифры (деньги, штуки), а не проценты:
+    проценты уже висят под плитками, здесь владелец сверяет величины.
+    """
+    rows: list[list[str]] = []
+    for key, title, is_money in (
+        ("revenue", "Выручка", True),
+        ("bookings", "Записей", False),
+        ("dialogs", "Диалогов", False),
+        ("conversion", "Конверсия", False),
+        ("avg_check", "Средний чек", True),
+        ("lost_rate", "Отмен и неявок", False),
+        ("new_clients", "Новых клиентов", False),
+    ):
+        item = diff.get(key)
+        if not isinstance(item, dict):
+            continue
+        fmt = money if is_money else (lambda v: str(v))
+        change = item.get("change")
+        if change is None:
+            change_text = "—"
+        elif is_money:
+            change_text = f"{change:+,.0f}".replace(",", " ").replace("-", "−") + " ₽"
+        else:
+            change_text = f"{change:+g}".replace("-", "−")
+        rows.append([
+            title,
+            fmt(item.get("current") or 0),
+            fmt(item.get("previous") or 0),
+            change_text,
+        ])
+    if not rows:
+        return '<div class="empty">Сравнение появится вместе с выбором периода</div>'
+    prev_col = (
+        f"прошлый период ({prev_days} дн.)" if prev_days else f"было ({prev_label})"
+    )
+    return table(
+        ["Показатель", "Сейчас", prev_col, "Изменение"], rows,
+    )
+
+
 def page_reports(
     data: dict[str, Any],
     salon: dict | None,
@@ -839,22 +929,32 @@ def page_reports(
                  _trend(diff.get("lost_rate"), good_down=True)),
         ]
     )
-    load_rows = [
-        [
-            esc(m["name"]),
-            str(m["bookings"]),
-            f'{float(m["busy_hours"]):.1f} ч',
-            money(m["revenue"]),
-        ]
+    load_cards = [
+        '<div class="m-card">'
+        f'<div class="m-top"><b>{esc(m["name"])}</b></div>'
+        f'<span class="meta">Записей: {m["bookings"]} · '
+        f'Занято: {float(m["busy_hours"]):.1f} ч</span>'
+        f'<span class="meta">Выручка: {money(m["revenue"])}</span>'
+        "</div>"
         for m in data["load"]
     ]
-    loss_rows = [
-        ["Всего записей", str(data["loss"]["total"])],
-        ["Отменено клиентом", str(data["loss"]["cancelled"])],
-        ["Не пришёл", str(data["loss"]["no_show"])],
-        ["Новых клиентов", str(stats["new_clients"])],
-        ["Затраты на LLM", money(stats["llm_cost"])],
+    load_block = (
+        f'<div class="m-grid">{"".join(load_cards)}</div>'
+        if load_cards else '<div class="empty">Данных пока нет</div>'
+    )
+    loss_cards = [
+        '<div class="m-card"><div class="m-top">'
+        f"<b>{esc(str(val))}</b></div>"
+        f'<span class="meta">{esc(title)}</span></div>'
+        for title, val in (
+            ("Всего записей", data["loss"]["total"]),
+            ("Отменено клиентом", data["loss"]["cancelled"]),
+            ("Не пришёл", data["loss"]["no_show"]),
+            ("Новых клиентов", stats["new_clients"]),
+            ("Затраты на LLM", money(stats["llm_cost"])),
+        )
     ]
+    loss_block = f'<div class="m-grid">{"".join(loss_cards)}</div>'
     bot = data.get("bot") or {}
     bot_prev = data.get("bot_previous") or {}
     bot_rows = [
@@ -892,13 +992,14 @@ def page_reports(
         + card("Выручка по дням", _bar_chart(data["by_day"], ZoneInfo("UTC")))
         + card(
             "Сравнение с прошлым периодом",
-            _compare_table(diff, prev_label) if diff else
+            _compare_table(
+                diff, prev_label,
+                prev_window.days if prev_window else None,
+            ) if diff else
             '<div class="empty">Сравнение появится вместе с выбором периода</div>',
         )
-        + card("Загрузка мастеров", table(
-            ["Мастер", "Записей", "Занято", "Выручка"], load_rows, "Данных пока нет",
-        ))
-        + card("Потери и затраты", table(["Показатель", "Значение"], loss_rows))
+        + card("Загрузка мастеров", load_block)
+        + card("Потери и затраты", loss_block)
         + card(
             f"Качество бота: {label} и {prev_label}",
             table(["Показатель", label, prev_label], bot_rows)
@@ -953,16 +1054,24 @@ def page_billing(
                     "/billing", "", "Выставить счёт")
         if isinstance(ctx, dict) else ""
     )
-    rows = [
-        [
-            esc(str(row["period_start"])),
-            f'{row["period_end"]}',
-            f'{float(row["amount"] or 0):.0f} руб.',
+    pay_cards = [
+        '<div class="m-card">'
+        f'<div class="m-top"><b>{float(row["amount"] or 0):.0f} руб.</b>'
+        + badge(
             esc(STATUS_RU.get(str(row["status"]), str(row["status"]))),
-            esc(str(row["paid_at"])[:10]) if row.get("paid_at") else "—",
-        ]
+            "green" if str(row["status"]) == "paid" else "yellow",
+        ) + "</div>"
+        f'<span class="meta">Период: {esc(str(row["period_start"]))} — '
+        f'{esc(str(row["period_end"]))}</span>'
+        f'<span class="meta">Оплачен: '
+        f'{esc(str(row["paid_at"])[:10]) if row.get("paid_at") else "—"}</span>'
+        "</div>"
         for row in history
     ]
+    pay_block = (
+        f'<div class="m-grid">{"".join(pay_cards)}</div>'
+        if pay_cards else '<div class="empty">Платежей пока не было</div>'
+    )
     requisites_block = card("Реквизиты для оплаты (СБП)", (
         '<div class="empty">Задайте BILLING_* в docker/.env — реквизиты появятся здесь'
         "</div>"
@@ -992,10 +1101,7 @@ def page_billing(
             + actions + "</div>"
             if actions else ""
         )
-        + card("История платежей", table(
-            ["Период с", "Период по", "Сумма", "Статус", "Оплачен"], rows,
-            "Платежей пока не было",
-        ))
+        + card("История платежей", pay_block)
         + requisites_block
         + (_legal_card(legal, csrf, "/billing", errors) if may_billing else ""),
         salon=salon, salons=salons, role=_role(ctx),
@@ -1082,78 +1188,147 @@ def _legal_card(
         ),
     )
 
+def page_pay(
+    status: dict[str, Any], salon: dict | None, salons: list[dict] | None,
+    legal: dict[str, Any] | None = None, errors: list[str] | None = None,
+    flash: str = "", flash_error: bool = False, ctx: Any | None = None,
+) -> str:
+    """Страница оплаты тарифа: счёт, реквизиты и профиль плательщика.
 
-STATUS_RU = {
-    "issued": "выставлен", "paid": "оплачен",
-    "overdue": "просрочен", "void": "аннулирован",
-}
-
-
-STATUS_RU = {
-    "issued": "выставлен", "paid": "оплачен",
-    "overdue": "просрочен", "void": "аннулирован",
-}
-
-
-def _period_tabs(periods: list[tuple[str, str, Any]], current: str, salon: dict | None) -> str:
-    """Переключатель периода: ссылки, а не форма — период видно в адресной строке."""
-    if not periods:
-        return ""
-    sid = esc(salon["id"]) if salon else ""
-    items = []
-    for key, label, _days in periods:
-        active = " tab-active" if key == current else ""
-        link = f"/reports?period={esc(key)}" + (f"&amp;salon={sid}" if sid else "")
-        items.append(f'<a class="tab{active}" href="{link}">{esc(label)}</a>')
-    return f'<div class="tabs">{"".join(items)}</div>'
-
-
-def _trend(value: dict[str, Any] | None, *, good_down: bool = False) -> str:
-    """Подпись «+12 % к прошлому периоду» под плиткой.
-
-    Пустой прочерк, когда сравнивать не с чем: «+100 %» от нуля — не результат,
-    а ошибка деления, и показывать её нельзя.
+    От ``page_billing`` отличается точкой зрения: здесь владелец точки видит,
+    сколько и за что он должен, и вводит свои реквизиты (тип ИП/ООО/самозанятый).
+    Реквизиты команды ( BILLING_* ) тоже показываем — салон платит по ним.
     """
-    if not value:
-        return ""
-    percent = value["percent"]
-    if percent is None:
-        return '<span class="trend muted">не с чем сравнить</span>'
-    tone = "up" if value["change"] > 0 else ("down" if value["change"] < 0 else "flat")
-    if tone != "flat" and good_down:
-        tone = "up" if tone == "down" else "down"
-    sign = "+" if value["change"] > 0 else ""
-    return f'<span class="trend {tone}">{sign}{percent} % к прошлому</span>'
-
-
-def _compare_table(diff: dict[str, Any], prev_label: str) -> str:
-    """Таблица «сейчас / было / изменение» — цифры, а не только проценты."""
-    rows: list[tuple[str, str, bool]] = [
-        ("Выручка", "revenue", True),
-        ("Записей", "bookings", False),
-        ("Диалогов", "dialogs", False),
-        ("Конверсия, %", "conversion", False),
-        ("Средний чек", "avg_check", True),
-        ("Отмен и неявок, %", "lost_rate", False),
-        ("Новых клиентов", "new_clients", False),
-    ]
-    out = []
-    for title, key, is_money in rows:
-        value = diff.get(key)
-        if not value:
-            continue
-        percent = value.get("percent")
-        change = f"{percent:+} %" if percent is not None else "—"
-        fmt = money if is_money else (lambda x: str(int(round(float(x)))))
-        out.append(
-            [
-                esc(title),
-                esc(fmt(value["current"])),
-                esc(fmt(value["previous"])),
-                esc(change),
-            ]
+    errors = list(errors or [])
+    csrf = ctx.get("csrf", "") if isinstance(ctx, dict) else ""
+    # Профиль плательщика — это данные точки: владелец правит свои реквизиты,
+    # команда может подправить от имени любой точки.
+    may_pay = _role(ctx) in ("owner", "team")
+    req = status.get("requisites") or {}
+    paid_until = status.get("paid_until")
+    expired = bool(status.get("expired"))
+    tone = "yellow" if expired else ("accent" if status.get("is_trial") else "green")
+    head = (
+        f'<p class="sub">{esc(status.get("status_text") or "Тариф не оплачен")}</p>'
+        + '<div class="tiles">'
+        + tile(f'{status.get("price", 0):.0f} руб.', "в месяц", tone, "")
+        + tile(
+            f'{paid_until:%d.%m.%Y}' if paid_until else "—",
+            "оплачено до", "" if not expired else "yellow", "",
         )
-    return table(
-        ["Показатель", "Сейчас", esc(prev_label).title(), "Изменение"], out,
-        "Пока нет данных за прошлый период",
+        + tile(str(status.get("plan") or "start"), "тариф", "", "")
+        + "</div>"
     )
+    history = status.get("history") or []
+    # Лимиты тарифа: полоски использования + предупреждение при 80% и на исчерпании.
+    limits_card = _limits_card(status.get("usage"))
+    pay_cards = [
+        '<div class="m-card">'
+        f'<div class="m-top"><b>{float(row["amount"] or 0):.0f} руб.</b>'
+        + badge(
+            esc(STATUS_RU.get(str(row["status"]), str(row["status"]))),
+            "green" if str(row["status"]) == "paid" else "yellow",
+        ) + "</div>"
+        f'<span class="meta">Период: {esc(str(row["period_start"]))} — '
+        f'{esc(str(row["period_end"]))}</span>'
+        f'<span class="meta">Оплачен: '
+        f'{esc(str(row["paid_at"])[:10]) if row.get("paid_at") else "—"}</span>'
+        "</div>"
+        for row in history
+    ]
+    pay_block = (
+        f'<div class="m-grid">{"".join(pay_cards)}</div>'
+        if pay_cards else '<div class="empty">Платежей пока не было</div>'
+    )
+    requisites_block = card("Реквизиты для оплаты (СБП)", (
+        '<div class="empty">Задайте BILLING_* в docker/.env — реквизиты появятся здесь'
+        "</div>"
+        if not req.get("legal_name") else
+        '<table><tbody>'
+        + "".join(
+            f"<tr><th>{esc(title)}</th><td>{esc(str(req.get(key) or '—'))}</td></tr>"
+            for key, title in (
+                ("legal_name", "Получатель"), ("inn", "ИНН"), ("kpp", "КПП"),
+                ("bank", "Банк"), ("bik", "БИК"), ("account", "Р/с"), ("tg", "Вопросы"),
+            )
+            if req.get(key)
+        )
+        + "</tbody></table>"
+        + '<p class="sub">Карты не храним, автосписания нет: салон платит переводом '
+        "раз в месяц, оплату подтверждает менеджер.</p>"
+    ))
+    # Онлайн-оплата картой — только когда в .env заданы ключи эквайринга.
+    # Без них показываем лишь ручной перевод по реквизитам (прежний путь).
+    card_block = ""
+    if status.get("card_enabled") and may_pay:
+        card_block = card(
+            "Онлайн-оплата картой",
+            f'<form method="post" action="/pay/card" class="inline">{csrf_field(csrf)}'
+            '<input type="hidden" name="back" value="/pay">'
+            f'<button type="submit">Оплатить {status.get("price", 0):.0f} ₽ картой</button></form>'
+            '<p class="sub">Платёж проходит через ЮKassa. Подтверждение приходит '
+            "автоматически — статус «оплачено до» обновится сам.</p>"
+        )
+    return layout(
+        "Оплата", "/pay",
+        page_head("Оплата", "", salon, salons) + flash_html(flash, flash_error) + head
+        + limits_card
+        + card("История платежей", pay_block)
+        + requisites_block
+        + card_block
+        + (_legal_card(legal, csrf, "/pay", errors) if may_pay else ""),
+        salon=salon, salons=salons, role=_role(ctx),
+    )
+
+
+# Русские подписи ресурсов для индикаторов лимита.
+_LIMIT_TITLES = {
+    "clients": "Клиентские карточки",
+    "services": "Услуги в прайсе",
+    "masters": "Мастера",
+    "bookings_per_month": "Записи в этом месяце",
+}
+
+
+def _limits_card(usage: dict[str, Any] | None) -> str:
+    """Карточка «Лимиты тарифа»: полоски использования и предупреждения.
+
+    При 80% (plans.WARN_PERCENT) строка подсвечивается жёлтым, на исчерпании —
+    красным и общим текстом «нужен следующий тариф». Без данных или без
+    лимитов (pro/network) карточка не показывается — не занимать место.
+    """
+    if not usage or not usage.get("rows"):
+        return ""
+    rows = [row for row in usage["rows"] if row.get("limit") is not None]
+    if not rows:
+        return ""
+    bars = []
+    for row in rows:
+        title = _LIMIT_TITLES.get(str(row["resource"]), str(row["resource"]))
+        bars.append(
+            f'<div class="limit-row"><span class="limit-name">{esc(title)}</span>'
+            + usage_bar(int(row["used"]), row["limit"], row.get("percent"))
+            + "</div>"
+        )
+    body = "".join(bars)
+    at_limit = usage.get("at_limit") or []
+    near_limit = usage.get("near_limit") or []
+    if at_limit:
+        names = ", ".join(_LIMIT_TITLES.get(r, r) for r in at_limit)
+        body += (
+            f'<div class="usage-warn at">Лимит исчерпан: {esc(names)}. '
+            "Добавить больше нельзя — выберите следующий тариф.</div>"
+        )
+    elif near_limit:
+        names = ", ".join(_LIMIT_TITLES.get(r, r) for r in near_limit)
+        body += (
+            f'<div class="usage-warn">Близко к лимиту: {esc(names)} — '
+            "пора подумать о смене тарифа.</div>"
+        )
+    return card(f"Лимиты тарифа «{usage.get('plan') or ''}»", body)
+
+
+STATUS_RU = {
+    "issued": "выставлен", "paid": "оплачен",
+    "overdue": "просрочен", "void": "аннулирован",
+}

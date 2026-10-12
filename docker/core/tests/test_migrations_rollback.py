@@ -13,23 +13,27 @@ async def test_rollback_migrations_reverts_and_reapplies(pool) -> None:
     """Откат убирает объекты миграции, повторный накат их возвращает."""
     await run_migrations(pool)
     assert await pool.fetchval(
-        "SELECT EXISTS (SELECT 1 FROM schema_migrations WHERE name = '009_legal.sql')"
+        "SELECT EXISTS (SELECT 1 FROM schema_migrations "
+        "WHERE name = '010_payments_acquiring.sql')"
     ) is True
 
     rolled = await rollback_migrations(pool, steps=1)
-    assert rolled == ["009_legal.sql"]
+    assert rolled == ["010_payments_acquiring.sql"]
+    # Откат 010 убирает поля эквайринга, но сама таблица payments (из 008) остаётся.
+    assert await pool.fetchval(
+        "SELECT column_name FROM information_schema.columns "
+        "WHERE table_name = 'payments' AND column_name = 'provider'"
+    ) is None, "поля эквайринга должны исчезнуть"
     assert await pool.fetchval(
         "SELECT to_regclass('public.client_legal') IS NOT NULL"
-    ) is False, "таблица платежей должна исчезнуть"
-    assert await pool.fetchval(
-        "SELECT to_regclass('public.reminders') IS NOT NULL"
     ) is True, "остальные миграции не трогаются"
 
     reapplied = await run_migrations(pool)
-    assert "009_legal.sql" in reapplied
+    assert "010_payments_acquiring.sql" in reapplied
     assert await pool.fetchval(
-        "SELECT to_regclass('public.client_legal') IS NOT NULL"
-    ) is True, "повторный накат обязан вернуть таблицу"
+        "SELECT column_name FROM information_schema.columns "
+        "WHERE table_name = 'payments' AND column_name = 'provider'"
+    ) is not None, "повторный накат обязан вернуть поля эквайринга"
 
 
 async def test_rollback_files_are_not_migrations(pool) -> None:
@@ -47,7 +51,10 @@ async def test_rollback_files_are_not_migrations(pool) -> None:
 async def test_rollback_keeps_baseline_intact(pool) -> None:
     """Базовые таблицы из initdb при откате остаются на месте."""
     rolled = await rollback_migrations(pool, steps=99)
-    assert rolled == ["009_legal.sql", "008_billing.sql", "007_inbound.sql", "006_ops.sql", "005_panel_users.sql"]
+    assert rolled == [
+        "010_payments_acquiring.sql", "009_legal.sql", "008_billing.sql",
+        "007_inbound.sql", "006_ops.sql", "005_panel_users.sql",
+    ]
     assert await pool.fetchval("SELECT to_regclass('public.salons') IS NOT NULL") is True
     # возвращаем базу в рабочее состояние для следующих тестов
     await run_migrations(pool)

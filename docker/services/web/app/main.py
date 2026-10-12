@@ -17,10 +17,13 @@ from typing import Any
 from urllib.parse import quote, urlencode
 from zoneinfo import ZoneInfo
 
+from admin_core import acquiring
 from admin_core.bot_quality import bot_quality
 from admin_core.db import get_pool, run_migrations
 from admin_core.health import ServiceMetrics, make_health_app, start_health_server
 from admin_core.web import actions, dashboard, queries, reports, users
+from admin_core.web.legal import oferta_page, pdn_page
+from admin_core.web.onboarding import onboarding_steps
 from admin_core.web.pages_core import page_bookings, page_today
 from admin_core.web.pages_lists import (
     page_audit,
@@ -29,6 +32,7 @@ from admin_core.web.pages_lists import (
     page_dialogs,
     page_masters,
     page_network,
+    page_pay,
     page_reports,
     page_services,
     page_settings,
@@ -43,6 +47,8 @@ from admin_core.web.security import (
     security_headers,
 )
 from admin_core.web.session import (
+    LOGIN_COOKIE,
+    REMEMBER_TTL,
     SESSION_COOKIE,
     PageCtx,
     Panel,
@@ -71,9 +77,11 @@ async def _today(
     start, end = queries.day_bounds(tz)
     stats = await dashboard.today_stats(panel.pool, str(salon["id"]), start, end)
     schedule = await dashboard.schedule_for_day(panel.pool, str(salon["id"]), start, end)
+    # Чек-лист «Первые шаги» для новой точки: что настроено, что осталось.
+    onboarding = dict(await onboarding_steps(panel.pool, salon))
     panel.metrics.messages.labels("page_view").inc()
     msg, err = _flash_from(request)
-    return page_today(stats, schedule, tz, salon, salons, ctx, msg, err)
+    return page_today(stats, schedule, tz, salon, salons, ctx, msg, err, onboarding)
 
 
 def _flash_from(request: Any) -> tuple[str, bool]:
@@ -234,7 +242,61 @@ async def _billing(
         salon["id"],
     )
     msg, err = _flash_from(request)
-    return page_billing(status, salon, salons, history, msg, err, ctx)
+    # Именованные аргументы: позиционный вызов подсовывал flash в `legal`,
+    # а ctx в `flash` — карточка плательщика исчезала, а в лог шёл мусор.
+    return page_billing(
+        status, salon, salons, history,
+        flash=msg, flash_error=err, ctx=ctx,
+    )
+
+
+async def _pay(
+    panel: Panel, salon: dict, salons: list[dict], request: Any, ctx: PageCtx | None = None
+) -> str:
+    """Оплата тарифа точки: статус, реквизиты и профиль плательщика.
+
+    Вариант раздела для салона: владелец видит свой счёт и правит свои
+    реквизиты (ИНН и т.п.). Внутренняя админка (счета, долги, CSV) — /billing.
+    """
+    from admin_core import billing, billing_legal  # noqa: PLC0415
+
+    role = ctx.role if ctx else "guest"
+    # владелец платит сам (pay), команда управляет всем (billing)
+    if not (can(role, "pay") or can(role, "billing")):
+        panel.metrics.errors.labels("forbidden").inc()
+        return page_pay(
+            {"status_text": "Недостаточно прав: раздел для владельца точки",
+             "price": 0, "plan": "", "requisites": {},
+             "is_trial": False, "expired": False},
+            salon, salons,
+            flash="Недостаточно прав на раздел «Оплата»",
+            flash_error=True, ctx=ctx,
+        )
+
+    salon_row = dict(await panel.pool.fetchrow(
+        "SELECT id, name, plan, paid_until, timezone FROM salons WHERE id = $1",
+        salon["id"],
+    ))
+    status = dict(await billing.billing_status(panel.pool, salon_row))
+    # Кнопка «Оплатить картой» — только когда в .env заданы ключи эквайринга.
+    # Без них работаем в ручном режиме (перевод по реквизитам), как раньше.
+    status["card_enabled"] = acquiring.provider_from_env() is not None
+    # Использование лимитов тарифа: полоски и предупреждения на странице оплаты.
+    from admin_core import plans  # noqa: PLC0415
+
+    status["usage"] = dict(await plans.usage_report(panel.pool, salon_row))
+    history = await panel.pool.fetch(
+        "SELECT period_start, period_end, amount, status, paid_at, invoice_no "
+        "FROM payments WHERE salon_id = $1 ORDER BY period_start DESC LIMIT 24",
+        salon["id"],
+    )
+    status["history"] = [dict(row) for row in history]
+    legal = await billing_legal.get(panel.pool, str(salon["id"]))
+    msg, err = _flash_from(request)
+    return page_pay(
+        status, salon, salons, legal=legal,
+        flash=msg, flash_error=err, ctx=ctx,
+    )
 
 
 async def _network(
@@ -430,29 +492,131 @@ def build_app(
         sep = "&" if "?" in back else "?"
         return web.HTTPFound(f"{back}{sep}" + urlencode(params))
 
+    async def pay_card(request: Any) -> Any:
+        """POST /pay/card — выставить счёт, создать платёж у ЮKassa и увести
+        владельца на страницу оплаты. Сессия и CSRF — как у обычной правки.
+        """
+        session_token = request.cookies.get(SESSION_COOKIE, "")
+        if not await panel.authorized(session_token):
+            return web.HTTPFound("/login")
+        session = await panel.session_of(session_token)
+        form = await request.post()
+        if not panel.csrf_ok(session_token, str(form.get("csrf", ""))):
+            panel.metrics.errors.labels("csrf").inc()
+            return web.HTTPFound(
+                "/pay?err=1&msg=" + quote("Форма устарела — обновите страницу", safe="")
+            )
+        role = session.role if session else "guest"
+        if not (can(role, "pay") or can(role, "billing")):
+            panel.metrics.errors.labels("forbidden").inc()
+            return web.HTTPFound(
+                "/pay?err=1&msg=" + quote(
+                    f"Роли «{role_label(role)}» не хватает прав на оплату", safe=""
+                )
+            )
+        provider_settings = acquiring.provider_from_env()
+        if provider_settings is None:
+            return web.HTTPFound(
+                "/pay?err=1&msg=" + quote("Онлайн-оплата не настроена", safe="")
+            )
+        salon, _salons = await panel.salon_for_session(request, session)
+        if salon is None:
+            return web.HTTPFound(
+                "/pay?err=1&msg=" + quote("Нет подключённых точек", safe="")
+            )
+        actor = audit_actor(role, session.login)
+        try:
+            result = await acquiring.start_card_payment(
+                panel.pool, acquiring.YooKassaProvider(provider_settings),
+                salon, actor=actor,
+            )
+        except Exception:  # noqa: BLE001 — сеть/провайдер, показываем человеку
+            panel.metrics.errors.labels("payment").inc()
+            return web.HTTPFound(
+                "/pay?err=1&msg=" + quote(
+                    "Не удалось создать платёж. Попробуйте ещё раз или "
+                    "оплатите переводом по реквизитам.", safe="",
+                )
+            )
+        if not result.get("ok"):
+            return web.HTTPFound(
+                "/pay?err=1&msg=" + quote(
+                    str(result.get("error") or "Провайдер не вернул ссылку"), safe=""
+                )
+            )
+        return web.HTTPFound(str(result["confirmation_url"]))
+
+    async def pay_notify(request: Any) -> Any:
+        """POST /pay/notify — уведомление от ЮKassa. Публичный (server-to-server).
+
+        Без сессии и CSRF: провайдер стучится сам. Безопасность — не в подписи
+        тела (у ЮKassa её нет), а в перечитывании платежа у провайдера и сверке
+        суммы (process_webhook_notification): подделав payment.succeeded в теле,
+        нельзя создать реальный успешный платёж на стороне ЮKassa. Ограничение
+        по IP провайдера — на уровне nginx (фаза 3)."""
+        provider_settings = acquiring.provider_from_env()
+        if provider_settings is None:
+            # Эквайринг выключен — 200, чтобы провайдер не ушёл в бесконечный ретрай.
+            return web.json_response({"ok": False, "reason": "not_configured"})
+        try:
+            payload = await request.json()
+        except Exception:  # noqa: BLE001 — тело не JSON, не наше уведомление
+            return web.json_response({"ok": False, "reason": "bad_json"})
+        provider = acquiring.YooKassaProvider(provider_settings)
+        try:
+            tag = await acquiring.process_webhook_notification(panel.pool, provider, payload)
+        except Exception:  # noqa: BLE001 — сеть/БД; ЮKassa перешлёт повторно
+            panel.metrics.errors.labels("webhook").inc()
+            tag = "error"
+        # 200 на любое доставленное уведомление — иначе ЮKassa ретраит бесконечно.
+        return web.json_response({"ok": True, "result": tag})
+
     async def index(_request: Any) -> Any:
         return web.HTTPFound("/today")
 
-    async def login_get(_request: Any) -> Any:
-        return web.Response(text=login_page(), content_type="text/html")
+    async def login_get(request: Any) -> Any:
+        # Логин из «Запомнить меня» — только предзаполнение поля, не пароль.
+        remembered = str(request.cookies.get(LOGIN_COOKIE, ""))[:200]
+        return web.Response(
+            text=login_page(login=remembered), content_type="text/html"
+        )
 
     async def login_post(request: Any) -> Any:
         form = await request.post()
         login = str(form.get("login", "")).strip()[:200]
         password = str(form.get("password", ""))[:200]
         code = str(form.get("code", ""))[:10]
+        # Согласия обязательны: оферта и обработка ПДн (152-ФЗ). Без них
+        # входа нет — это юридически значимое действие, а не косметика.
+        agreed = bool(form.get("agree_oferta")) and bool(form.get("agree_pdn"))
+        remember = bool(form.get("remember"))
         ip = request.remote or "unknown"
+        if not agreed:
+            return web.Response(
+                text=login_page(
+                    "Чтобы войти, примите условия оферты и согласие "
+                    "на обработку персональных данных",
+                    login=login,
+                    remember=remember,
+                ),
+                content_type="text/html",
+                status=400,
+            )
         if panel.login_blocked(login, ip):
             panel.metrics.errors.labels("login_throttled").inc()
             return web.Response(
                 text=login_page(
                     "Слишком много попыток входа. Попробуйте через 15 минут.",
                     login=login,
+                    agreed=True,
+                    remember=remember,
                 ),
                 content_type="text/html",
                 status=429,
             )
-        token, error = await panel.login_user(login, password, code)
+        token, error = await panel.login_user(
+            login, password, code, remember=remember,
+        )
         if error == "need_totp":
             # неверный код 2FA тоже считаем попыткой: иначе перебирают миллион кодов
             if code:
@@ -460,14 +624,17 @@ def build_app(
             return web.Response(
                 text=login_page(
                     "Введите код из приложения-аутентификатора",
-                    login=login, need_totp=True,
+                    login=login, need_totp=True, agreed=True, remember=remember,
                 ),
                 content_type="text/html",
             )
         if not token:
             panel.note_login_failure(login, ip)
             return web.Response(
-                text=login_page("Неверный логин или пароль", login=login),
+                text=login_page(
+                    "Неверный логин или пароль",
+                    login=login, agreed=True, remember=remember,
+                ),
                 content_type="text/html",
             )
         panel.note_login_success(login, ip)
@@ -475,10 +642,23 @@ def build_app(
         secure_cookie = cookie_secure_flag(
             secure=is_secure_request(request, tls_enabled=tls_enabled, trust_proxy=trust_proxy)
         )
+        # «Запомнить меня» — cookie с max_age (30 дней) вместо session-cookie;
+        # без галочки браузер забывает сессию при закрытии.
         resp.set_cookie(
             SESSION_COOKIE, token, httponly=True, samesite="Lax", path="/",
             secure=secure_cookie,
+            max_age=int(REMEMBER_TTL.total_seconds()) if remember else None,
         )
+        if remember:
+            # Только логин для предзаполнения поля; пароль в cookie не кладём —
+            # его сохранит менеджер паролей браузера (галочка + login.js).
+            resp.set_cookie(
+                LOGIN_COOKIE, login, httponly=True, samesite="Lax", path="/",
+                secure=secure_cookie,
+                max_age=int(REMEMBER_TTL.total_seconds()),
+            )
+        else:
+            resp.del_cookie(LOGIN_COOKIE, path="/")
         return resp
 
     async def logout(request: Any) -> Any:
@@ -501,6 +681,24 @@ def build_app(
             text=(STATIC_DIR / "static.css").read_text(encoding="utf-8"),
             content_type="text/css",
         )
+
+    async def login_js(_request: Any) -> Any:
+        """Микроскрипт страницы входа: включает сохранение пароля при «Запомнить меня».
+
+        Отдельный файл, а не инлайн — CSP запрещает inline-скрипты.
+        """
+        return web.Response(
+            text=(STATIC_DIR / "login.js").read_text(encoding="utf-8"),
+            content_type="application/javascript",
+        )
+
+    async def oferta(_request: Any) -> Any:
+        """Публичная оферта — доступна без входа (ссылка на форме логина)."""
+        return web.Response(text=oferta_page(), content_type="text/html")
+
+    async def pdn(_request: Any) -> Any:
+        """Соглашение об обработке ПДн — доступно без входа (152-ФЗ)."""
+        return web.Response(text=pdn_page(), content_type="text/html")
 
     async def export_csv(request: Any) -> Any:
         """Выгрузка отчёта в CSV — то, что отдают бухгалтеру и в налоговую.
@@ -611,6 +809,7 @@ def build_app(
         "/services": _services, "/masters": _masters, "/dialogs": _dialogs,
         "/audit": _audit, "/settings": _settings, "/reports": _reports,
         "/billing": _billing,
+        "/pay": _pay,
         "/network": _network,
     }
     check_builder_signatures(sections)  # падаем на старте, а не в HTTP
@@ -621,7 +820,12 @@ def build_app(
     app.router.add_get("/logout", logout)
     app.router.add_get("/salon", set_salon)
     app.router.add_post("/actions", do_action)
+    app.router.add_post("/pay/card", pay_card)
+    app.router.add_post("/pay/notify", pay_notify)
     app.router.add_get("/static.css", static_css)
+    app.router.add_get("/login.js", login_js)
+    app.router.add_get("/oferta", oferta)
+    app.router.add_get("/pdn", pdn)
     app.router.add_get("/export.csv", export_csv)
     app.router.add_get("/accounting.csv", accounting_export)
     for path, builder in sections.items():
@@ -712,6 +916,4 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    import asyncio  # noqa: PLC0415
-
     asyncio.run(main())

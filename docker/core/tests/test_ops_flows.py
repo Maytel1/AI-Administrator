@@ -253,6 +253,66 @@ async def test_usage_report_shows_headroom(demo, pool):
     assert resources["services"]["used"] >= 1
     assert resources["services"]["limit"] == 150
     assert report["at_limit"] == []
+    assert report["near_limit"] == []
+    # Проценты считаются, и в норме предупреждений нет.
+    assert resources["services"]["percent"] is not None
+    assert resources["services"]["warn"] is False
+    assert resources["services"]["percent"] == round(
+        100 * resources["services"]["used"] / 150
+    )
+
+
+def test_percent_of_handles_edges():
+    """Процент: границы, отсутствие лимита и защита от деления на ноль."""
+    assert plans.percent_of(0, 100) == 0
+    assert plans.percent_of(80, 100) == 80
+    assert plans.percent_of(100, 100) == 100
+    assert plans.percent_of(150, 100) == 150
+    assert plans.percent_of(5, None) is None  # без ограничения
+    assert plans.percent_of(5, 0) is None     # сломанный лимит не роняет панель
+
+
+async def test_usage_report_warns_at_80_percent(demo, pool):
+    """На 80% ресурс попадает в near_limit и получает warn=True."""
+    # Триал: 20 карточек клиентов; создаём 16 — это ровно 80%.
+    await pool.execute("UPDATE salons SET plan = 'trial' WHERE id = $1", demo["salon"]["id"])
+    salon_id = str(demo["salon"]["id"])
+    existing = int(await pool.fetchval(
+        "SELECT count(*) FROM clients WHERE salon_id = $1", salon_id
+    ))
+    crm = InternalCRM(pool)
+    for i in range(16 - existing):
+        await crm.create_client_manual(
+            salon_id, phone=f"+7911{i:07d}", name=f"Лимит {i}"
+        )
+    report = await plans.usage_report(
+        pool, {**demo["salon"], "plan": "trial", "timezone": "Asia/Yekaterinburg"}
+    )
+    clients = next(r for r in report["rows"] if r["resource"] == "clients")
+    assert clients["used"] == 16
+    assert clients["limit"] == 20
+    assert clients["percent"] == 80
+    assert clients["warn"] is True
+    assert "clients" in report["near_limit"]
+    assert "clients" not in report["at_limit"]
+
+
+async def test_onboarding_counts_real_steps(demo, pool):
+    """Онбординг считается из таблиц: демо-салон уже прошёл 4 шага из 5.
+
+    В фикстуре есть услуга, мастер, связь и график — не хватает только записи.
+    """
+    from admin_core.web.onboarding import onboarding_steps
+
+    result = await onboarding_steps(pool, demo["salon"])
+    steps = {s["key"]: s for s in result["steps"]}
+    assert steps["services"]["done"] is True
+    assert steps["masters"]["done"] is True
+    assert steps["master_services"]["done"] is True
+    assert steps["working_hours"]["done"] is True
+    assert steps["bookings"]["done"] is False
+    assert result["done"] == 4
+    assert result["total"] == 5
 
 
 if __name__ == "__main__":  # pragma: no cover

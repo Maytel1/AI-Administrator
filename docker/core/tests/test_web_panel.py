@@ -17,6 +17,7 @@ from admin_core.web.pages_lists import (
     page_clients,
     page_dialogs,
     page_masters,
+    page_pay,
     page_reports,
     page_services,
     page_settings,
@@ -31,6 +32,7 @@ from admin_core.web.render import (
     page_head,
     table,
     tile,
+    usage_bar,
 )
 from admin_core.web.render import (
     flash as flash_html,
@@ -794,18 +796,23 @@ def test_period_picker_shows_chosen_window():
     )
 
 
-def test_bookings_table_has_no_stray_cells():
-    """В строке ровно столько ячеек, сколько заголовков.
+def test_bookings_card_has_all_fields_and_one_menu():
+    """Карточка записи несёт все поля строки и ровно одно меню действий.
 
-    Раньше строка выдавала ещё две ячейки — отметку предоплаты и форму
-    переноса, — на которые в шапке не было ни заголовка. Таблица от этого
-    разъезжалась, а перенос дублировал пункт «Действия».
+    Раньше это была таблица, и строка выдавала больше ячеек, чем заголовков:
+    отметка предоплаты и форма переноса разъезжали таблицу и дублировали
+    «Действия». Теперь строка — карточка, но смысл тот же: каждое поле видно,
+    меню действий ровно одно и ни одной лишней формы переноса рядом.
     """
     html = page_bookings([dict(BOOKING)], TZ, "", SALON, [SALON], OWNER_CTX)
-    header_part, body_part = html.split("</thead>", 1)
-    headers = header_part.count("<th>")
-    first_row = body_part.split("<tr>", 1)[1].split("</tr>", 1)[0]
-    assert first_row.count("<td>") == headers
+    # Все ключевые поля карточки — на месте.
+    for needle in ("03.10 11:00", "Иван", "+79001234567", "Маникюр",
+                   "Мария", f"2{NBSP}000", "источник"):
+        assert needle.lower() in html.lower(), needle
+    # Одна запись → одна карточка, одно меню, одна форма переноса.
+    assert html.count('class="m-card"') == 1
+    assert html.count("menu-pop") == 1
+    assert html.count('name="new_start"') == html.count("menu-pop")
 
 
 def test_filters_are_in_table_header():
@@ -821,16 +828,16 @@ def test_filters_are_in_table_header():
 def test_today_schedule_uses_action_menu():
     """В расписании на сегодня — то же меню действий, что и в «Записях».
 
-    Здесь была та же болезнь: строка выдавала больше ячеек, чем заголовков,
-    и отдельные поля с датой и кнопкой «Перенести» дублировали меню.
+    Расписание тоже стало карточками, но защита прежняя: меню одно на
+    карточку, отдельных форм переноса рядом с ним быть не должно — иначе
+    пункт «Перенести» дублируется и путает.
     """
     row = {**BOOKING, "status": "confirmed"}
     html = page_today(dict(STATS), [row], TZ, SALON, [SALON], OWNER_CTX)
-    head, _, body = html.partition("</thead>")
-    first_row = body.split("<tr>", 1)[1].split("</tr>", 1)[0]
-    assert first_row.count("<td>") == head.count("<th>")
+    assert 'class="m-card"' in html
     assert "menu-pop" in html and "booking_reschedule" in html
-    # Отдельных форм переноса в таблице быть не должно.
+    # Одна карточка → одно меню и одна форма переноса внутри него.
+    assert html.count('class="m-card"') == 1
     assert html.count('name="new_start"') == html.count("menu-pop")
 
 
@@ -911,8 +918,8 @@ def test_today_blocks_order():
     i_load = html.index('class="load-line"')
     i_tiles = html.index('tiles tiles-row')
     i_panel = html.index("panel-tight")
-    i_table = html.index("<table>")
-    assert i_load < i_tiles < i_panel < i_table, "блоки идут не в том порядке"
+    i_grid = html.index('class="m-grid"')  # сетка карточек расписания
+    assert i_load < i_tiles < i_panel < i_grid, "блоки идут не в том порядке"
 
 
 def test_today_dashboard_two_columns():
@@ -1191,6 +1198,238 @@ def test_login_page_has_login_password_and_totp_fields():
     assert 'name="code"' in with_totp
     assert 'value="boss@test.ru"' in with_totp  # логин не теряем при вводе кода
     assert "Введите код" in with_totp
+
+
+def test_login_page_requires_two_consents():
+    """Вход загорожен двумя галочками (оферта + ПДн) и даёт ссылки на документы."""
+    html = login_page()
+    assert 'name="agree_oferta"' in html and 'name="agree_pdn"' in html
+    assert 'href="/oferta"' in html and 'href="/pdn"' in html
+    assert 'name="remember"' in html  # «Запомнить меня» — на той же форме
+
+
+def test_login_page_agreed_hides_checkboxes_behind_hidden_fields():
+    """После POST (шаг 2FA) согласия пробрасываются скрытыми полями, без галочек."""
+    html = login_page(need_totp=True, login="boss@test.ru", agreed=True, remember=True)
+    assert 'name="agree_oferta"' in html and 'name="agree_pdn"' in html
+    assert 'type="hidden" name="agree_oferta"' in html
+    assert 'type="checkbox"' not in html  # повторные клики не требуются
+    assert 'type="hidden" name="remember"' in html  # remember тоже пробрасывается
+
+    # Без remember скрытого поля нет — не отмеченную галочку пробрасывать нечего.
+    plain = login_page(need_totp=True, login="boss@test.ru", agreed=True)
+    assert 'name="remember"' not in plain
+
+
+def test_legal_pages_render_with_requisites(monkeypatch):
+    """Документы подставляют реквизиты из env и не роняют на пустых."""
+    from admin_core.web import legal  # noqa: PLC0415
+
+    monkeypatch.setenv("BILLING_LEGAL_NAME", "ИП Тестов Т.Т.")
+    monkeypatch.setenv("BILLING_INN", "123456789012")
+    oferta = legal.oferta_page()
+    assert "ИП Тестов Т.Т." in oferta and "123456789012" in oferta
+    assert "Публичная оферта" in oferta
+    pdn = legal.pdn_page()
+    assert "152-ФЗ" in pdn and "ИП Тестов Т.Т." in pdn
+
+    monkeypatch.delenv("BILLING_LEGAL_NAME", raising=False)
+    monkeypatch.delenv("BILLING_INN", raising=False)
+    empty = legal.oferta_page()
+    assert "задайте BILLING_LEGAL_NAME" in empty  # пустые реквизиты — с подсказкой
+
+
+def test_page_pay_shows_status_and_legal_form():
+    """Страница /pay: плитки тарифа + профиль плательщика для своей команды."""
+    status = {
+        "status_text": "Оплачено до 01.02.2026", "price": 990.0, "plan": "start",
+        "paid_until": datetime(2026, 2, 1), "expired": False, "is_trial": False,
+        "requisites": {"legal_name": "ООО Ромашка", "inn": "770123456"},
+        "history": [{"amount": 990.0, "status": "paid", "period_start": "01.01.2026",
+                     "period_end": "31.01.2026", "paid_at": "03.01.2026"}],
+    }
+    ctx = PageCtx(csrf="f" * 32, role="team", login="admin@test.ru")
+    html = page_pay(status, SALON, [SALON], ctx=ctx)
+    assert "Оплата" in html
+    assert "990" in html and "ООО Ромашка" in html and "770123456" in html
+    assert 'name="client_type"' in html          # выбор типа плательщика
+    assert "01.02.2026" in html                  # оплачено до
+    # Владелец точки — полноправный пользователь /pay: видит профиль плательщика.
+    html_owner = page_pay(
+        status, SALON, [SALON],
+        ctx=PageCtx(csrf="f" * 32, role="owner", login="boss@test.ru"),
+    )
+    assert 'name="client_type"' in html_owner
+    # Администратор точки тариф не оплачивает — карточки нет.
+    html_staff = page_pay(
+        status, SALON, [SALON],
+        ctx=PageCtx(csrf="s" * 32, role="staff", login="recep@test.ru"),
+    )
+    assert 'name="client_type"' not in html_staff
+
+
+def test_usage_bar_shows_progress_and_tones():
+    """Полоска лимита: цвет по порогу (80% — жёлтый, 100% — красный)."""
+    normal = usage_bar(10, 100, 10)
+    assert "u-accent" in normal and "10 из 100 (10%)" in normal
+    warn = usage_bar(80, 100, 80)
+    assert "u-yellow" in warn and "80%" in warn
+    full = usage_bar(100, 100, 100)
+    assert "u-red" in full
+    unlimited = usage_bar(42, None, None)
+    assert "42" in unlimited and "без ограничений" in unlimited
+    assert "usage-track" not in unlimited  # без лимита полоска не рисуется
+
+
+def test_page_pay_shows_limit_indicators_and_warning():
+    """На /pay — полоски использования и предупреждение при 80% лимита."""
+    usage = {
+        "plan": "trial",
+        "rows": [
+            {"resource": "clients", "used": 18, "limit": 20, "percent": 90, "warn": True},
+            {"resource": "services", "used": 1, "limit": 5, "percent": 20, "warn": False},
+            {"resource": "masters", "used": 1, "limit": 2, "percent": 50, "warn": False},
+            {"resource": "bookings_per_month", "used": 5, "limit": 50,
+             "percent": 10, "warn": False},
+        ],
+        "near_limit": ["clients"], "at_limit": [],
+    }
+    status = {
+        "status_text": "Триал", "price": 0, "plan": "trial",
+        "paid_until": None, "expired": False, "is_trial": True,
+        "requisites": {}, "history": [], "usage": usage,
+    }
+    ctx = PageCtx(csrf="f" * 32, role="owner", login="boss@test.ru")
+    html = page_pay(status, SALON, [SALON], ctx=ctx)
+    assert "Лимиты тарифа" in html
+    assert "Клиентские карточки" in html and "18 из 20 (90%)" in html
+    assert "u-yellow" in html            # 90% — предупреждение
+    assert "Близко к лимиту" in html     # текст предупреждения при ≥80%
+    # Внутренние ключи ресурсов не светятся подписями (в меню есть /clients —
+    # проверяем именно строку подписи в карточке лимитов).
+    assert '<span class="limit-name">clients</span>' not in html
+
+
+def test_page_pay_hides_limits_card_for_unlimited_plan():
+    """Тариф без лимитов (pro) — карточка индикаторов не показывается."""
+    usage = {
+        "plan": "pro",
+        "rows": [
+            {"resource": "clients", "used": 500, "limit": None,
+             "percent": None, "warn": False},
+        ],
+        "near_limit": [], "at_limit": [],
+    }
+    status = {
+        "status_text": "Оплачено", "price": 7990, "plan": "pro",
+        "paid_until": datetime(2026, 2, 1), "expired": False, "is_trial": False,
+        "requisites": {}, "history": [], "usage": usage,
+    }
+    ctx = PageCtx(csrf="f" * 32, role="owner", login="boss@test.ru")
+    html = page_pay(status, SALON, [SALON], ctx=ctx)
+    assert "Лимиты тарифа" not in html
+
+
+def test_page_pay_shows_card_button_when_acquiring_enabled():
+    """Кнопка «Оплатить картой» — только при заданных ключах эквайринга.
+
+    Без ключей (ручной режим) кнопки нет: иначе салон нажал бы «оплатить
+    картой» и ушёл в ошибку вместо перевода по реквизитам. Роль staff тариф не
+    оплачивает — кнопки нет даже при включённом эквайринге.
+    """
+    status = {
+        "status_text": "Тариф не оплачен", "price": 12000.0, "plan": "standard",
+        "paid_until": None, "expired": False, "is_trial": False,
+        "requisites": {}, "history": [], "card_enabled": True,
+    }
+    # Владелец при включённом эквайринге — видит кнопку на /pay/card.
+    html_owner = page_pay(
+        status, SALON, [SALON],
+        ctx=PageCtx(csrf="f" * 32, role="owner", login="boss@test.ru"),
+    )
+    assert 'action="/pay/card"' in html_owner
+    assert "Оплатить" in html_owner and "картой" in html_owner
+    # Без ключей эквайринга (card_enabled=False) кнопки нет — ручной путь.
+    html_manual = page_pay(
+        dict(status, card_enabled=False), SALON, [SALON],
+        ctx=PageCtx(csrf="f" * 32, role="owner", login="boss@test.ru"),
+    )
+    assert 'action="/pay/card"' not in html_manual
+    # staff тариф не оплачивает — кнопки нет даже при включённом эквайринге.
+    html_staff = page_pay(
+        status, SALON, [SALON],
+        ctx=PageCtx(csrf="f" * 32, role="staff", login="admin@test.ru"),
+    )
+    assert 'action="/pay/card"' not in html_staff
+
+
+def test_page_pay_shows_exhausted_limit():
+    """Исчерпанный лимит — красное предупреждение «нужен следующий тариф»."""
+    usage = {
+        "plan": "trial",
+        "rows": [
+            {"resource": "services", "used": 5, "limit": 5, "percent": 100, "warn": True},
+        ],
+        "near_limit": [], "at_limit": ["services"],
+    }
+    status = {
+        "status_text": "Триал", "price": 0, "plan": "trial",
+        "paid_until": None, "expired": False, "is_trial": True,
+        "requisites": {}, "history": [], "usage": usage,
+    }
+    ctx = PageCtx(csrf="f" * 32, role="owner", login="boss@test.ru")
+    html = page_pay(status, SALON, [SALON], ctx=ctx)
+    assert "Лимит исчерпан" in html
+    assert "u-red" in html
+
+
+def test_onboarding_card_shows_progress_and_links():
+    """Чек-лист «Первые шаги»: прогресс, галочки у готового, ссылки у остального."""
+    from admin_core.web.onboarding import onboarding_card
+
+    ob = {
+        "steps": [
+            {"key": "services", "title": "Добавьте услуги в прайс",
+             "hint": "hint", "link": "/services", "done": True, "count": 3},
+            {"key": "bookings", "title": "Примите первую запись",
+             "hint": "hint", "link": "/bookings", "done": False, "count": 0},
+        ],
+        "done": 1, "total": 5,
+    }
+    html = onboarding_card(ob, "salon-42")
+    assert "Первые шаги" in html
+    assert "осталось 4" in html          # total - done
+    assert "1 из 5" in html              # прогресс
+    assert "onb done" in html            # выполненный шаг помечен
+    assert "Добавьте услуги в прайс" in html  # его текст виден (без ссылки)
+    assert "/services?salon=salon-42" not in html  # готовый шаг — не ссылка
+    assert "/bookings?salon=salon-42" in html  # невыполненный ведёт с salon
+
+
+def test_onboarding_card_hidden_when_complete():
+    """Когда все шаги пройдены (или данных нет) — карточки нет."""
+    from admin_core.web.onboarding import onboarding_card
+
+    assert onboarding_card({"steps": [], "done": 5, "total": 5}) == ""
+    assert onboarding_card(None) == ""
+    # done == total тоже должен скрывать карточку.
+    full = {"steps": [{"key": "x", "title": "t", "hint": "h", "link": "/x",
+                       "done": True, "count": 1}], "done": 1, "total": 1}
+    assert onboarding_card(full) == ""
+
+
+def test_page_today_embeds_onboarding_checklist():
+    """На главной «Сегодня» появляется чек-лист, если он передан."""
+    ob = {
+        "steps": [
+            {"key": "bookings", "title": "Примите первую запись",
+             "hint": "hint", "link": "/bookings", "done": False, "count": 0},
+        ],
+        "done": 0, "total": 5,
+    }
+    html = page_today(dict(STATS), [dict(BOOKING)], TZ, SALON, [SALON], onboarding=ob)
+    assert "Первые шаги" in html
+    assert "/bookings?salon=" in html
 
 
 def test_builder_signature_guard():

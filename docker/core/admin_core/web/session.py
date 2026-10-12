@@ -22,7 +22,11 @@ from .roles import can
 from .users import authenticate
 
 SESSION_TTL = timedelta(hours=12)
+# «Запомнить меня»: сессия живёт 30 дней вместо 12 часов; cookie — с max_age.
+REMEMBER_TTL = timedelta(days=30)
 SESSION_COOKIE = "dz24_session"
+# Логин (не пароль!) из «Запомнить меня» — только для предзаполнения поля.
+LOGIN_COOKIE = "dz24_login"
 
 
 @dataclass
@@ -166,8 +170,14 @@ class Panel:
             return False
         return hmac.compare_digest(self.csrf_token(session_token), submitted)
 
-    async def login_user(self, login: str, password: str, code: str = "") -> tuple[str, str]:
-        """Вход по учётной записи. Возвращает (токен, ошибка); токен '' — не вошли."""
+    async def login_user(
+        self, login: str, password: str, code: str = "", *, remember: bool = False,
+    ) -> tuple[str, str]:
+        """Вход по учётной записи. Возвращает (токен, ошибка); токен '' — не вошли.
+
+        ``remember=True`` (галочка «Запомнить меня») — сессия живёт REMEMBER_TTL
+        (30 дней) вместо обычных 12 часов.
+        """
         result = await authenticate(self.pool, login, password, code)
         if not result["ok"]:
             if result["error"] == "need_totp":
@@ -176,10 +186,11 @@ class Panel:
             await self._log_login(login, ok=False, reason=result["error"])
             return "", "invalid"
         user = result["user"]
+        ttl = REMEMBER_TTL if remember else SESSION_TTL
         token = secrets.token_urlsafe(24)
         self.sessions[token] = Session(
             user=user, role=user["role"], login=user["login"],
-            salon_id=user["salon_id"], until=datetime.now(ZoneInfo("UTC")) + SESSION_TTL,
+            salon_id=user["salon_id"], until=datetime.now(ZoneInfo("UTC")) + ttl,
         )
         # Дублируем в БД: иначе при двух инстансах веб-сервиса вход, сделанный
         # на одном, не работает на другом — и выглядит как «панель выкидывает».

@@ -179,6 +179,68 @@ async def test_billing_page_opens_for_team(demo, pool):
         await http.close()
 
 
+async def test_pay_page_opens_for_owner(client):
+    """/pay — страница салона: владелец видит статус и правит свои реквизиты."""
+    http, _panel, _token, _demo = client
+    response = await http.get("/pay")
+    assert response.status == 200
+    body = await response.text()
+    assert LOGIN_MARK not in body
+    assert "Недостаточно прав" not in body
+    assert "Оплата" in body
+    assert 'name="client_type"' in body, "владелец должен править карточку плательщика"
+
+
+async def test_pay_page_is_hidden_from_staff(client, demo, pool):
+    """Администратор точки не оплачивает тариф и не видит реквизиты."""
+    from admin_core.web.session import Panel  # noqa: PLC0415
+    from aiohttp.test_utils import TestClient, TestServer  # noqa: PLC0415
+    from app.main import build_app  # noqa: PLC0415
+
+    panel = Panel(pool, metrics=None)
+    app = build_app(panel)
+    http = TestClient(TestServer(app))
+    await http.start_server()
+    token = await panel.open_session(
+        role="staff", login="recep@test.ru", salon_id=str(demo["salon"]["id"])
+    )
+    http.session.cookie_jar.update_cookies({"dz24_session": token})
+    try:
+        response = await http.get("/pay")
+        assert response.status == 200
+        body = await response.text()
+        assert LOGIN_MARK not in body
+        assert "Недостаточно прав" in body
+        assert "БИК" not in body, "реквизиты не должны утекать администратору"
+    finally:
+        await http.close()
+
+
+async def test_pay_page_opens_for_team(demo, pool):
+    """/pay у нашей команды открывается: статус тарифа + реквизиты + профиль."""
+    from admin_core.web.session import Panel  # noqa: PLC0415
+    from aiohttp.test_utils import TestClient, TestServer  # noqa: PLC0415
+    from app.main import build_app  # noqa: PLC0415
+
+    panel = Panel(pool, metrics=None)
+    app = build_app(panel)
+    http = TestClient(TestServer(app))
+    await http.start_server()
+    token = await panel.open_session(
+        role="team", login="admin@test.ru", salon_id=None
+    )
+    http.session.cookie_jar.update_cookies({"dz24_session": token})
+    try:
+        response = await http.get("/pay")
+        assert response.status == 200
+        body = await response.text()
+        assert LOGIN_MARK not in body
+        assert "Недостаточно прав" not in body
+        assert "Оплата" in body
+    finally:
+        await http.close()
+
+
 async def test_billing_actions_require_permission(demo, pool):
     """Прямой POST от администратора не должен выставлять счёт."""
     from admin_core.web.roles import can_action  # noqa: PLC0415
@@ -300,6 +362,205 @@ async def _csrf(http) -> str:  # noqa: ANN001
     return http.session.cookie_jar.filter_cookies(
         yarl.URL("http://127.0.0.1")
     )["dz24_session"].value
+
+
+# --- Оферта, ПДн и согласия на входе -----------------------------------------
+
+CONSENT = {"agree_oferta": "1", "agree_pdn": "1"}
+
+
+async def test_oferta_and_pdn_pages_are_public(client):
+    """Документы открываются без входа — иначе ссылка на форме логина ведёт в никуда."""
+    http, _panel, _token, _demo = client
+    http.session.cookie_jar.clear()
+    oferta = await http.get("/oferta")
+    assert oferta.status == 200
+    text = await oferta.text()
+    assert "Публичная оферта" in text and "15 000" in text  # тарифы из TARIFFS.md
+    pdn = await http.get("/pdn")
+    assert pdn.status == 200
+    text = await pdn.text()
+    assert "152-ФЗ" in text and "Обработка персональных данных" in text
+
+
+async def test_login_js_is_served(client):
+    """CSP запрещает inline-скрипты — страница входа грузит /login.js отдельным файлом."""
+    http, _panel, _token, _demo = client
+    http.session.cookie_jar.clear()
+    response = await http.get("/login.js")
+    assert response.status == 200
+    assert "remember" in await response.text()
+
+
+async def test_login_page_shows_consents_and_remember(client):
+    """На форме входа — две обязательные галочки согласия и «Запомнить меня»."""
+    http, _panel, _token, _demo = client
+    http.session.cookie_jar.clear()
+    response = await http.get("/login")
+    text = await response.text()
+    assert 'name="agree_oferta"' in text and 'name="agree_pdn"' in text
+    assert 'name="remember"' in text
+    assert 'href="/oferta"' in text and 'href="/pdn"' in text
+
+
+async def test_login_post_without_consents_is_rejected(client):
+    """POST без согласий отклоняется сервером, даже с верным паролем: 400 и без cookie."""
+    http, _panel, _token, _demo = client
+    http.session.cookie_jar.clear()
+    response = await http.post(
+        "/login",
+        data={"login": "nobody@nowhere.ru", "password": "any-password"},
+    )
+    assert response.status == 400
+    assert "примите условия оферты" in (await response.text()).lower()
+    assert not http.session.cookie_jar.filter_cookies(
+        yarl.URL("http://127.0.0.1")
+    ).get("dz24_session")
+
+
+async def test_login_post_with_consents_and_wrong_password(client):
+    """Согласия есть, пароль неверный — входим только с ошибкой, cookie нет."""
+    http, _panel, _token, _demo = client
+    http.session.cookie_jar.clear()
+    response = await http.post(
+        "/login",
+        data={"login": "nobody@nowhere.ru", "password": "wrong", **CONSENT},
+    )
+    assert response.status == 200
+    assert "Неверный логин или пароль" in await response.text()
+    assert not http.session.cookie_jar.filter_cookies(
+        yarl.URL("http://127.0.0.1")
+    ).get("dz24_session")
+
+
+async def test_login_post_success_without_remember_sets_session_cookie(client, pool):
+    """Вход без «Запомнить меня»: обычный session-cookie (без max-age)."""
+    from admin_core.web import users  # noqa: PLC0415
+
+    http, _panel, _token, demo = client
+    http.session.cookie_jar.clear()
+    await users.create_user(
+        pool, login="remember-off@test.ru", password="parol-12345",
+        role="staff", salon_id=str(demo["salon"]["id"]),
+    )
+    response = await http.post(
+        "/login",
+        data={"login": "remember-off@test.ru", "password": "parol-12345", **CONSENT},
+        allow_redirects=False,
+    )
+    assert response.status == 302
+    assert response.headers["Location"] == "/today"
+    jar = http.session.cookie_jar.filter_cookies(yarl.URL("http://127.0.0.1"))
+    assert "dz24_session" in jar
+    assert not jar["dz24_session"]["max-age"]  # session-cookie
+    assert "dz24_login" not in jar  # без галочки логин не запоминаем
+
+
+async def test_login_post_remember_sets_long_cookie_and_login(client, pool):
+    """С «Запомнить меня»: cookie живёт 30 дней, логин сохраняется для предзаполнения."""
+    from admin_core.web import users  # noqa: PLC0415
+
+    http, _panel, _token, demo = client
+    http.session.cookie_jar.clear()
+    await users.create_user(
+        pool, login="remember-on@test.ru", password="parol-12345",
+        role="staff", salon_id=str(demo["salon"]["id"]),
+    )
+    response = await http.post(
+        "/login",
+        data={
+            "login": "remember-on@test.ru", "password": "parol-12345",
+            "remember": "1", **CONSENT,
+        },
+        allow_redirects=False,
+    )
+    assert response.status == 302
+    # Проверяем заголовок Set-Cookie напрямую: cookie_jar aiohttp не хранит max-age.
+    session_headers = [
+        h for h in response.headers.getall("Set-Cookie")
+        if h.startswith("dz24_session=")
+    ]
+    assert session_headers and "Max-Age=2592000" in session_headers[0]
+    jar = http.session.cookie_jar.filter_cookies(yarl.URL("http://127.0.0.1"))
+    assert jar["dz24_login"].value == "remember-on@test.ru"  # только логин!
+
+    # После выхода логин подставляется в поле, пароль — нет.
+    await http.get("/logout", allow_redirects=False)
+    page = await http.get("/login")
+    text = await page.text()
+    assert 'value="remember-on@test.ru"' in text
+
+
+async def test_login_without_js_still_requires_consents(client, pool):
+    """Скрытое поле согласия с шага 2FA проходит серверную проверку повторно."""
+    from admin_core.web import users  # noqa: PLC0415
+
+    http, _panel, _token, demo = client
+    http.session.cookie_jar.clear()
+    await users.create_user(
+        pool, login="hidden-consent@test.ru", password="parol-12345",
+        role="staff", salon_id=str(demo["salon"]["id"]),
+    )
+    # POST как после шага 2FA: согласия приходят скрытыми полями.
+    response = await http.post(
+        "/login",
+        data={"login": "hidden-consent@test.ru", "password": "parol-12345", **CONSENT},
+        allow_redirects=False,
+    )
+    assert response.status == 302
+
+
+async def test_pay_card_requires_login(client):
+    """POST /pay/card без сессии — уводит на вход, а не создаёт платёж."""
+    http, _panel, _token, _demo = client
+    http.session.cookie_jar.clear()
+    response = await http.post("/pay/card", data={}, allow_redirects=False)
+    assert response.status in (302, 303)
+    assert "/login" in response.headers.get("Location", "")
+
+
+async def test_pay_card_requires_csrf(client):
+    """POST /pay/card без CSRF отклоняется даже с валидной сессией владельца."""
+    http, _panel, _token, _demo = client
+    response = await http.post("/pay/card", data={}, allow_redirects=False)
+    assert response.status in (302, 303)
+    assert "err=1" in response.headers.get("Location", "")
+
+
+async def test_pay_card_without_keys_redirects_to_manual(client):
+    """POST /pay/card без ключей эквайринга — понятный отказ и назад на /pay.
+
+    Сессия и CSRF проходят, но провайдер не настроен (в тестах ключи
+    YOOKASSA_* не заданы) → человеку показывается ошибка, а не зависший
+    редирект на несуществующую страницу оплаты.
+    """
+    http, _panel, token, _demo = client
+    response = await http.post(
+        "/pay/card", data={"csrf": token}, allow_redirects=False,
+    )
+    assert response.status in (302, 303)
+    location = response.headers.get("Location", "")
+    assert location.startswith("/pay?") and "err=1" in location
+
+
+async def test_pay_notify_is_public_and_returns_200(client):
+    """Вебхук ЮKassa публичен (без сессии/CSRF) и всегда отвечает 200.
+
+    ЮKassa доставляет уведомления server-to-server, без cookie. 200 на
+    не-настроенный эквайринг — чтобы провайдер не ушёл в бесконечный ретрай.
+    Логика сверки платежа и суммы — в test_acquiring.py.
+    """
+    http, _panel, _token, _demo = client
+    http.session.cookie_jar.clear()  # вебхук приходит без сессии
+    response = await http.post(
+        "/pay/notify",
+        json={"type": "notification", "event": "payment.succeeded",
+              "object": {"id": "pay_test", "status": "succeeded"}},
+    )
+    assert response.status == 200
+    payload = await response.json()
+    # Эквайринг в тестах не настроен — ответ not_configured, но код 200.
+    assert payload["ok"] is False
 
 
 if __name__ == "__main__":  # pragma: no cover

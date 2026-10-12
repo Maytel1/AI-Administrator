@@ -44,10 +44,14 @@ HUNDREDS_ONES = {
 }
 THOUSAND_ONES = {1: "одна", 2: "две", 3: "три", 4: "четыре"}
 
-# Цены по умолчанию (₽/месяц). Переопределяются BILLING_PRICES (JSON): цены
-# меняются по договорённости, и трогать код для этого не должно.
+# Цены по умолчанию (₽/месяц) = согласованный прайс TARIFFS.md, вариант B
+# (Текст/Голос/Полный = 5000/12000/15000). Переопределяются BILLING_PRICES
+# (JSON): цены меняются по договорённости, и трогать код для этого не должно.
+# Держим дефолт синхронно с прайсом: иначе при пустом BILLING_PRICES панель
+# молча покажет старые цифры — ровно тот рассинхрон, из-за которого на встрече
+# с клиентом всплывают две разные цены.
 DEFAULT_PRICES: dict[str, int] = {
-    "trial": 0, "start": 1990, "standard": 3990, "pro": 7990,
+    "trial": 0, "start": 5000, "standard": 12000, "pro": 15000,
 }
 
 
@@ -178,7 +182,9 @@ def _thousands(value: int) -> str:
         # «один тысяча» — грамматически неверно: перед «тысяча» нужно «одна».
         head = head[:-len("один")] + "одна" if head.endswith("один") else head + "одна"
         ending = "тысяча"
-    elif tail in (2, 3, 4):
+    # 12/13/14 тысяч — «двенадцать тысяч», а не «двенадцать тысячи»: как и для
+    # рубля, склонение зависит от последних двух разрядов, а не только от units.
+    elif tail in (2, 3, 4) and value % 100 not in (12, 13, 14):
         ending = "тысячи"
     else:
         ending = "тысяч"
@@ -212,6 +218,89 @@ def invoice_text(salon: dict[str, Any], period: Period, amount: int, number: str
     if req["tg"]:
         lines.extend(["", f"Вопросы по оплате: {req['tg']}"])
     return "\n".join(line for line in lines if line)
+
+
+def act_text(
+    salon: dict[str, Any], period: Period, amount: int, number: str
+) -> str:
+    """Текст акта оказанных услуг за период — первичный документ для бухгалтерии.
+
+    Салон-юрлицо/ИП на ОСНО принимает расходы к учёту по акту, а не по одному
+    счёту: счёт — это требование оплатить, акт — подтверждение, что услуга
+    действительно оказана за период. Генерируем по тем же данным, что и счёт
+    (период, сумма, тариф), чтобы цифры не разошлись. НДС зависит от режима
+    исполнителя: подставляем из ``BILLING_VAT`` («без НДС» для УСН/патента,
+    «НДС 20%» для ОСНО) — по умолчанию «без НДС», как у большинства пилотов.
+    """
+    req = requisites()
+    who = str(salon.get("name") or "Клиент")
+    vat = os.getenv("BILLING_VAT", "").strip() or "НДС не начисляется (УСН/патент)"
+    today = f"{date.today():%d.%m.%Y}"
+    lines = [
+        f"АКТ № {number} оказанных услуг от {today}",
+        "",
+        f"Исполнитель: {req['legal_name'] or '(задайте BILLING_LEGAL_NAME)'}",
+        f"Заказчик: {who}",
+        "",
+        "Основание: Договор оферты на оказание услуг, опубликованный на сайте.",
+        "",
+        f"1. Исполнитель оказал, а Заказчик принял услуги за период "
+        f"{period.start:%d.%m.%Y} — {period.end:%d.%m.%Y}:",
+        "",
+        f"   Абонентское обслуживание сервиса записи и автоматизации, "
+        f"тариф «{salon.get('plan')}»: {amount} руб.",
+        "",
+        "2. Услуги оказаны в полном объёме и в срок. Претензий по объёму, "
+        "качеству и срокам Заказчик не имеет.",
+        "",
+        f"3. {vat}.",
+        "",
+        "4. Акт составлен в двух экземплярах, по одному для каждой из сторон, "
+        "и является основанием для расчётов.",
+        "",
+        "ИСПОЛНИТЕЛЬ: ______________________ / "
+        f"{req['legal_name'] or '(ФИО)'} /",
+        "",
+        "ЗАКАЗЧИК: ______________________ / (ФИО, должность) /",
+    ]
+    return "\n".join(line for line in lines if line is not None)
+
+
+async def issue_act(
+    pool: Any, salon: dict[str, Any], *, actor: str = "team:cli",
+) -> dict[str, Any]:
+    """Сформировать акт за последний оплаченный период салона.
+
+    Акт привязан к уже оплаченному счёту: берём последнюю оплату из ``payments``,
+    чтобы закрывать факт оказания услуг за реально оплаченный месяц. Если
+    оплат нет — честно сообщаем, что закрывать нечего (не выдумываем период).
+    """
+    salon_id = str(salon["id"])
+    row = await pool.fetchrow(
+        "SELECT period_start, period_end, amount, invoice_no "
+        "FROM payments WHERE salon_id = $1 AND status = 'paid' "
+        "ORDER BY period_start DESC LIMIT 1",
+        salon_id,
+    )
+    if not row:
+        return {"ok": False, "error": "no_paid_period"}
+    period = Period(
+        date.fromisoformat(str(row["period_start"])[:10]),
+        date.fromisoformat(str(row["period_end"])[:10]),
+    )
+    # Базу считаем отдельно: в одном f-строковом выражении спец `:%Y%m` применится
+    # ко всему `invoice_no or period.start`, и при непустом invoice_no (обычный
+    # случай) формат даты падал бы на строке. Поэтому базу выделяем.
+    base = row["invoice_no"] or f"{period.start:%Y%m}"
+    number = f"А-{base}"
+    amount = int(row["amount"])
+    return {
+        "ok": True,
+        "act_no": number,
+        "period": period,
+        "amount": amount,
+        "text": act_text(salon, period, amount, number),
+    }
 
 
 async def issue_invoice(

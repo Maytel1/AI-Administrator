@@ -16,6 +16,18 @@ from typing import Any
 
 TRIAL_DAYS = 14
 
+# Порог предупреждения об исчерпании лимита: при 80% использования ресурса
+# панель показывает предупреждение — чтобы смену тарифа успели выбрать заранее.
+WARN_PERCENT = 80
+
+# Русские названия ресурсов для сообщений и индикаторов.
+RESOURCE_NAMES = {
+    "clients": ("клиентских карточек", "карточки клиентов"),
+    "services": ("услуг в прайсе", "услуги в прайсе"),
+    "masters": ("мастеров", "мастера"),
+    "bookings_per_month": ("записей в этом месяце", "записи в этом месяце"),
+}
+
 # Лимиты тарифа: None — без ограничения.
 # plan            клиенты услуги мастера записи_в_месяц
 PLAN_LIMITS: dict[str, dict[str, int | None]] = {
@@ -117,29 +129,53 @@ async def check_limit(
     }
 
 
+def percent_of(used: int, limit: int | None) -> int | None:
+    """Процент использования лимита; None — лимита нет (без ограничения).
+
+    Деление на ноль исключено: limit=0 считается «без ограничения» — так
+    сломанный env не блокирует всю панель.
+    """
+    if not limit:
+        return None
+    return min(999, int(round(100 * int(used) / int(limit))))
+
+
 async def usage_report(pool: Any, salon: dict[str, Any]) -> dict[str, Any]:
-    """Полная картина «сколько занято / сколько можно» — для панели и алертов."""
+    """Полная картина «сколько занято / сколько можно» — для панели и алертов.
+
+    В каждой строке: used, limit, percent (None если лимита нет) и warn —
+    True при достижении WARN_PERCENT (80%). ``near_limit`` — ресурсы на
+    пороге, ``at_limit`` — исчерпанные: по ним панель строит предупреждение.
+    """
     plan = str(salon.get("plan") or DEFAULT_PLAN)
     usage = await current_usage(
         pool, str(salon["id"]), tz_name=str(salon.get("timezone") or "UTC")
     )
     rows: list[dict[str, Any]] = []
+    near_limit: list[str] = []
+    exhausted: list[str] = []
     for resource in ("clients", "services", "masters", "bookings_per_month"):
+        used = int(getattr(usage, USAGE_FIELD.get(resource, resource), 0))
+        limit = limit_of(plan, resource)
+        percent = percent_of(used, limit)
+        warn = percent is not None and percent >= WARN_PERCENT
         rows.append({
             "resource": resource,
-            "used": getattr(usage, USAGE_FIELD.get(resource, resource), 0),
-            "limit": limit_of(plan, resource),
+            "used": used,
+            "limit": limit,
+            "percent": percent,
+            "warn": warn,
         })
-    exhausted: list[str] = []
-    for row in rows:
-        limit = row["limit"]
         if limit is None:
             continue
-        if int(row["used"] or 0) >= int(limit):
-            exhausted.append(str(row["resource"]))
+        if used >= int(limit):
+            exhausted.append(resource)
+        elif warn:
+            near_limit.append(resource)
     return {
         "plan": plan,
         "trial_ends_at": salon.get("trial_ends_at"),
         "rows": rows,
+        "near_limit": near_limit,
         "at_limit": exhausted,
     }

@@ -19,7 +19,6 @@ from .render import (
     money,
     page_head,
     salon_switch,
-    table,
     tile,
 )
 from .render import (
@@ -226,8 +225,11 @@ def page_today(
     ctx: Any | None = None,
     flash: str = "",
     flash_error: bool = False,
+    onboarding: dict[str, Any] | None = None,
 ) -> str:
     """Дашборд дня: плитки сверху, расписание снизу."""
+    from .onboarding import onboarding_card
+
     csrf, may_status = _ctx_parts(ctx, "booking_status")
     load_pct = round(
         100 * stats["busy_masters"] / stats["masters_total"] if stats["masters_total"] else 0
@@ -250,22 +252,29 @@ def page_today(
         f"</div>"
     )
     sid = f"?salon={esc(salon['id'])}" if salon else ""
-    rows = [
-        [
-            dt_local(b["starts_at"], tz),
-            esc(b["client_name"] or "Без имени"),
-            esc(b["client_phone"] or ""),
-            esc(b["service_title"]),
-            esc(b["master_name"]),
-            money(b["price"]),
-            _status_badge(b["status"]),
-            _action_menu(
-                str(b["id"]), b["status"], csrf, may_status, f"/today{sid}",
-                prepay_status=b.get("prepayment_status") or "not_required",
-            ),
-        ]
+    cards = [
+        '<div class="m-card">'
+        f'<div class="m-top"><b>{esc(dt_local(b["starts_at"], tz))}</b>'
+        + _status_badge(b["status"]) + "</div>"
+        f'<span class="meta">{esc(b["client_name"] or "Без имени")}'
+        f'{(" · " + esc(b["client_phone"])) if b["client_phone"] else ""}</span>'
+        f'<span class="meta">{esc(b["service_title"])} · {esc(b["master_name"])}</span>'
+        f'<span class="meta">{money(b["price"])}</span>'
+        '<div class="m-actions">'
+        + _action_menu(
+            str(b["id"]), b["status"], csrf, may_status, f"/today{sid}",
+            prepay_status=b.get("prepayment_status") or "not_required",
+        )
+        + "</div></div>"
         for b in schedule
     ]
+    if cards:
+        schedule_body = f'<div class="m-grid">{"".join(cards)}</div>'
+    else:
+        schedule_body = (
+            '<div class="empty">На сегодня записей нет. '
+            "Бот продолжает принимать заявки.</div>"
+        )
     content = (
         # Слева заголовок, полоса загрузки и переключатель салона, справа —
         # узкие плитки в один ряд. Раньше плитки шли во всю ширину, а
@@ -281,18 +290,15 @@ def page_today(
         + f'<div class="tiles tiles-row">{tiles}</div>'
         "</div>"
         + flash_html(flash, flash_error)
+        # Чек-лист онбординга: только пока владелец не прошёл «первые шаги».
+        # Прячем при 100% (onboarding_card вернёт "") — не мозолить глаза потом.
+        + onboarding_card(onboarding, str(salon["id"]) if salon else "")
         + '<div class="panel panel-tight">'
         + '<div class="panel-head"><div class="panel-title"><h2 class="panel-h">'
         + "Расписание на сегодня</h2>"
         + f'<span class="count">Записей: {len(schedule)}</span></div></div>'
-        + '<div class="scroll-x">'
-        + table(
-            ["Время", "Клиент", "Телефон", "Услуга", "Мастер", "Цена",
-             "Статус", "Действие"],
-            rows,
-            "На сегодня записей нет. Бот продолжает принимать заявки.",
-        )
-        + "</div></div>"
+        + schedule_body
+        + "</div>"
     )
     return layout(
         "Сегодня", "/today", content, salon=salon, salons=salons,
@@ -326,31 +332,38 @@ def page_bookings(
         '<a class="btn" style="margin-right:6px" href="/bookings?salon=' + esc(sid) + '">Все</a>'
     ]
     for code in statuses[1:]:
-        style = ' style="background:var(--accent-bg);color:var(--text)"' if code == status else ""
+        active = (
+            ' style="margin-right:6px;background:var(--accent-bg);color:var(--text)"'
+            if code == status else ' style="margin-right:6px"'
+        )
         links.append(
-            f'<a class="btn"{style} style="margin-right:6px" '
+            f'<a class="btn"{active} '
             f'href="/bookings?salon={esc(sid)}&status={esc(code)}">{esc(STATUS_RU[code])}</a>'
         )
-    table_rows = [
-        [
-            dt_local(b["starts_at"], tz, "%d.%m %H:%M"),
-            esc(b["client_name"] or "Без имени"),
-            esc(b["client_phone"] or ""),
-            esc(b["service_title"]),
-            esc(b["master_name"]),
-            money(b["price"]),
-            esc(SOURCE_RU.get(b["source"], b["source"])),
-            _status_badge(b["status"]),
-            _action_menu(
-                str(b["id"]), b["status"], csrf, may_status, back,
-                prepay_status=b.get("prepayment_status") or "not_required",
-            ),
-        ]
+    cards = [
+        '<div class="m-card">'
+        f'<div class="m-top"><b>{esc(dt_local(b["starts_at"], tz, "%d.%m %H:%M"))}</b>'
+        + _status_badge(b["status"]) + "</div>"
+        f'<span class="meta">{esc(b["client_name"] or "Без имени")}'
+        f'{(" · " + esc(b["client_phone"])) if b["client_phone"] else ""}</span>'
+        f'<span class="meta">{esc(b["service_title"])} · {esc(b["master_name"])}</span>'
+        f'<span class="meta">{money(b["price"])} · '
+        f"Источник: {esc(SOURCE_RU.get(b['source'], b['source']))}</span>"
+        '<div class="m-actions">'
+        + _action_menu(
+            str(b["id"]), b["status"], csrf, may_status, back,
+            prepay_status=b.get("prepayment_status") or "not_required",
+        )
+        + "</div></div>"
         for b in rows
     ]
+    if cards:
+        feed = f'<div class="m-grid">{"".join(cards)}</div>'
+    else:
+        feed = '<div class="empty">Под выбранный фильтр записей нет.</div>'
     content = (
         # Заголовок вкладки — общий для всех (page_head), а ниже панель с
-        # фильтрами и таблицей. Раньше «Записи» были единственной вкладкой
+        # фильтрами и карточками. Раньше «Записи» были единственной вкладкой
         # с заголовком внутри панели — вид отличался от остальных.
         page_head("Записи", "", salon, salons)
         + flash_html(flash, flash_error)
@@ -362,13 +375,7 @@ def page_bookings(
         + "".join(links)
         + _period_picker(days, sid, status)
         + "</div></div>"
-        + '<div class="scroll-x">'
-        + table(
-            ["Когда", "Клиент", "Телефон", "Услуга", "Мастер", "Цена", "Источник",
-             "Статус", "Действие"],
-            table_rows,
-            "Под выбранный фильтр записей нет.",
-        )
-        + "</div></div>"
+        + feed
+        + "</div>"
     )
     return layout("Записи", "/bookings", content, salon=salon, salons=salons, role=_role(ctx))
