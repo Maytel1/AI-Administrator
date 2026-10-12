@@ -39,5 +39,6 @@ def make_provider(settings: Settings | None = None) -> LLMProvider:
             api_key=s.openai_api_key,
             base_url=s.openai_base_url,
             model=s.openai_model,
+            max_tokens=s.llm_max_tokens,
         )
     raise RuntimeError(f"Неизвестный LLM_PROVIDER: {s.llm_provider}")

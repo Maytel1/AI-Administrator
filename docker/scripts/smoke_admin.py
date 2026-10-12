@@ -8,6 +8,7 @@
 
 import argparse
 import asyncio
+import os
 import re
 import sys
 from typing import Any
@@ -18,7 +19,9 @@ import aiohttp  # noqa: E402
 
 BASE = "https://web:8080"  # порт внутри сети; 8082 — проброс на хост
 USER = "owner"
-PASSWORD = "Test-Passw0rd!2026"
+PASSWORD = os.getenv("SMOKE_ADMIN_PASSWORD", "")
+if not PASSWORD:
+    sys.exit("[smoke] задайте SMOKE_ADMIN_PASSWORD в окружении (пароль учётки owner)")
 
 TEAM_ONLY = {"/billing", "/network"}
 

@@ -19,6 +19,7 @@ class Settings:
     openai_api_key: str | None = os.getenv("OPENAI_API_KEY")
     openai_base_url: str = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
     openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    llm_max_tokens: int = int(os.getenv("LLM_MAX_TOKENS", "1024"))
     altegio_base_url: str = os.getenv("ALTEGIO_BASE_URL", "https://api.altegio.ru/api/v1")
     altegio_partner_token: str | None = os.getenv("ALTEGIO_PARTNER_TOKEN")
     altegio_company_id: str | None = os.getenv("ALTEGIO_COMPANY_ID")

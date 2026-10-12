@@ -16,13 +16,19 @@ from .base import LLMProvider, LLMResponse, ToolCall
 class OpenAICompatProvider(LLMProvider):
     name = "openai_compat"
 
-    def __init__(self, api_key: str, base_url: str, model: str):
+    def __init__(self, api_key: str, base_url: str, model: str, max_tokens: int = 1024):
         self.url = base_url.rstrip("/") + "/chat/completions"
         self.headers = {"Authorization": f"Bearer {api_key}"}
         self.model = model
+        self.max_tokens = max_tokens
 
     async def chat(self, messages: list[dict], tools=None) -> LLMResponse:
-        payload: dict = {"model": self.model, "messages": messages, "temperature": 0.3}
+        payload: dict = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": 0.3,
+            "max_tokens": self.max_tokens,  # лимит ответа — защита от «бомбы по деньгам»
+        }
         if tools:
             payload["tools"] = [
                 {
