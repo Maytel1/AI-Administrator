@@ -217,6 +217,88 @@ async def test_user_create_shows_password_once(demo, pool) -> None:
     assert "один раз" in result["once"]["note"]
 
 
+async def test_password_change_switches_password(demo, pool) -> None:
+    """Смена своего пароля: старый обязателен, новый работает сразу.
+
+    Логин берётся из сессии актора — форма не может указать чужого.
+    """
+    from admin_core.web import users  # noqa: PLC0415 — только в этом тесте
+
+    salon = str(demo["salon"]["id"])
+    created = await actions.apply_form(
+        pool, salon,
+        {"action": "user_create", "login": "pwd-user@test.ru", "role": "staff"},
+        actor="owner:boss@test.ru",
+    )
+    assert created["ok"] is True, created
+    old = created["once"]["password"]
+
+    # неверный текущий пароль — отказ, хеш не меняется
+    wrong = await actions.apply_form(
+        pool, salon,
+        {"action": "password_change", "old_password": "ne-tot-parol",
+         "new_password": "novyj-parol-1"},
+        actor="staff:pwd-user@test.ru",
+    )
+    assert wrong["ok"] is False and wrong["error"] == "bad_old_password"
+
+    # короткий новый пароль не принимается даже с верным старым
+    short = await actions.apply_form(
+        pool, salon,
+        {"action": "password_change", "old_password": old, "new_password": "1234567"},
+        actor="staff:pwd-user@test.ru",
+    )
+    assert short["ok"] is False and short["error"] == "weak_password"
+
+    changed = await actions.apply_form(
+        pool, salon,
+        {"action": "password_change", "old_password": old,
+         "new_password": "novyj-parol-1"},
+        actor="staff:pwd-user@test.ru",
+    )
+    assert changed["ok"] is True, changed
+    fresh = await users.authenticate(pool, "pwd-user@test.ru", "novyj-parol-1")
+    assert fresh["ok"] is True
+    assert (await users.authenticate(pool, "pwd-user@test.ru", old))["ok"] is False
+
+
+async def test_password_reset_returns_new_password_once(demo, pool) -> None:
+    """Владелец сбрасывает пароль сотруднику: новый одноразовый, старый мёртв."""
+    from admin_core.web import users  # noqa: PLC0415 — только в этом тесте
+
+    salon = str(demo["salon"]["id"])
+    created = await actions.apply_form(
+        pool, salon,
+        {"action": "user_create", "login": "smenarol@test.ru", "role": "staff"},
+        actor="owner:boss@test.ru",
+    )
+    assert created["ok"] is True, created
+    old = created["once"]["password"]
+
+    result = await actions.apply_form(
+        pool, salon, {"action": "password_reset", "login": "smenarol@test.ru"},
+        actor="owner:boss@test.ru",
+    )
+    assert result["ok"] is True, result
+    assert result["once"]["password"] != old
+    assert "один раз" in result["once"]["note"]
+    check = await users.authenticate(pool, "smenarol@test.ru", result["once"]["password"])
+    assert check["ok"] is True
+    assert (await users.authenticate(pool, "smenarol@test.ru", old))["ok"] is False
+
+
+async def test_password_reset_unknown_login(demo, pool) -> None:
+    """Неизвестный логин — «не найден», без единого штриха в БД."""
+    result = await actions.apply_form(
+        pool, str(demo["salon"]["id"]),
+        {"action": "password_reset", "login": "net-ogo@test.ru"},
+        actor="owner:boss@test.ru",
+    )
+    assert result["ok"] is False
+    assert result["error"] == "not_found"
+    assert result.get("once") is None
+
+
 async def test_user_totp_hides_secret_from_foreign_salon(demo, pool) -> None:
     """Чужой сотрудник не должен получать секрет 2FA.
 
@@ -492,3 +574,7 @@ async def test_master_services_save_replaces_and_rejects_foreign(demo, pool) -> 
         actor="owner:panel",
     )
     assert junk["ok"] is True and "услуг — 0" in junk["message"]
+
+    # Тестовый мусор: чужой салон убираем сразу, иначе каждый прогон
+    # оставлял бы копию «other-x» (накопилось 33 штуки).
+    await pool.execute("DELETE FROM salons WHERE id = $1", other["id"])

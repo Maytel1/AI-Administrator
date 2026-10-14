@@ -80,6 +80,29 @@ async def test_totp_cannot_be_enabled_for_another_salon(demo, pool):
         await pool.execute("DELETE FROM salons WHERE id = $1", other["id"])
 
 
+async def test_password_reset_cannot_cross_salons(demo, pool):
+    """Сброс пароля чужого сотрудника невозможен: хеш не меняется, пароля не выдаётся."""
+    other = await _other_salon(pool, "audit-other-pwd")
+    login = "victim-pwd@other.ru"
+    try:
+        await _user_in(pool, login=login, salon_id=str(other["id"]))
+        before = await pool.fetchval(
+            "SELECT password_hash FROM panel_users WHERE login = $1", login
+        )
+        result = await _apply(
+            pool, str(demo["salon"]["id"]), {"action": "password_reset", "login": login}
+        )
+        assert result["ok"] is False, "чужой салон нельзя сбросить из панели"
+        assert result.get("once") is None, "новый пароль чужого салона утекать не должен"
+        after = await pool.fetchval(
+            "SELECT password_hash FROM panel_users WHERE login = $1", login
+        )
+        assert after == before, "хеш чужого сотрудника не должен меняться"
+    finally:
+        await pool.execute("DELETE FROM panel_users WHERE login = $1", login)
+        await pool.execute("DELETE FROM salons WHERE id = $1", other["id"])
+
+
 async def test_totp_cannot_be_enabled_for_team_account_by_owner(demo, pool):
     """Учётка нашей команды (salon_id IS NULL) не трогается владельцем точки."""
     login = "hq-team@dz24.ru"

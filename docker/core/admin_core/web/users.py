@@ -214,6 +214,83 @@ async def disable_user(
     return {"ok": True}
 
 
+async def change_password(
+    pool: Any, *, login: str, old_password: str, new_password: str,
+    actor: str = "",
+) -> dict[str, Any]:
+    """Смена собственного пароля: старый обязателен, логин — только из сессии.
+
+    Без требования старого пароля открытая в браузере вкладка позволяла бы
+    сменить пароль зряче — форма приходит от актора, а не от жертвы.
+    ``login`` берётся в web.actions из сессии, поэтому «чужой» пароль
+    сменить невозможно в принципе: действие не принимает user_id/login из формы.
+    """
+    login = (login or "").strip().lower()
+    if len(str(new_password or "")) < 8:
+        return {
+            "ok": False, "error": "weak_password",
+            "message": "Новый пароль — минимум 8 символов",
+        }
+    row = await pool.fetchrow(
+        "SELECT id, salon_id, password_hash FROM panel_users "
+        "WHERE login = $1 AND is_active",
+        login,
+    )
+    if not row or not verify_password(old_password or "", row["password_hash"]):
+        return {
+            "ok": False, "error": "bad_old_password",
+            "message": "Текущий пароль указан неверно",
+        }
+    await pool.execute(
+        "UPDATE panel_users SET password_hash = $2 WHERE id = $1",
+        row["id"], hash_password(new_password),
+    )
+    await pool.execute(
+        "INSERT INTO audit_log (salon_id, actor, action, details) "
+        "VALUES ($1, $2, 'change_panel_password', $3)",
+        row["salon_id"], actor or login,
+        json.dumps({"login": login}, ensure_ascii=False),
+    )
+    return {"ok": True}
+
+
+async def reset_password(
+    pool: Any, *, login: str, actor: str, salon_id: str | None,
+    actor_role: str = "owner",
+) -> dict[str, Any]:
+    """Сброс пароля сотруднику: новый случайный, показывается один раз.
+
+    Изоляция — через ``find_user_in_salon`` (тот же предикат, что в set_totp):
+    владелец точки не сбросит пароль чужому сотруднику, а роль ``team``
+    работает по всем салонам и служебным учёткам.
+    """
+    target = await find_user_in_salon(
+        pool, login, salon_id=salon_id, actor_role=actor_role,
+    )
+    if not target:
+        return {
+            "ok": False, "error": "not_found",
+            "message": "Сотрудник не найден в вашей точке",
+        }
+    password = random_password()
+    row = await pool.fetchrow(
+        "UPDATE panel_users SET password_hash = $2 WHERE id = $1 AND is_active "
+        "RETURNING salon_id",
+        target["id"], hash_password(password),
+    )
+    if not row:
+        return {
+            "ok": False, "error": "not_found", "message": "Учётка уже отключена",
+        }
+    await pool.execute(
+        "INSERT INTO audit_log (salon_id, actor, action, details) "
+        "VALUES ($1, $2, 'reset_panel_password', $3)",
+        row["salon_id"], actor,
+        json.dumps({"login": target["login"]}, ensure_ascii=False),
+    )
+    return {"ok": True, "login": target["login"], "password": password}
+
+
 async def grant_temporary_password(
     pool: Any, login: str, role: str, salon_id: str | None
 ) -> dict[str, Any]:

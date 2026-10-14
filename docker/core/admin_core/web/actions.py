@@ -406,6 +406,41 @@ async def apply_form(
             return fail("not_found")
         return ok("Доступ отключён")
 
+    if action == "password_change":
+        # Логин берётся из сессии актора (who), не из формы: сменить пароль
+        # можно только свой, да и то только со старым паролем в руках.
+        from .users import change_password  # noqa: PLC0415 — только для этого действия
+
+        result = await change_password(
+            pool, login=who,
+            old_password=str(form.get("old_password", "")),
+            new_password=str(form.get("new_password", "")),
+            actor=actor,
+        )
+        if not result["ok"]:
+            return fail(result["error"], result["message"])
+        return ok("Пароль обновлён — при следующем входе используйте новый")
+
+    if action == "password_reset":
+        # Сброс чужого: изоляция по салону — внутри reset_password (find_user_in_salon)
+        from .users import reset_password  # noqa: PLC0415 — только для этого действия
+
+        result = await reset_password(
+            pool, login=str(form.get("login", "")), actor=actor,
+            salon_id=salon_id, actor_role=role,
+        )
+        if not result["ok"]:
+            return fail(result["error"], result["message"])
+        return {
+            "ok": True,
+            "message": f"Пароль {result['login']} сброшен",
+            "once": {
+                "login": result["login"],
+                "password": result["password"],
+                "note": "Новый пароль показывается один раз — передайте сотруднику лично",
+            },
+        }
+
     return fail("save_failed", "Неизвестное действие формы")
 
 

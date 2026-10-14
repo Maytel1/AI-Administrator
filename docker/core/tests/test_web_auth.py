@@ -136,6 +136,11 @@ def test_action_permission_mapping():
     assert can_action("staff", "master_services_save") is False
     assert can_action("staff", "client_save") is True
     assert can_action("staff", "unknown_action") is False
+    # свой пароль меняет любая роль, сброс чужого — только owner/team
+    assert can_action("staff", "password_change") is True
+    assert can_action("staff", "password_reset") is False
+    assert can_action("owner", "password_reset") is True
+    assert can_action("team", "password_reset") is True
 
 
 def test_labels_and_actor():

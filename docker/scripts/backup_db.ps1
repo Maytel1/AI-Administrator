@@ -29,18 +29,25 @@ Write-Host "Бэкап БД -> $target" -ForegroundColor Cyan
 # Дамп делаем через контейнер postgres: на хосте pg_dump может быть другой версии.
 $dumpCmd = "docker compose exec -T postgres pg_dump -U aiadmin -d aiadmin -Fc > `"$target`""
 cmd /c $dumpCmd
-if ($LASTEXITCODE -ne 0) { Write-Host 'pg_dump упал' -ForegroundColor Red; exit 1 }
+if ($LASTEXITCODE -ne 0) {
+    # Недокачанный остаток не должен выглядеть как рабочая копия — убираем.
+    Remove-Item $target -Force -ErrorAction SilentlyContinue
+    Write-Host 'pg_dump упал — битый дамп удалён' -ForegroundColor Red
+    exit 1
+}
 
 $size = (Get-Item $target).Length
 if ($size -lt 1024) {
-    Write-Host "Дамп подозрительно мал ($size байт) — возможно, база пуста или доступ закрыт" -ForegroundColor Red
+    Remove-Item $target -Force -ErrorAction SilentlyContinue
+    Write-Host "Дамп подозрительно мал ($size байт) — возможно, база пуста или доступ закрыт; файл удалён" -ForegroundColor Red
     exit 1
 }
 
 # Проверка читаемости: pg_restore --list обязан разобрать заголовок дампа.
 $check = cmd /c "docker compose exec -T postgres pg_restore --list < `"$target`" 2>&1"
 if ($LASTEXITCODE -ne 0) {
-    Write-Host 'Дамп не читается pg_restore — копия битая' -ForegroundColor Red
+    Remove-Item $target -Force -ErrorAction SilentlyContinue
+    Write-Host 'Дамп не читается pg_restore — копия битая, файл удалён' -ForegroundColor Red
     Write-Host $check
     exit 1
 }

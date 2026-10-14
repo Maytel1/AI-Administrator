@@ -157,21 +157,26 @@ async def test_staff_cannot_edit_other_salon(demo, pool):
         "INSERT INTO salons (name, timezone) VALUES ('Chuzhoy salon', 'Asia/Yekaterinburg') "
         "RETURNING id",
     )
-    foreign = await pool.fetchrow(
-        "INSERT INTO services (salon_id, title, duration_min, price) "
-        "VALUES ($1, 'Chuzhaya usluga', 60, 999) RETURNING id, price",
-        other["id"],
-    )
-    result = await _apply(
-        pool, salon_id,
-        {"action": "service_save", "service_id": str(foreign["id"]),
-         "price": "1", "duration_min": "10", "is_active": "on"},
-        actor="staff:x@test.ru",
-    )
-    assert result["ok"] is False and result["error"] == "not_found"
-    assert await pool.fetchval(
-        "SELECT price FROM services WHERE id = $1", foreign["id"]
-    ) == foreign["price"]
+    try:
+        foreign = await pool.fetchrow(
+            "INSERT INTO services (salon_id, title, duration_min, price) "
+            "VALUES ($1, 'Chuzhaya usluga', 60, 999) RETURNING id, price",
+            other["id"],
+        )
+        result = await _apply(
+            pool, salon_id,
+            {"action": "service_save", "service_id": str(foreign["id"]),
+             "price": "1", "duration_min": "10", "is_active": "on"},
+            actor="staff:x@test.ru",
+        )
+        assert result["ok"] is False and result["error"] == "not_found"
+        assert await pool.fetchval(
+            "SELECT price FROM services WHERE id = $1", foreign["id"]
+        ) == foreign["price"]
+    finally:
+        # Салон — тестовый мусор; без этой строки каждый прогон оставлял бы
+        # копию (накопилось 105 штук — см. камень про чистку базы).
+        await pool.execute("DELETE FROM salons WHERE id = $1", other["id"])
 
 
 async def test_new_user_bound_to_session_salon(demo, pool):
@@ -180,17 +185,22 @@ async def test_new_user_bound_to_session_salon(demo, pool):
         "INSERT INTO salons (name, timezone) VALUES ('Tretiy salon', 'Asia/Yekaterinburg') "
         "RETURNING id",
     )
-    login = f"podkol-{str(other['id'])[:8]}@test.ru"
-    result = await _apply(
-        pool, str(other["id"]),
-        {"action": "user_create", "login": login, "role": "staff"},
-        actor="owner:boss@test.ru",
-    )
-    assert result["ok"] is True
-    row = await pool.fetchrow(
-        "SELECT salon_id FROM panel_users WHERE login = $1", login
-    )
-    assert str(row["salon_id"]) == str(other["id"])
+    try:
+        login = f"podkol-{str(other['id'])[:8]}@test.ru"
+        result = await _apply(
+            pool, str(other["id"]),
+            {"action": "user_create", "login": login, "role": "staff"},
+            actor="owner:boss@test.ru",
+        )
+        assert result["ok"] is True
+        row = await pool.fetchrow(
+            "SELECT salon_id FROM panel_users WHERE login = $1", login
+        )
+        assert str(row["salon_id"]) == str(other["id"])
+    finally:
+        # Иначе каждый прогон оставлял бы новый «Tretiy salon» с учёткой
+        # (каскад снесёт и созданного сотрудника).
+        await pool.execute("DELETE FROM salons WHERE id = $1", other["id"])
 
 
 # ═══ ПЕРЕБОР ════════════════════════════════════════════════════════════

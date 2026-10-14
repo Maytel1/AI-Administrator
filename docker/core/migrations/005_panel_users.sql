@@ -5,7 +5,8 @@
 -- пароля хранятся только здесь, пароль в открытом виде не сохраняется нигде.
 -- Миграция идемпотентна. Требует: 002_schema_reference.sql (salons).
 
-BEGIN;
+-- Внешний BEGIN/COMMIT убран: run_migrations оборачивает каждый файл в свою
+-- транзакцию, а свой COMMIT внутри рвал внешнюю транзакцию (test_migrations_rollback).
 
 -- ═══ ПОЛЬЗОВАТЕЛИ ПАНЕЛИ ════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS panel_users (
@@ -30,4 +31,4 @@ CREATE INDEX IF NOT EXISTS idx_panel_users_active ON panel_users (login) WHERE i
 -- Список команды салона (владелец управляет доступом своей точки)
 CREATE INDEX IF NOT EXISTS idx_panel_users_salon ON panel_users (salon_id) WHERE is_active;
 
-COMMIT;
+-- COMMIT выше не нужен — см. комментарий в начале файла.

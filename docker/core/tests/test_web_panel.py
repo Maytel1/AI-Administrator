@@ -684,11 +684,15 @@ def test_settings_page_shows_team_management():
     assert 'value="user_create"' in owner_html
     assert 'value="user_totp"' in owner_html
     assert 'value="user_disable"' in owner_html
+    assert 'value="password_reset"' in owner_html    # сброс чужого пароля
+    assert 'value="password_change"' in owner_html   # смена своего пароля
     staff_html = page_settings(
         SALON, [SALON], {}, session={"login": "p@test.ru", "role": "staff"},
         team=team, ctx=STAFF_CTX,
     )
     assert 'value="user_create"' not in staff_html  # администратор команду не ведёт
+    assert 'value="password_reset"' not in staff_html  # и чужие пароли не сбрасывает
+    assert 'value="password_change"' in staff_html  # но свой пароль меняет
     assert "Пётр" in staff_html  # но состав команды видит
 
 
@@ -1171,6 +1175,7 @@ async def test_salon_for_session_isolates_tenant(demo, pool):
     assert salon is not None
     assert str(salon["id"]) == str(demo["salon"]["id"])  # не чужой!
     assert len(salons) == 1
+    await pool.execute("DELETE FROM salons WHERE id = $1", other["id"])
 
 
 async def test_team_session_sees_all_salons(demo, pool):

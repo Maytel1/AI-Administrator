@@ -721,9 +721,11 @@ def page_settings(
                 continue
             hidden = f'<input type="hidden" name="login" value="{esc(u["login"])}">'
             hidden_id = f'<input type="hidden" name="user_id" value="{esc(u["id"])}">'
-            buttons = action_form(
-                "user_totp", csrf, back, hidden, "Включить 2FA"
-            ) + " " + action_form("user_disable", csrf, back, hidden_id, "Отключить")
+            buttons = (
+                action_form("user_totp", csrf, back, hidden, "Включить 2FA")
+                + " " + action_form("password_reset", csrf, back, hidden, "Сбросить пароль")
+                + " " + action_form("user_disable", csrf, back, hidden_id, "Отключить")
+            )
             rows.append(
                 [esc(u["login"]), esc(u["name"] or "—"), role_label(str(u["role"])),
                  badge("2FA включена", "green") if u["totp_enabled"]
@@ -769,11 +771,22 @@ def page_settings(
             ) + add_form,
         )
 
-    note = (
-        '<div class="card"><h2>Что дальше</h2><p class="sub" style="margin:0">'
-        "Смена своего пароля, отчёты и биллинг — по плану фазы 4 "
-        "(DEVELOPMENT_PLAN.md §8.2)."
-        "</p></div>"
+    # Смена своего пароля — раньше «по плану фазы 4», теперь форма здесь:
+    # login приходит из сессии, поэтому сменить можно только свою учётку.
+    pwd_card = card(
+        "Сменить свой пароль",
+        '<form method="post" action="/actions">'
+        '<input type="hidden" name="action" value="password_change">'
+        f'<input type="hidden" name="back" value="{back}">'
+        f"{csrf_field(csrf)}"
+        '<label class="field"><span>Текущий пароль</span>'
+        '<input type="password" name="old_password" '
+        'autocomplete="current-password" required></label>'
+        '<label class="field"><span>Новый пароль — минимум 8 символов</span>'
+        '<input type="password" name="new_password" minlength="8" '
+        'autocomplete="new-password" required></label>'
+        '<button type="submit">Сменить пароль</button>'
+        "</form>",
     )
     content = (
         '<div class="page">'
@@ -784,7 +797,7 @@ def page_settings(
         + secrets_block
         + card("Точка и доступ", table(["Параметр", "Значение"], body))
         + people
-        + note
+        + pwd_card
         + "</div></div>"
     )
     return layout(
