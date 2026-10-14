@@ -14,7 +14,7 @@ services:
       PGTZ: Asia/Yekaterinburg
       POSTGRES_INITDB_ARGS: "--encoding=UTF8"
     ports:
-      - "${POSTGRES_PORT:-5433}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
@@ -37,7 +37,7 @@ services:
       - path: .env
         required: false
     ports:
-      - "${BOT_HTTP_PORT:-8080}:8080"   # webhook-эндпоинт появится в фазе 2
+      - "127.0.0.1:${BOT_HTTP_PORT:-8080}:8080"   # только localhost: webhook появится в фазе 2
     depends_on:
       postgres:
         condition: service_healthy
@@ -64,11 +64,35 @@ services:
     volumes:
       - ./certs:/app/certs:ro
     ports:
-      - "${WEB_HTTP_PORT:-8082}:8080"      # панель: http://localhost:8082/today
-      - "${WEB_HEALTH_PORT:-8083}:8081"   # /health и /metrics соседним портом
+      - "127.0.0.1:${WEB_HTTP_PORT:-8082}:8080"      # панель: http://localhost:8082/today
+      - "127.0.0.1:${WEB_HEALTH_PORT:-8083}:8081"   # /health и /metrics соседним портом
     depends_on:
       postgres:
         condition: service_healthy
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: ai-admin-nginx
+    # Единственный сервис с публичными портами (80/443): терминация TLS,
+    # rate-limit на /login, скрытие заголовков. Остальные сервисы в compose
+    # привязаны к 127.0.0.1 и наружу не светятся.
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./certs:/etc/nginx/certs:ro
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/proxy_params_default:/etc/nginx/proxy_params_default:ro
+      - ./nginx/acme:/var/www/certbot:ro
+      - ./nginx/options-ssl-params.conf:/etc/nginx/snippets/options-ssl-params.conf:ro
+    depends_on:
+      - web
+    healthcheck:
+      test: ["CMD-SHELL", "nginx -t || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     restart: unless-stopped
 
   whatsapp:
@@ -90,7 +114,7 @@ services:
       - path: .env
         required: false
     ports:
-      - "${WHATSAPP_HTTP_PORT:-8086}:8080"   # webhook Meta Cloud API
+      - "127.0.0.1:${WHATSAPP_HTTP_PORT:-8086}:8080"   # webhook Meta Cloud API
     depends_on:
       postgres:
         condition: service_healthy
@@ -114,8 +138,8 @@ services:
       - path: .env
         required: false
     ports:
-      - "${CALL_HTTP_PORT:-8081}:8080"   # API звонков
-      - "${CALL_HEALTH_PORT:-8085}:8081" # /health и /metrics
+      - "127.0.0.1:${CALL_HTTP_PORT:-8081}:8080"   # API звонков
+      - "127.0.0.1:${CALL_HEALTH_PORT:-8085}:8081" # /health и /metrics
     depends_on:
       postgres:
         condition: service_healthy
@@ -137,7 +161,7 @@ services:
       - path: .env
         required: false
     ports:
-      - "${WORKER_HEALTH_PORT:-8084}:8084"  # /health и /metrics
+      - "127.0.0.1:${WORKER_HEALTH_PORT:-8084}:8084"  # /health и /metrics
     depends_on:
       postgres:
         condition: service_healthy
@@ -173,7 +197,7 @@ services:
       - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
       - promdata:/prometheus
     ports:
-      - "${PROMETHEUS_PORT:-9090}:9090"
+      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
     # Порты сервисов наружу закрыты, поэтому ходим к ним по внутренней сети.
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -191,7 +215,7 @@ services:
       - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - alertdata:/alertmanager
     ports:
-      - "${ALERTMANAGER_PORT:-9093}:9093"
+      - "127.0.0.1:${ALERTMANAGER_PORT:-9093}:9093"
     depends_on:
       - alert-relay
     restart: unless-stopped
@@ -211,8 +235,8 @@ services:
       TG_ALERT_CHAT_ID: ${TG_ALERT_CHAT_ID:-}
       ALERT_RELAY_PORT: "8086"
     ports:
-      # 8086 занят на машине разработчика, поэтому наружу отдаём 8087.
-      - "${ALERT_RELAY_PORT:-8087}:8086"
+      # 8086 занят на машине разработчика, поэтому наружу отдаём 8087 (localhost).
+      - "127.0.0.1:${ALERT_RELAY_PORT:-8087}:8086"
     env_file:
       - path: .env
         required: false

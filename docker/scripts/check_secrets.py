@@ -71,6 +71,11 @@ def scan_content(name: str, text: str) -> list[str]:
         for pattern, description in PATTERNS:
             match = re.search(pattern, line)
             if match:
+                # Значение вида ${VAR} — ссылка на переменную окружения
+                # (compose: `WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}`),
+                # а не литеральный секрет.
+                if "${" in match.group(0):
+                    continue
                 found.append(
                     f"{name}:{line_number}: похоже на {description}: {mask(match.group(0))}"
                 )

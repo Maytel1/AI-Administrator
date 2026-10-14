@@ -57,6 +57,21 @@ def test_finds_s3_secret() -> None:
     assert found
 
 
+def test_env_interpolation_is_not_a_secret() -> None:
+    """`${VAR}` в docker-compose.yml — ссылка на переменную, не секрет.
+
+    Без этого ложное срабатывание блокировало коммит любого изменения compose:
+    `WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}` матчилось как литерал.
+    """
+    compose_line = "      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}"
+    assert mod.scan_content("docker/docker-compose.yml", compose_line) == []
+    # ...но литеральный секрет в той же строке обязан находиться.
+    # Ключ склеен: иначе хук нашёл бы его в этом же файле и заблокировал коммит
+    # (тот же приём, что в тестах выше).
+    literal = "      WHATSAPP_APP" + "_SECRET: " + "a" * 40
+    assert mod.scan_content("docker/docker-compose.yml", literal)
+
+
 def test_ordinary_code_is_clean() -> None:
     """Обычный код не должен давать ложных срабатываний: иначе хук отключат."""
     source = (
