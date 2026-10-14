@@ -253,12 +253,13 @@ async def _billing(
 async def _pay(
     panel: Panel, salon: dict, salons: list[dict], request: Any, ctx: PageCtx | None = None
 ) -> str:
-    """Оплата тарифа точки: статус, реквизиты и профиль плательщика.
+    """Оплата тарифа точки: статус, лимиты, история и реквизиты.
 
-    Вариант раздела для салона: владелец видит свой счёт и правит свои
-    реквизиты (ИНН и т.п.). Внутренняя админка (счета, долги, CSV) — /billing.
+    Вариант раздела для салона: владелец видит свой счёт и платит по
+    реквизитам. Реквизиты плательщика (ИНН и т.п.) и внутренняя админка
+    (счета, долги, CSV) — на /billing, карточки плательщика здесь нет.
     """
-    from admin_core import billing, billing_legal  # noqa: PLC0415
+    from admin_core import billing  # noqa: PLC0415
 
     role = ctx.role if ctx else "guest"
     # владелец платит сам (pay), команда управляет всем (billing)
@@ -291,10 +292,9 @@ async def _pay(
         salon["id"],
     )
     status["history"] = [dict(row) for row in history]
-    legal = await billing_legal.get(panel.pool, str(salon["id"]))
     msg, err = _flash_from(request)
     return page_pay(
-        status, salon, salons, legal=legal,
+        status, salon, salons,
         flash=msg, flash_error=err, ctx=ctx,
     )
 

@@ -1203,16 +1203,16 @@ def _legal_card(
 
 def page_pay(
     status: dict[str, Any], salon: dict | None, salons: list[dict] | None,
-    legal: dict[str, Any] | None = None, errors: list[str] | None = None,
     flash: str = "", flash_error: bool = False, ctx: Any | None = None,
 ) -> str:
-    """Страница оплаты тарифа: счёт, реквизиты и профиль плательщика.
+    """Страница оплаты тарифа: статус, лимиты, история и реквизиты.
 
     От ``page_billing`` отличается точкой зрения: здесь владелец точки видит,
-    сколько и за что он должен, и вводит свои реквизиты (тип ИП/ООО/самозанятый).
-    Реквизиты команды ( BILLING_* ) тоже показываем — салон платит по ним.
+    сколько и за что он должен. Реквизиты команды ( BILLING_* ) показываем —
+    салон платит по ним. Реквизиты плательщика (ИНН и т.п.) вводятся на
+    внутренней странице /billing силами нашей команды, поэтому карточки
+    плательщика здесь нет.
     """
-    errors = list(errors or [])
     csrf = ctx.get("csrf", "") if isinstance(ctx, dict) else ""
     # Профиль плательщика — это данные точки: владелец правит свои реквизиты,
     # команда может подправить от имени любой точки.
@@ -1288,8 +1288,7 @@ def page_pay(
         + limits_card
         + card("История платежей", pay_block)
         + requisites_block
-        + card_block
-        + (_legal_card(legal, csrf, "/pay", errors) if may_pay else ""),
+        + card_block,
         salon=salon, salons=salons, role=_role(ctx),
     )
 

@@ -1244,8 +1244,12 @@ def test_legal_pages_render_with_requisites(monkeypatch):
     assert "задайте BILLING_LEGAL_NAME" in empty  # пустые реквизиты — с подсказкой
 
 
-def test_page_pay_shows_status_and_legal_form():
-    """Страница /pay: плитки тарифа + профиль плательщика для своей команды."""
+def test_page_pay_has_no_payer_form():
+    """/pay: плитки тарифа и реквизиты, но БЕЗ карточки плательщика.
+
+    Реквизиты плательщика (ИНН и т.п.) вводятся на /billing — на странице
+    оплаты салона этой формы нет.
+    """
     status = {
         "status_text": "Оплачено до 01.02.2026", "price": 990.0, "plan": "start",
         "paid_until": datetime(2026, 2, 1), "expired": False, "is_trial": False,
@@ -1257,15 +1261,15 @@ def test_page_pay_shows_status_and_legal_form():
     html = page_pay(status, SALON, [SALON], ctx=ctx)
     assert "Оплата" in html
     assert "990" in html and "ООО Ромашка" in html and "770123456" in html
-    assert 'name="client_type"' in html          # выбор типа плательщика
+    assert 'name="client_type"' not in html      # карточки плательщика нет
     assert "01.02.2026" in html                  # оплачено до
-    # Владелец точки — полноправный пользователь /pay: видит профиль плательщика.
+    # Владелец точки тоже видит страницу, но без формы плательщика.
     html_owner = page_pay(
         status, SALON, [SALON],
         ctx=PageCtx(csrf="f" * 32, role="owner", login="boss@test.ru"),
     )
-    assert 'name="client_type"' in html_owner
-    # Администратор точки тариф не оплачивает — карточки нет.
+    assert 'name="client_type"' not in html_owner
+    # Администратор точки тариф не оплачивает — тем более без формы.
     html_staff = page_pay(
         status, SALON, [SALON],
         ctx=PageCtx(csrf="s" * 32, role="staff", login="recep@test.ru"),

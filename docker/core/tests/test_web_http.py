@@ -180,7 +180,7 @@ async def test_billing_page_opens_for_team(demo, pool):
 
 
 async def test_pay_page_opens_for_owner(client):
-    """/pay — страница салона: владелец видит статус и правит свои реквизиты."""
+    """/pay — страница салона: владелец видит статус и реквизиты для оплаты."""
     http, _panel, _token, _demo = client
     response = await http.get("/pay")
     assert response.status == 200
@@ -188,7 +188,7 @@ async def test_pay_page_opens_for_owner(client):
     assert LOGIN_MARK not in body
     assert "Недостаточно прав" not in body
     assert "Оплата" in body
-    assert 'name="client_type"' in body, "владелец должен править карточку плательщика"
+    assert 'name="client_type"' not in body, "карточка плательщика убрана с /pay"
 
 
 async def test_pay_page_is_hidden_from_staff(client, demo, pool):
