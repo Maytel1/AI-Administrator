@@ -36,7 +36,10 @@ try {
     # ip не передаём — duckdns определяет внешний адрес сам.
     $uri = 'https://www.duckdns.org/update?domains=' + [uri]::EscapeDataString($domains) +
            '&token=' + [uri]::EscapeDataString($token)
-    $resp = (Invoke-WebRequest -Uri $uri -UseBasicParsing -TimeoutSec 30).Content.Trim()
+    $raw = (Invoke-WebRequest -Uri $uri -UseBasicParsing -TimeoutSec 30).Content
+    # PS 5.1 может вернуть Content как byte[] — приводим к тексту универсально.
+    $resp = if ($raw -is [byte[]]) { [System.Text.Encoding]::UTF8.GetString($raw) } else { [string]$raw }
+    $resp = $resp.Trim()
     if ($resp -eq 'OK') {
         Write-Log "ddns: обновлено ($domains)"
         exit 0
