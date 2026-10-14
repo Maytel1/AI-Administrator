@@ -57,6 +57,14 @@ call, worker, prometheus, alertmanager, alert-relay. Наружу — тольк
 
 ## Этап 2 — Домен и публичный адрес (1–3 часа)
 
+> **⚙️ В работе (14.10.2026)**: выбран вариант Б (проброс + DDNS).
+> Готово: скрипт `docker/scripts/ddns_duckdns.ps1` + задача Task Scheduler
+> `Dezhurny24-DDNS` (каждые 5 минут, LastTaskResult=0), ключи `DUCKDNS_*`
+> в `.env.example`. Машина: `192.168.0.5` (Wi-Fi, DHCP), MAC
+> `FC-22-1C-00-4C-E3`, роутер `192.168.0.1`, внешний IP `90.151.85.37`.
+> **Ожидается**: токен/поддомен DuckDNS → `docker/.env`; проброс 80/443
+> и DHCP-резерв MAC на роутере; внешняя проверка портов (затем этап 3 — TLS).
+
 **2.1 Домен** (пример: `salon.example.ru`) у любого регистратора.
 
 **2.2 Выбор способа доступа — рекомендую Cloudflare Tunnel:**
