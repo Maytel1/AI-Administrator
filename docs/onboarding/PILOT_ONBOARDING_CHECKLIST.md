@@ -8,8 +8,10 @@
 
 - [ ] **A1. Юр.минимум** по `docs/legal/00`: уведомление РКН до начала обработки,
       оценка ущерба ПДн, решение по трансграничной передаче, вычитка оферты/ПДН юристом.
-- [ ] **A2. Прод-стенд**: домен и настоящий TLS (`scripts/check_prod_tls.ps1`),
-      секреты в `docker/.env` (`TELEGRAM_BOT_TOKEN`, `WHATSAPP_*`, `BILLING_*`).
+- [ ] **A2. Прод-стенд**: домен и настоящий TLS (`docker/scripts/check_prod_tls.ps1`),
+      секреты в `docker/.env` (`TELEGRAM_BOT_TOKEN`, `WHATSAPP_*`, `BILLING_*`,
+      `YOOKASSA_*`). Пошаговый план развёртывания на домашнем ПК —
+      `docs/onboarding/PILOT_STAND_DEPLOY_PLAN.md` (этапы 1–4).
 - [ ] **A3. Бэкапы живы**: задача `Dezhurny24-Backup` —
       `(Get-ScheduledTaskInfo 'Dezhurny24-Backup').LastTaskResult = 0`,
       свежий дамп в `docker/backups/`, лог `backups/backup.log` заполнен.
