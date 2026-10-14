@@ -34,3 +34,8 @@ docker/nginx/acme/
 # ������ ��: ������������ ������, � git �� �� �����
 docker/backups/
 docker/deploy-backup/
+
+# pytest coverage
+.coverage
+*.cover
+htmlcov/
