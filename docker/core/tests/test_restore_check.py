@@ -10,7 +10,14 @@ import importlib.util
 from pathlib import Path
 from types import ModuleType
 
-_SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "restore_check.py"
+_HERE = Path(__file__).resolve().parent
+# Локально тест лежит в docker/core/tests => скрипт в docker/scripts.
+# В контейнере (cli) тест лежит в /app/tests => скрипт в /app/scripts.
+_CANDIDATES = [
+    _HERE.parent.parent.parent / "scripts" / "restore_check.py",
+    _HERE.parent / "scripts" / "restore_check.py",
+]
+_SCRIPT = next(p for p in _CANDIDATES if p.exists())
 _spec = importlib.util.spec_from_file_location("restore_check", _SCRIPT)
 assert _spec is not None and _spec.loader is not None
 mod: ModuleType = importlib.util.module_from_spec(_spec)

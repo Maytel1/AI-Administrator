@@ -1033,9 +1033,12 @@ def page_billing(
     history: list[dict[str, Any]],
     legal: dict[str, Any] | None = None, errors: list[str] | None = None,
     flash: str = "", flash_error: bool = False, ctx: Any | None = None,
+    counterparties: list[dict[str, Any]] | None = None,
 ) -> str:
     errors = list(errors or [])
-    csrf = ctx.get("csrf", "") if isinstance(ctx, dict) else ""
+    # ctx — объект PageCtx (не dict): берём атрибут, иначе csrf пустой и форма
+    # счёта не проходит проверку.
+    csrf = getattr(ctx, "csrf", "") if ctx is not None else ""
     # Форму реквизитов показываем только своей команде: в ней названия полей,
     # и владельцу салона они видеть незачем.
     may_billing = _role(ctx) == "team"
@@ -1062,10 +1065,23 @@ def page_billing(
         )
         + "</div>"
     )
+    # Список выбора контрагента для счёта — только из реестра. Если реестр
+    # пуст, счёт выставляется на саму точку (как раньше).
+    cp_options = "".join(
+        f'<option value="{esc(c["id"])}">{esc(c.get("title") or c.get("legal_name"))}'
+        f' (ИНН {esc(c.get("inn") or "—")})</option>'
+        for c in (counterparties or [])
+    )
+    cp_select = (
+        f'<label class="field"><span>Контрагент (кому выставить)</span>'
+        f'<select name="counterparty_id">{cp_options}</select></label>'
+        if cp_options else ""
+    )
     actions = (
-        action_form("invoice_issue", ctx.get("csrf", "") if isinstance(ctx, dict) else "",
-                    "/billing", "", "Выставить счёт")
-        if isinstance(ctx, dict) else ""
+        action_form(
+            "invoice_issue", csrf, "/billing", cp_select, "Выставить счёт",
+        )
+        if ctx is not None else ""
     )
     pay_cards = [
         '<div class="m-card">'
@@ -1200,6 +1216,128 @@ def _legal_card(
             + "</form>"
         ),
     )
+
+def page_counterparties(
+    counterparties: list[dict[str, Any]], editing: dict[str, Any] | None,
+    salons: list[dict] | None, csrf: str,
+    errors: list[str] | None = None, flash: str = "", flash_error: bool = False,
+    ctx: Any | None = None,
+) -> str:
+    """Реестр контрагентов: подключённые клиенты, которым выставляют документы.
+
+    Общий на всю команду справочник. Его данные питают счёт/акт и списки
+    выбора — реквизиты вводятся один раз. Форма показывает поля только по
+    выбранному типу на CSS ``:has()`` (как карточка плательщика), но сервер
+    всё равно проверяет набор своего типа: скрытие — удобство, не защита.
+    """
+    from admin_core.billing_legal import CLIENT_TYPES, fields_of  # noqa: PLC0415
+
+    errors = list(errors or [])
+    cur = editing or {}
+    cur_type = str(cur.get("client_type") or "ip")
+    details = cur.get("details") or {}
+    if not isinstance(details, dict):
+        details = {}
+    edit_id = str(cur.get("id") or "")
+
+    # — Список контрагентов —
+    rows = []
+    for c in counterparties:
+        ctype = CLIENT_TYPES.get(str(c.get("client_type")), str(c.get("client_type")))
+        rows.append(
+            '<div class="m-card">'
+            f'<div class="m-top"><b>{esc(c.get("title"))}</b>'
+            + badge(esc(ctype), "") + "</div>"
+            f'<span class="meta">ИНН {esc(c.get("inn") or "—")} · '
+            f'{esc(c.get("legal_name") or "")}</span>'
+            + (
+                f'<span class="meta">Договор № {esc(c["contract_no"])}</span>'
+                if c.get("contract_no") else ""
+            )
+            + '<div class="row-end">'
+            + f'<a class="tab" href="/counterparties?edit={esc(c["id"])}">'
+              "Править</a> "
+            + action_form(
+                "counterparty_toggle", csrf, "/counterparties",
+                f'<input type="hidden" name="counterparty_id" value="{esc(c["id"])}">'
+                f'<input type="hidden" name="is_active" value="'
+                f'{0 if c.get("is_active") else 1}">',
+                "Архивировать" if c.get("is_active") else "Вернуть",
+            )
+            + "</div></div>"
+        )
+    list_block = (
+        f'<div class="m-grid">{"".join(rows)}</div>'
+        if rows else '<div class="empty">Контрагентов пока нет — добавьте первого</div>'
+    )
+
+    # — Форма добавления/правки (поля по типу, CSS :has()) —
+    types = "".join(
+        f'<label class="radio"><input type="radio" name="client_type" '
+        f'value="{esc(key)}"{" checked" if key == cur_type else ""}> '
+        f"{esc(title)}</label>"
+        for key, title in CLIENT_TYPES.items()
+    )
+    blocks = []
+    for key in CLIENT_TYPES:
+        frows = []
+        if key == cur_type:
+            frows.append(
+                f'<label class="field"><span>ИНН ('
+                f'{"10" if key == "llc" else "12"} цифр)</span>'
+                f'<input name="inn" value="{esc(cur.get("inn", ""))}" required></label>'
+            )
+        for field_key, title, required, hint in fields_of(key):
+            frows.append(
+                f'<label class="field"><span>{esc(title)}'
+                f'{" *" if required else ""}</span>'
+                f'<input name="cp_{esc(key)}_{esc(field_key)}" '
+                f'value="{esc(str(details.get(field_key, "")))}"'
+                f'{" required" if required else ""}>'
+                + (f"<small>{esc(hint)}</small>" if hint else "")
+                + "</label>"
+            )
+        blocks.append(f'<fieldset data-type="{esc(key)}">{"".join(frows)}</fieldset>')
+    form = (
+        f'<form method="post" action="/actions" class="legal-form">{csrf_field(csrf)}'
+        '<input type="hidden" name="action" value="counterparty_save">'
+        '<input type="hidden" name="back" value="/counterparties">'
+        + (f'<input type="hidden" name="counterparty_id" value="{esc(edit_id)}">' if edit_id else "")
+        + '<label class="field"><span>Название (как показывать в списках)</span>'
+        f'<input name="title" value="{esc(cur.get("title", ""))}" required></label>'
+        + '<label class="field"><span>Наименование для документа (ФИО / ООО)</span>'
+        f'<input name="legal_name" value="{esc(cur.get("legal_name", ""))}" required></label>'
+        + f'<div class="radios">{types}</div>'
+        + "".join(blocks)
+        + '<label class="field"><span>Номер договора</span>'
+        f'<input name="contract_no" value="{esc(cur.get("contract_no") or "")}"></label>'
+        + '<div class="row-end">'
+        + '<button type="submit" class="btn">'
+        + ("Сохранить" if edit_id else "Добавить контрагента") + "</button>"
+        + (
+            '<a class="tab" href="/counterparties">Отмена</a>' if edit_id else ""
+        )
+        + "</div></form>"
+    )
+    form_card = card(
+        ("Правка контрагента" if edit_id else "Новый контрагент"),
+        (
+            (f'<div class="flash err">{esc("; ".join(errors))}</div>' if errors else "")
+            + '<p class="sub">Тип выбирается первым — дальше нужны только его поля. '
+              "ИНН, ОГРН и ОГРНИП проверяются по контрольной сумме.</p>"
+            + form
+        ),
+    )
+    return layout(
+        "Контрагенты", "/counterparties",
+        page_head("Контрагенты", "Подключённые клиенты — источник данных для счетов и актов",
+                  None, salons)
+        + flash_html(flash, flash_error)
+        + card("Список", list_block)
+        + form_card,
+        salons=salons, role=_role(ctx),
+    )
+
 
 def page_pay(
     status: dict[str, Any], salon: dict | None, salons: list[dict] | None,

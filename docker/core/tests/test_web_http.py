@@ -563,5 +563,60 @@ async def test_pay_notify_is_public_and_returns_200(client):
     assert payload["ok"] is False
 
 
+async def test_salon_js_is_served(client):
+    """Внешний скрипт переключателя точки отдаётся как JS (CSP-совместимо)."""
+    http, _panel, _token, _demo = client
+    response = await http.get("/salon.js")
+    assert response.status == 200
+    assert "javascript" in response.headers.get("Content-Type", "")
+    body = await response.text()
+    assert "salon-select" in body
+
+
+async def test_set_salon_sets_cookie_and_returns_back(client):
+    """Переключение точки ставит cookie и возвращает на исходную страницу.
+
+    Раньше /salon всегда вёл на /today — выбор точки с любой вкладки уводил
+    на главную. Теперь возвращаемся по Referer (путь, без query).
+    """
+    http, _panel, _token, _demo = client
+    new_id = "22222222-2222-2222-2222-222222222222"
+    response = await http.get(
+        f"/salon?id={new_id}",
+        headers={"Referer": "http://127.0.0.1/clients?salon=old"},
+        allow_redirects=False,
+    )
+    assert response.status == 302
+    assert response.headers.get("Location") == "/clients"
+    cookies = response.headers.getall("Set-Cookie", [])
+    assert any(c.startswith(f"salon={new_id}") for c in cookies)
+
+
+async def test_set_salon_never_open_redirects(client):
+    """Внешний Referer не превращает переключение в open-redirect.
+
+    Берём только путь Referer — он всегда внутренний (со схемой/хостом не
+    сравниваем, иначе пришлось бы сверять хост, а за прокси он другой).
+    """
+    http, _panel, _token, _demo = client
+    response = await http.get(
+        "/salon?id=22222222-2222-2222-2222-222222222222",
+        headers={"Referer": "https://evil.example/phish"},
+        allow_redirects=False,
+    )
+    assert response.status == 302
+    location = response.headers.get("Location", "")
+    assert location.startswith("/") and not location.startswith("//")
+
+
+async def test_today_has_salon_switch_and_script(client):
+    """Страница несёт переключатель (#salon-select) и подключает salon.js."""
+    http, _panel, _token, _demo = client
+    response = await http.get("/today")
+    body = await response.text()
+    assert 'id="salon-select"' in body
+    assert 'src="/salon.js"' in body
+
+
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-v"]))

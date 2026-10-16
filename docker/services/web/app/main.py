@@ -14,7 +14,7 @@ import traceback
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote, urlencode
+from urllib.parse import quote, urlencode, urlsplit
 from zoneinfo import ZoneInfo
 
 from admin_core import acquiring
@@ -29,6 +29,7 @@ from admin_core.web.pages_lists import (
     page_audit,
     page_billing,
     page_clients,
+    page_counterparties,
     page_dialogs,
     page_masters,
     page_network,
@@ -242,10 +243,44 @@ async def _billing(
         salon["id"],
     )
     msg, err = _flash_from(request)
+    # Список выбора контрагента — только из реестра (источник данных счёта).
+    from admin_core import counterparties  # noqa: PLC0415
+
+    cp_list = await counterparties.active_options(panel.pool)
     # Именованные аргументы: позиционный вызов подсовывал flash в `legal`,
     # а ctx в `flash` — карточка плательщика исчезала, а в лог шёл мусор.
     return page_billing(
         status, salon, salons, history,
+        flash=msg, flash_error=err, ctx=ctx, counterparties=cp_list,
+    )
+
+
+async def _counterparties(
+    panel: Panel, salon: dict, salons: list[dict], request: Any, ctx: PageCtx | None = None
+) -> str:
+    """Реестр контрагентов: общий на команду справочник подключённых клиентов.
+
+    Его данные питают документы (счёт/акт) и списки выбора. Правит только
+    роль team — проверка здесь, а не только в меню: пункт скрыт, а URL открыт.
+    """
+    from admin_core import counterparties  # noqa: PLC0415
+
+    role = ctx.role if ctx else "guest"
+    if not can(role, "counterparties"):
+        panel.metrics.errors.labels("forbidden").inc()
+        return page_counterparties(
+            [], None, salons, "",
+            flash="Недостаточно прав на раздел «Контрагенты»",
+            flash_error=True, ctx=ctx,
+        )
+    csrf = ctx.csrf if ctx else ""
+    items = await counterparties.list_all(panel.pool)
+    # ?edit=<id> — правка существующего: подставляем его данные в форму.
+    edit_id = str(request.query.get("edit", ""))
+    editing = await counterparties.get(panel.pool, edit_id) if edit_id else None
+    msg, err = _flash_from(request)
+    return page_counterparties(
+        items, editing, salons, csrf,
         flash=msg, flash_error=err, ctx=ctx,
     )
 
@@ -668,11 +703,21 @@ def build_app(
         return resp
 
     async def set_salon(request: Any) -> Any:
-        """Переключение тенанта командой админки; запоминаем в cookie."""
-        data = await request.get()
-        resp = web.HTTPFound("/today")
-        if data.get("id"):
-            resp.set_cookie("salon", str(data["id"]), httponly=True, samesite="Lax", path="/")
+        """Переключение тенанта командой админки; запоминаем в cookie.
+
+        После переключения возвращаем на ту же страницу (по Referer), а не
+        всегда на «Сегодня»: иначе выбор точки с любой вкладки уводил бы
+        пользователя на главную. Если Referer нет или он внешний — на «Сегодня».
+        """
+        data = request.query.get("id")
+        target = "/today"
+        referer = request.headers.get("Referer", "")
+        path = urlsplit(referer).path
+        if path.startswith("/") and not path.startswith("//"):
+            target = path
+        resp = web.HTTPFound(target)
+        if data:
+            resp.set_cookie("salon", str(data), httponly=True, samesite="Lax", path="/")
         return resp
 
     async def static_css(_request: Any) -> Any:
@@ -689,6 +734,17 @@ def build_app(
         """
         return web.Response(
             text=(STATIC_DIR / "login.js").read_text(encoding="utf-8"),
+            content_type="application/javascript",
+        )
+
+    async def salon_js(_request: Any) -> Any:
+        """Микроскрипт переключателя точки: отправляет форму по change.
+
+        Отдельный файл, а не инлайн — CSP запрещает inline-скрипты (иначе
+        выбор точки ничего не делал).
+        """
+        return web.Response(
+            text=(STATIC_DIR / "salon.js").read_text(encoding="utf-8"),
             content_type="application/javascript",
         )
 
@@ -809,6 +865,7 @@ def build_app(
         "/services": _services, "/masters": _masters, "/dialogs": _dialogs,
         "/audit": _audit, "/settings": _settings, "/reports": _reports,
         "/billing": _billing,
+        "/counterparties": _counterparties,
         "/pay": _pay,
         "/network": _network,
     }
@@ -824,6 +881,7 @@ def build_app(
     app.router.add_post("/pay/notify", pay_notify)
     app.router.add_get("/static.css", static_css)
     app.router.add_get("/login.js", login_js)
+    app.router.add_get("/salon.js", salon_js)
     app.router.add_get("/oferta", oferta)
     app.router.add_get("/pdn", pdn)
     app.router.add_get("/export.csv", export_csv)

@@ -48,22 +48,20 @@ async def test_rollback_migrations_reverts_and_reapplies(pool) -> None:
         try:
             scoped = _TxPool(conn)
             rolled = await rollback_migrations(scoped, steps=1)
-            assert rolled == ["010_payments_acquiring.sql"]
-            # Откат 010 убирает поля эквайринга, но сама таблица payments (из 008) остаётся.
+            assert rolled == ["011_counterparties.sql"]
+            # откат 011 удалил таблицу counterparties, 010 не трогал.
             assert await conn.fetchval(
-                "SELECT column_name FROM information_schema.columns "
-                "WHERE table_name = 'payments' AND column_name = 'provider'"
-            ) is None, "поля эквайринга должны исчезнуть"
+                "SELECT to_regclass('public.counterparties') IS NOT NULL"
+            ) is False, "таблица counterparties должна быть удалена"
             assert await conn.fetchval(
                 "SELECT to_regclass('public.client_legal') IS NOT NULL"
             ) is True, "остальные миграции не трогаются"
 
             reapplied = await run_migrations(scoped)
-            assert "010_payments_acquiring.sql" in reapplied
+            assert "011_counterparties.sql" in reapplied
             assert await conn.fetchval(
-                "SELECT column_name FROM information_schema.columns "
-                "WHERE table_name = 'payments' AND column_name = 'provider'"
-            ) is not None, "повторный накат обязан вернуть поля эквайринга"
+                "SELECT to_regclass('public.counterparties') IS NOT NULL"
+            ) is True, "таблица counterparties должна быть восстановлена"
         finally:
             # Не коммитим: схема и данные должны вернуться как до теста.
             await tx.rollback()
@@ -90,7 +88,7 @@ async def test_rollback_keeps_baseline_intact(pool) -> None:
             scoped = _TxPool(conn)
             rolled = await rollback_migrations(scoped, steps=99)
             assert rolled == [
-                "010_payments_acquiring.sql", "009_legal.sql", "008_billing.sql",
+                "011_counterparties.sql", "010_payments_acquiring.sql", "009_legal.sql", "008_billing.sql",
                 "007_inbound.sql", "006_ops.sql", "005_panel_users.sql",
             ]
             assert await conn.fetchval(

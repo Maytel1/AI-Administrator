@@ -347,14 +347,62 @@ async def apply_form(
             return fail("legal_invalid", "; ".join(result["errors"]))
         return ok("Карточка плательщика сохранена")
 
+    if action == "counterparty_save":
+        from admin_core import counterparties  # noqa: PLC0415
+
+        client_type = str(form.get("client_type") or "ip")
+        # Поля скрытых блоков приходят в форму (display:none не мешает), поэтому
+        # берём только блок выбранного типа — иначе в реквизиты попало бы то,
+        # что заполняли для другого типа. Префикс cp_{тип}_{поле}.
+        wanted = client_type if client_type in ("ip", "llc", "self_employed") else "ip"
+        prefix = f"cp_{wanted}_"
+        cp_details: dict[str, str] = {}
+        for key in form:
+            if key.startswith(prefix) and len(key) > len(prefix):
+                cp_details[key[len(prefix):]] = str(form[key]).strip()
+        result = await counterparties.save(
+            pool,
+            counterparty_id=_uuid(form.get("counterparty_id")) or None,
+            title=str(form.get("title", "")),
+            client_type=client_type,
+            legal_name=str(form.get("legal_name", "")),
+            inn=str(form.get("inn", "")),
+            details=details,
+            contract_no=str(form.get("contract_no", "")),
+        )
+        if not result["ok"]:
+            return fail("counterparty_invalid", "; ".join(result["errors"]))
+        return ok("Контрагент сохранён")
+
+    if action == "counterparty_toggle":
+        from admin_core import counterparties  # noqa: PLC0415
+
+        counterparty_id = _uuid(form.get("counterparty_id"))
+        if not counterparty_id:
+            return fail("bad_id")
+        active = str(form.get("is_active", "1")) in ("1", "on", "true")
+        result = await counterparties.set_active(pool, counterparty_id, active)
+        if not result.get("ok"):
+            return fail("counterparty_not_found", "Контрагент не найден")
+        return ok(
+            f"Контрагент «{result['title']}» возвращён в список"
+            if active else f"Контрагент «{result['title']}» в архиве"
+        )
+
     if action == "invoice_issue":
-        from admin_core import billing  # noqa: PLC0415
+        from admin_core import billing, counterparties  # noqa: PLC0415
 
         salon_row = dict(await pool.fetchrow(
             "SELECT id, name, plan, paid_until, timezone FROM salons WHERE id = $1",
             salon_id,
         ))
-        invoice = await billing.issue_invoice(pool, salon_row, actor=actor)
+        # Контрагент выбирается из реестра: его реквизиты (ИНН, наименование,
+        # договор) попадают в документ. Необязательно — без него счёт на точку.
+        cp_id = _uuid(form.get("counterparty_id"))
+        counterparty = await counterparties.get(pool, cp_id) if cp_id else None
+        invoice = await billing.issue_invoice(
+            pool, salon_row, actor=actor, counterparty=counterparty,
+        )
         return ok(f"Счёт {invoice['invoice_no']} на {invoice['amount']} руб. "
                   f"выставлен за {invoice['period'].label}")
 

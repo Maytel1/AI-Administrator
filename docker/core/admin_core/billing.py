@@ -191,14 +191,35 @@ def _thousands(value: int) -> str:
     return f"{head} {ending}"
 
 
-def invoice_text(salon: dict[str, Any], period: Period, amount: int, number: str) -> str:
+def _payer_block(
+    salon: dict[str, Any], counterparty: dict[str, Any] | None
+) -> list[str]:
+    """Кто платит: контрагент из реестра (если выбран) или сама точка.
+
+    Реестр — источник данных для документа: у контрагента заполнены ИНН,
+    наименование и тип, поэтому в счёт подставляем его, а не только имя салона.
+    """
+    if counterparty:
+        who = str(counterparty.get("legal_name") or counterparty.get("title") or "Клиент")
+        lines = [f"Плательщик: {who}"]
+        if counterparty.get("inn"):
+            lines.append(f"  ИНН {counterparty['inn']}")
+        if counterparty.get("contract_no"):
+            lines.append(f"  Договор № {counterparty['contract_no']}")
+        return lines
+    return [f"Плательщик: {str(salon.get('name') or 'Клиент')}"]
+
+
+def invoice_text(
+    salon: dict[str, Any], period: Period, amount: int, number: str,
+    counterparty: dict[str, Any] | None = None,
+) -> str:
     """Текст счёта: его можно отправить салону как есть."""
     req = requisites()
-    who = str(salon.get("name") or "Клиент")
     lines = [
         f"СЧЁТ № {number} от {date.today():%d.%m.%Y}",
         "",
-        f"Плательщик: {who}",
+        *_payer_block(salon, counterparty),
         f"Тариф: {salon.get('plan')}, месячное обслуживание",
         f"Период: {period.label} ({period.start:%d.%m.%Y} — {period.end:%d.%m.%Y})",
         f"Сумма: {amount} руб.",
@@ -221,7 +242,8 @@ def invoice_text(salon: dict[str, Any], period: Period, amount: int, number: str
 
 
 def act_text(
-    salon: dict[str, Any], period: Period, amount: int, number: str
+    salon: dict[str, Any], period: Period, amount: int, number: str,
+    counterparty: dict[str, Any] | None = None,
 ) -> str:
     """Текст акта оказанных услуг за период — первичный документ для бухгалтерии.
 
@@ -231,9 +253,17 @@ def act_text(
     (период, сумма, тариф), чтобы цифры не разошлись. НДС зависит от режима
     исполнителя: подставляем из ``BILLING_VAT`` («без НДС» для УСН/патента,
     «НДС 20%» для ОСНО) — по умолчанию «без НДС», как у большинства пилотов.
+
+    Заказчик — контрагент из реестра, если выбран: у него заполнены ИНН и
+    наименование, поэтому в документ подставляем его, а не имя салона.
     """
     req = requisites()
-    who = str(salon.get("name") or "Клиент")
+    if counterparty:
+        who = str(counterparty.get("legal_name") or counterparty.get("title") or "Клиент")
+        if counterparty.get("inn"):
+            who = f"{who}, ИНН {counterparty['inn']}"
+    else:
+        who = str(salon.get("name") or "Клиент")
     vat = os.getenv("BILLING_VAT", "").strip() or "НДС не начисляется (УСН/патент)"
     today = f"{date.today():%d.%m.%Y}"
     lines = [
@@ -268,6 +298,7 @@ def act_text(
 
 async def issue_act(
     pool: Any, salon: dict[str, Any], *, actor: str = "team:cli",
+    counterparty: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Сформировать акт за последний оплаченный период салона.
 
@@ -299,12 +330,13 @@ async def issue_act(
         "act_no": number,
         "period": period,
         "amount": amount,
-        "text": act_text(salon, period, amount, number),
+        "text": act_text(salon, period, amount, number, counterparty),
     }
 
 
 async def issue_invoice(
     pool: Any, salon: dict[str, Any], *, actor: str = "team:cli",
+    counterparty: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Выставить счёт за следующий месячный период."""
     salon_id = str(salon["id"])
@@ -332,7 +364,7 @@ async def issue_invoice(
         "period": period,
         "amount": int(row["amount"]),
         "invoice_no": number,
-        "text": invoice_text(salon, period, int(row["amount"]), number),
+        "text": invoice_text(salon, period, int(row["amount"]), number, counterparty),
     }
 
 

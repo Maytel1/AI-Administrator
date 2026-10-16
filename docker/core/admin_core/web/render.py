@@ -23,6 +23,7 @@ NAV = [
     ("/network", "Сеть", "◈"),
     ("/pay", "Оплата", "Ⓢ"),
     ("/billing", "Счета (команда)", "€"),
+    ("/counterparties", "Контрагенты", "☍"),
     ("/audit", "Аудит", "⚑"),
     ("/settings", "Настройки", "⚙"),
 ]
@@ -155,6 +156,11 @@ def salon_switch(salon: dict | None, salons: list[dict] | None) -> str:
 
     на «Сегодня» он должен стоять под заголовком и полосой загрузки, а не
     справа от всего содержимого.
+
+    Отправку на ``/salon`` делает внешний ``salon.js`` (по ``change``), а не
+    инлайновый ``onchange``: CSP панели — ``script-src 'self'`` без
+    ``'unsafe-inline'``, поэтому инлайновый обработчик не выполнялся и выбор
+    точки ничего не делал.
     """
     if not salons:
         return ""
@@ -166,7 +172,7 @@ def salon_switch(salon: dict | None, salons: list[dict] | None) -> str:
     )
     return (
         '<form method="get" action="/salon" class="salon-switch">'
-        f'<select name="id" onchange="this.form.submit()">{opts}</select></form>'
+        f'<select name="id" id="salon-select">{opts}</select></form>'
     )
 
 
@@ -192,12 +198,12 @@ def layout(
     # чужую выручку незачем, а ссылка в меню была бы враньём в интерфейсе.
     nav_items = [
         item for item in NAV
-    # /network и /billing видны только нашей команне: счета и сводка по сети
-    # — не клиентские данные салона.
+    # /network, /billing и /counterparties видны только нашей команде: счета,
+    # сводка по сети и реестр контрагентов — не клиентские данные салона.
     if (
-        (item[0] in ("/network", "/billing") and role == "team")
+        (item[0] in ("/network", "/billing", "/counterparties") and role == "team")
         or (item[0] == "/pay" and role in ("owner", "team"))
-        or item[0] not in ("/network", "/billing", "/pay")
+        or item[0] not in ("/network", "/billing", "/counterparties", "/pay")
     )
     ]
     nav = "".join(
@@ -219,7 +225,11 @@ def layout(
         # блоки страницы становились его детьми и выстраивались в один ряд
         # (расписание вставало справа от плиток вместо того, чтобы быть под ними).
         f'<div class="top"><div class="content">{content}</div>{switch}</div></main>'
-        "</div></body></html>"
+        "</div>"
+        # Внешний скрипт (не инлайн — CSP запрещает): дёргает отправку формы
+        # переключателя точки по событию change на #salon-select.
+        '<script src="/salon.js" defer></script>'
+        "</body></html>"
     )
 
 
