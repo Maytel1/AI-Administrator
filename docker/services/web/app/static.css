@@ -514,3 +514,22 @@ form.stack .check-cell{justify-content:flex-end}
 .doc th{background:var(--surface-2);font-weight:600}
 .doc .meta{color:var(--muted);font-size:12.5px}
 .doc a{color:var(--accent)}
+
+/* Аватары мастеров: круглые círcжки с инициалами (вкладка «Сегодня»). */
+.avatar{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:26px;height:26px;border-radius:50%;font-size:12px;font-weight:600;
+  color:#fff;background:var(--accent);margin-right:6px;flex-shrink:0;
+}
+
+/* Кнопка вызова модалки «Добавить» (клиент / услуга / мастер). */
+.btn.add{display:inline-flex;align-items:center;gap:6px;margin-top:14px}
+
+/* Таблица контрагентов: тонкие границы, выделение строки при наведении. */
+table.counterparties{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+table.counterparties th{text-align:left;color:var(--subtle);font-weight:500;font-size:12px;
+  padding:7px 10px;border-bottom:1px solid var(--border)}
+table.counterparties td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.05)}
+table.counterparties tr:last-child td{border-bottom:none}
+table.counterparties tr:hover td{background:var(--surface-2)}
+table.counterparties .row-end{display:flex;gap:8px;align-items:center}

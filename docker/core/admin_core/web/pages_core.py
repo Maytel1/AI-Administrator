@@ -51,6 +51,16 @@ def _status_badge(status: str) -> str:
     return badge(STATUS_RU.get(status, status), STATUS_TONE.get(status, "gray"))
 
 
+def _initials(name: str) -> str:
+    """Первые буквы имени и фамилии для аватарки мастера."""
+    parts = [p for p in str(name or "").split() if p]
+    if not parts:
+        return "?"
+    if len(parts) == 1:
+        return parts[0][:1].upper()
+    return (parts[0][:1] + parts[-1][:1]).upper()
+
+
 PERIOD_LABELS: tuple[tuple[int, str], ...] = (
     (1, "Сегодня"),
     (7, "Неделя"),
@@ -258,7 +268,8 @@ def page_today(
         + _status_badge(b["status"]) + "</div>"
         f'<span class="meta">{esc(b["client_name"] or "Без имени")}'
         f'{(" · " + esc(b["client_phone"])) if b["client_phone"] else ""}</span>'
-        f'<span class="meta">{esc(b["service_title"])} · {esc(b["master_name"])}</span>'
+        f'<span class="meta">{esc(b["service_title"])} · <span class="avatar">{_initials(b["master_name"])}</span> '
+        f'{esc(b["master_name"])}</span>'
         f'<span class="meta">{money(b["price"])}</span>'
         '<div class="m-actions">'
         + _action_menu(

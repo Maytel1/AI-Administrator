@@ -236,19 +236,28 @@ def page_clients(
     add_form = ""
     if may_add:
         add_form = (
-            '<form method="post" action="/actions" class="stack" style="margin-top:14px">'
-            '<input type="hidden" name="action" value="client_create">'
-            f'<input type="hidden" name="back" value="{back}">'
-            f"{csrf_field(csrf)}"
-            '<div class="cell"><span>Телефон</span>'
-            '<input type="tel" name="phone" placeholder="+79001234567" required></div>'
-            '<div class="cell"><span>Имя</span>'
-            '<input type="text" name="name" placeholder="Как обращаться"></div>'
-            '<div class="cell"><span>Заметки</span>'
-            '<input type="text" name="notes" placeholder="аллергии, пожелания"></div>'
-            '<div class="cell"><span>&nbsp;</span>'
-            '<button type="submit">Добавить</button></div>'
-            "</form>"
+            '<input type="checkbox" id="add-client" class="modal-toggle">' +
+            '<label class="btn" for="add-client" style="margin-top:14px">Добавить клиента</label>' +
+            '<div class="modal">' +
+            '<label class="modal-veil" for="add-client"></label>' +
+            '<form method="post" action="/actions" class="modal-card">' +
+            '<div class="modal-head"><b>Новый клиент</b>' +
+            '<label class="modal-x" for="add-client">✕</label></div>' +
+            '<div class="modal-body stack">' +
+                '<input type="hidden" name="action" value="client_create">' +
+                f'<input type="hidden" name="back" value="{back}">' +
+                f"{csrf_field(csrf)}" +
+                '<label class="field"><span>Телефон</span>' +
+                '<input type="tel" name="phone" placeholder="+79001234567" required></label>' +
+                '<label class="field"><span>Имя</span>' +
+                '<input type="text" name="name" placeholder="Как обращаться"></label>' +
+                '<label class="field"><span>Заметки</span>' +
+                '<input type="text" name="notes" placeholder="аллергии, пожелания"></label>' +
+            '</div>' +
+            '<div class="modal-foot">' +
+                '<label class="btn ghost" for="add-client">Отмена</label>' +
+                '<button type="submit">Добавить</button></div>' +
+            '</form></div>'
         )
     content = (
         page_head(
@@ -315,20 +324,28 @@ def page_services(
     add_form = ""
     if may_add:
         add_form = (
-            '<form method="post" action="/actions" class="stack add-row">'
-            '<input type="hidden" name="action" value="service_create">'
-            f'<input type="hidden" name="back" value="{back}">'
-            f"{csrf_field(csrf)}"
-            '<div class="cell wide"><span>Новая услуга</span>'
-            '<input type="text" name="title" placeholder="название" required></div>'
-            '<div class="cell"><span>Цена, ₽</span>'
-            '<input type="number" name="price" min="0" step="50" required></div>'
-            '<div class="cell"><span>Длительность, мин</span>'
-            '<input type="number" name="duration_min" value="60" min="5" max="600" '
-            'step="5" required></div>'
-            '<div class="cell save-cell"><span>&nbsp;</span>'
-            '<button type="submit">Добавить</button></div>'
-            "</form>"
+            '<input type="checkbox" id="add-service" class="modal-toggle">' +
+            '<label class="btn" for="add-service" style="margin-top:14px">Добавить услугу</label>' +
+            '<div class="modal">' +
+            '<label class="modal-veil" for="add-service"></label>' +
+            '<form method="post" action="/actions" class="modal-card">' +
+            '<div class="modal-head"><b>Новая услуга</b>' +
+            '<label class="modal-x" for="add-service">✕</label></div>' +
+            '<div class="modal-body stack">' +
+                '<input type="hidden" name="action" value="service_create">' +
+                f'<input type="hidden" name="back" value="{back}">' +
+                f"{csrf_field(csrf)}" +
+                '<label class="field"><span>Название услуги</span>' +
+                '<input type="text" name="title" placeholder="название" required></label>' +
+                '<label class="field"><span>Цена, ₽</span>' +
+                '<input type="number" name="price" min="0" step="50" required></label>' +
+                '<label class="field"><span>Длительность, мин</span>' +
+                '<input type="number" name="duration_min" value="60" min="5" max="600" step="5" required></label>' +
+            '</div>' +
+            '<div class="modal-foot">' +
+                '<label class="btn ghost" for="add-service">Отмена</label>' +
+                '<button type="submit">Добавить</button></div>' +
+            '</form></div>'
         )
     revenue = sum(float(s["price"] or 0) for s in rows)
     content = (
@@ -450,15 +467,24 @@ def page_masters(
     add_form = ""
     if may_add:
         add_form = (
-            '<form method="post" action="/actions" class="stack" style="margin-top:14px">'
-            '<input type="hidden" name="action" value="master_create">'
-            f'<input type="hidden" name="back" value="{back}">'
-            f"{csrf_field(csrf)}"
-            '<div class="cell"><span>Новый мастер</span>'
-            '<input type="text" name="name" placeholder="Имя" required></div>'
-            '<div class="cell"><span>&nbsp;</span>'
-            '<button type="submit">Добавить</button></div>'
-            "</form>"
+            '<input type="checkbox" id="add-master" class="modal-toggle">' +
+            '<label class="btn" for="add-master" style="margin-top:14px">Добавить мастера</label>' +
+            '<div class="modal">' +
+            '<label class="modal-veil" for="add-master"></label>' +
+            '<form method="post" action="/actions" class="modal-card">' +
+            '<div class="modal-head"><b>Новый мастер</b>' +
+            '<label class="modal-x" for="add-master">✕</label></div>' +
+            '<div class="modal-body stack">' +
+                '<input type="hidden" name="action" value="master_create">' +
+                f'<input type="hidden" name="back" value="{back}">' +
+                f"{csrf_field(csrf)}" +
+                '<label class="field"><span>Имя мастера</span>' +
+                '<input type="text" name="name" placeholder="Имя" required></label>' +
+            '</div>' +
+            '<div class="modal-foot">' +
+                '<label class="btn ghost" for="add-master">Отмена</label>' +
+                '<button type="submit">Добавить</button></div>' +
+            '</form></div>'
         )
     content = (
         page_head(
@@ -1240,23 +1266,20 @@ def page_counterparties(
         details = {}
     edit_id = str(cur.get("id") or "")
 
-    # — Список контрагентов —
-    rows = []
+    # — Список контрагентов (таблица) —
+    trs = []
     for c in counterparties:
         ctype = CLIENT_TYPES.get(str(c.get("client_type")), str(c.get("client_type")))
-        rows.append(
-            '<div class="m-card">'
-            f'<div class="m-top"><b>{esc(c.get("title"))}</b>'
-            + badge(esc(ctype), "") + "</div>"
-            f'<span class="meta">ИНН {esc(c.get("inn") or "—")} · '
-            f'{esc(c.get("legal_name") or "")}</span>'
-            + (
-                f'<span class="meta">Договор № {esc(c["contract_no"])}</span>'
-                if c.get("contract_no") else ""
-            )
-            + '<div class="row-end">'
-            + f'<a class="tab" href="/counterparties?edit={esc(c["id"])}">'
-              "Править</a> "
+        status_badge = badge("активен", "green") if c.get("is_active") else badge("в архиве", "gray")
+        trs.append(
+            '<tr>'
+            f'<td><b>{esc(c.get("title"))}</b> {status_badge}</td>'
+            f'<td>{esc(ctype)}</td>'
+            f'<td>{esc(c.get("inn") or "—")}</td>'
+            f'<td>{esc(c.get("legal_name") or "")}</td>'
+            f'<td>{esc(c.get("contract_no") or "—")}</td>'
+            '<td class="row-end">'
+            + f'<a class="tab" href="/counterparties?edit={esc(c["id"])}">Править</a> '
             + action_form(
                 "counterparty_toggle", csrf, "/counterparties",
                 f'<input type="hidden" name="counterparty_id" value="{esc(c["id"])}">'
@@ -1264,12 +1287,20 @@ def page_counterparties(
                 f'{0 if c.get("is_active") else 1}">',
                 "Архивировать" if c.get("is_active") else "Вернуть",
             )
-            + "</div></div>"
+            + "</td>"
+            + "</tr>"
         )
-    list_block = (
-        f'<div class="m-grid">{"".join(rows)}</div>'
-        if rows else '<div class="empty">Контрагентов пока нет — добавьте первого</div>'
-    )
+    if trs:
+        thead = (
+            '<thead><tr>'
+            '<th>Название</th><th>Тип</th><th>ИНН</th>'
+            '<th>Наименование в документах</th><th>Договор</th><th>Действия</th>'
+            '</tr></thead>'
+        )
+        tbody = f'<tbody>{"".join(trs)}</tbody>'
+        list_block = f'<table>{thead}{tbody}</table>'
+    else:
+        list_block = '<div class="empty">Контрагентов пока нет — добавьте первого</div>'
 
     # — Форма добавления/правки (поля по типу, CSS :has()) —
     types = "".join(
