@@ -1,0 +1,485 @@
+1000 |         + f'<p class="sub">{esc(label)} · сравнение с {esc(prev_label)}'
+1001 |         + " · по факту записей и диалогов</p>"
+1002 |         + "</div>"
+1003 |         '<div class="page-body">'
+1004 |         + f'<div class="tiles">{tiles}</div>'
+1005 |         + card("Выручка по дням", _bar_chart(data["by_day"], ZoneInfo("UTC")))
+1006 |         + card(
+1007 |             "Сравнение с прошлым периодом",
+1008 |             _compare_table(
+1009 |                 diff, prev_label,
+1010 |                 prev_window.days if prev_window else None,
+1011 |             ) if diff else
+1012 |             '<div class="empty">Сравнение появится вместе с выбором периода</div>',
+1013 |         )
+1014 |         + card("Загрузка мастеров", load_block)
+1015 |         + card("Потери и затраты", loss_block)
+1016 |         + card(
+1017 |             f"Качество бота: {label} и {prev_label}",
+1018 |             table(["Показатель", label, prev_label], bot_rows)
+1019 |             if bot.get("dialogs") else
+1020 |             '<div class="empty">За период диалогов не было — метрики появятся,'
+1021 |             " когда бот отработает хотя бы один диалог</div>",
+1022 |         )
+1023 |         + "</div></div>"
+1024 |     )
+1025 |     return layout(
+1026 |         "Отчёты", "/reports", content,
+1027 |         salon=salon, salons=salons, role=_role(ctx), inner_scroll=True,
+1028 |     )
+1029 | 
+1030 | 
+1031 | def page_billing(
+1032 |     status: dict[str, Any], salon: dict | None, salons: list[dict] | None,
+1033 |     history: list[dict[str, Any]],
+1034 |     legal: dict[str, Any] | None = None, errors: list[str] | None = None,
+1035 |     flash: str = "", flash_error: bool = False, ctx: Any | None = None,
+1036 |     counterparties: list[dict[str, Any]] | None = None,
+1037 | ) -> str:
+1038 |     errors = list(errors or [])
+1039 |     # ctx — объект PageCtx (не dict): берём атрибут, иначе csrf пустой и форма
+1040 |     # счёта не проходит проверку.
+1041 |     csrf = getattr(ctx, "csrf", "") if ctx is not None else ""
+1042 |     # Форму реквизитов показываем только своей команде: в ней названия полей,
+1043 |     # и владельцу салона они видеть незачем.
+1044 |     may_billing = _role(ctx) == "team"
+1045 |     req = status.get("requisites") or {}
+1046 |     paid_until = status.get("paid_until")
+1047 |     expired = bool(status.get("expired"))
+1048 |     tone = "yellow" if expired else ("accent" if status.get("is_trial") else "green")
+1049 |     head = (
+1050 |         f'<p class="sub">{esc(status.get("status_text") or "")}</p>'
+1051 |         + '<div class="tiles">'
+1052 |         + tile(f'{status.get("price", 0)} руб.', "в месяц", tone, "")
+1053 |         + tile(
+1054 |             f'{paid_until:%d.%m.%Y}' if paid_until else "—",
+1055 |             "оплачено до", "" if not expired else "yellow", "",
+1056 |         )
+1057 |         + tile(str(status.get("plan") or ""), "тариф", "", "")
+1058 |         + tile(
+1059 |             f'{status.get("debt", 0):.0f} руб.', "долг сети",
+1060 |             "yellow" if status.get("debt") else "", "",
+1061 |         )
+1062 |         + tile(
+1063 |             f'{status.get("paid_amount", 0):.0f} руб.', "оплачено за месяц",
+1064 |             "green", "",
+1065 |         )
+1066 |         + "</div>"
+1067 |     )
+1068 |     # Список выбора контрагента для счёта — только из реестра. Если реестр
+1069 |     # пуст, счёт выставляется на саму точку (как раньше).
+1070 |     cp_options = "".join(
+1071 |         f'<option value="{esc(c["id"])}">{esc(c.get("title") or c.get("legal_name"))}'
+1072 |         f' (ИНН {esc(c.get("inn") or "—")})</option>'
+1073 |         for c in (counterparties or [])
+1074 |     )
+1075 |     cp_select = (
+1076 |         f'<label class="field"><span>Контрагент (кому выставить)</span>'
+1077 |         f'<select name="counterparty_id">{cp_options}</select></label>'
+1078 |         if cp_options else ""
+1079 |     )
+1080 |     actions = (
+1081 |         action_form(
+1082 |             "invoice_issue", csrf, "/billing", cp_select, "Выставить счёт",
+1083 |         )
+1084 |         if ctx is not None else ""
+1085 |     )
+1086 |     pay_cards = [
+1087 |         '<div class="m-card">'
+1088 |         f'<div class="m-top"><b>{float(row["amount"] or 0):.0f} руб.</b>'
+1089 |         + badge(
+1090 |             esc(STATUS_RU.get(str(row["status"]), str(row["status"]))),
+1091 |             "green" if str(row["status"]) == "paid" else "yellow",
+1092 |         ) + "</div>"
+1093 |         f'<span class="meta">Период: {esc(str(row["period_start"]))} — '
+1094 |         f'{esc(str(row["period_end"]))}</span>'
+1095 |         f'<span class="meta">Оплачен: '
+1096 |         f'{esc(str(row["paid_at"])[:10]) if row.get("paid_at") else "—"}</span>'
+1097 |         "</div>"
+1098 |         for row in history
+1099 |     ]
+1100 |     pay_block = (
+1101 |         f'<div class="m-grid">{"".join(pay_cards)}</div>'
+1102 |         if pay_cards else '<div class="empty">Платежей пока не было</div>'
+1103 |     )
+1104 |     requisites_block = card("Реквизиты для оплаты (СБП)", (
+1105 |         '<div class="empty">Задайте BILLING_* в docker/.env — реквизиты появятся здесь'
+1106 |         "</div>"
+1107 |         if not req.get("legal_name") else
+1108 |         '<table><tbody>'
+1109 |         + "".join(
+1110 |             f"<tr><th>{esc(title)}</th><td>{esc(str(req.get(key) or '—'))}</td></tr>"
+1111 |             for key, title in (
+1112 |                 ("legal_name", "Получатель"), ("inn", "ИНН"), ("kpp", "КПП"),
+1113 |                 ("bank", "Банк"), ("bik", "БИК"), ("account", "Р/с"),
+1114 |                 ("tg", "Вопросы"),
+1115 |             )
+1116 |             if req.get(key)
+1117 |         )
+1118 |         + "</tbody></table>"
+1119 |         + '<p class="sub">Карты не храним, автосписания нет: салон платит переводом '
+1120 |         "раз в месяц, оплату подтверждает менеджер.</p>"
+1121 |     ))
+1122 |     return layout(
+1123 |         "Тариф и оплата", "/billing",
+1124 |         page_head("Тариф и оплата", "", salon, salons) + flash_html(flash, flash_error) + head
+1125 |         + (
+1126 |             '<div class="row-end">'
+1127 |             + '<a class="tab" href="/accounting.csv?kind=payments">Счета (CSV)</a> '
+1128 |             + '<a class="tab" href="/accounting.csv?kind=debtors">Долги (CSV)</a> '
+1129 |             + '<a class="tab" href="/accounting.csv?kind=clients">Клиенты (CSV)</a>'
+1130 |             + actions + "</div>"
+1131 |             if actions else ""
+1132 |         )
+1133 |         + card("История платежей", pay_block)
+1134 |         + requisites_block
+1135 |         + (_legal_card(legal, csrf, "/billing", errors) if may_billing else ""),
+1136 |         salon=salon, salons=salons, role=_role(ctx),
+1137 |     )
+1138 | 
+1139 | 
+1140 | def _legal_card(
+1141 |     legal: dict[str, Any] | None, csrf: str, back: str, errors: list[str],
+1142 | ) -> str:
+1143 | 
+1144 |     """Карточка плательщика: тип выбирается первым, поля — по типу.
+1145 | 
+1146 |     Показ полей сделан на CSS ``:has()`` без JavaScript: при смене типа браузер
+1147 |     сам показывает нужный набор, а сервер всё равно проверяет только его — то
+1148 |     есть скрытие полей не является защитой, а лишь удобством.
+1149 |     """
+1150 |     from admin_core.billing_legal import CLIENT_TYPES, fields_of  # noqa: PLC0415
+1151 | 
+1152 |     current = legal or {}
+1153 |     client_type = str(current.get("client_type") or "ip")
+1154 |     details = current.get("details") or {}
+1155 |     if not isinstance(details, dict):
+1156 |         details = {}
+1157 |     sid = esc(current.get("salon_id", ""))
+1158 |     types = "".join(
+1159 |         f'<label class="radio"><input type="radio" name="client_type" '
+1160 |         f'value="{esc(key)}"{" checked" if key == client_type else ""}> '
+1161 |         f'{esc(title)}</label>'
+1162 |         for key, title in CLIENT_TYPES.items()
+1163 |     )
+1164 |     blocks = []
+1165 |     for key in CLIENT_TYPES:
+1166 |         rows = []
+1167 |         if key == client_type:
+1168 |             rows.append(
+1169 |                 f'<label class="field"><span>ИНН ('
+1170 |                 f'{"10" if key == "llc" else "12"} цифр)</span>'
+1171 |                 f'<input name="inn" value="{esc(current.get("inn", ""))}" required></label>'
+1172 |             )
+1173 |         for field_key, title, required, hint in fields_of(key):
+1174 |             rows.append(
+1175 |                 f'<label class="field"><span>{esc(title)}'
+1176 |                 f'{" *" if required else ""}</span>'
+1177 |                 f'<input name="{esc(field_key)}[{esc(key)}]" '
+1178 |                 f'value="{esc(str(details.get(field_key, "")))}"'
+1179 |                 f'{" required" if required else ""}>'
+1180 |                 + (f'<small>{esc(hint)}</small>' if hint else "")
+1181 |                 + "</label>"
+1182 |             )
+1183 |         blocks.append(
+1184 |             f'<fieldset data-type="{esc(key)}">{"".join(rows)}</fieldset>'
+1185 |         )
+1186 |     return card(
+1187 |         "Карточка плательщика (нужна для счёта)",
+1188 |         (
+1189 |             (f'<div class="flash error">{esc("; ".join(errors))}</div>' if errors else "")
+1190 |             + '<p class="sub">Тип выбирается первым — дальше нужны только его поля. '
+1191 |               "ИНН, ОГРН и ОГРНИП проверяются по контрольной сумме: ошибку в цифре "
+1192 |               "банк отвергнет, и платёж потеряется.</p>"
+1193 |             + f'<form method="post" action="/actions" class="legal-form">{csrf_field(csrf)}'
+1194 |             + '<input type="hidden" name="action" value="legal_save">'
+1195 |             + f'<input type="hidden" name="back" value="{esc(back)}">'
+1196 |             + f'<input type="hidden" name="salon_id" value="{sid}">'
+1197 |             + f'<div class="radios">{types}</div>'
+1198 |             + "".join(blocks)
+1199 |             + '<label class="field"><span>Выставлять счёт автоматически '
+1200 |               f"каждый {esc(current.get('invoice_due_day', 1))} число</span>"
+1201 |               '<select name="invoice_due_day">'
+1202 |             + "".join(
+1203 |                 f'<option value="{day}"'
+1204 |                 f'{" selected" if int(current.get("invoice_due_day", 1)) == day else ""}>'
+1205 |                 f"{day} числа</option>"
+1206 |                 for day in (1, 5, 10, 15, 20, 25, 28)
+1207 |             )
+1208 |             + "</select></label>"
+1209 |             + '<label class="check"><input type="checkbox" name="auto_invoice" value="1"'
+1210 |             + (' checked' if current.get("auto_invoice", True) else "")
+1211 |             + "> включено</label>"
+1212 |             + '<label class="field"><span>Номер договора</span>'
+1213 |             + f'<input name="contract_no" value="{esc(current.get("contract_no") or "")}">'
+1214 |             + "</label>"
+1215 |             + '<button type="submit" class="btn">Сохранить карточку</button>'
+1216 |             + "</form>"
+1217 |         ),
+1218 |     )
+1219 | 
+1220 | def page_counterparties(
+1221 |     counterparties: list[dict[str, Any]], editing: dict[str, Any] | None,
+1222 |     salons: list[dict] | None, csrf: str,
+1223 |     errors: list[str] | None = None, flash: str = "", flash_error: bool = False,
+1224 |     ctx: Any | None = None,
+1225 | ) -> str:
+1226 |     """Реестр контрагентов: подключённые клиенты, которым выставляют документы.
+1227 | 
+1228 |     Общий на всю команду справочник. Его данные питают счёт/акт и списки
+1229 |     выбора — реквизиты вводятся один раз. Форма показывает поля только по
+1230 |     выбранному типу на CSS ``:has()`` (как карточка плательщика), но сервер
+1231 |     всё равно проверяет набор своего типа: скрытие — удобство, не защита.
+1232 |     """
+1233 |     from admin_core.billing_legal import CLIENT_TYPES, fields_of  # noqa: PLC0415
+1234 | 
+1235 |     errors = list(errors or [])
+1236 |     cur = editing or {}
+1237 |     cur_type = str(cur.get("client_type") or "ip")
+1238 |     details = cur.get("details") or {}
+1239 |     if not isinstance(details, dict):
+1240 |         details = {}
+1241 |     edit_id = str(cur.get("id") or "")
+1242 | 
+1243 |     # — Список контрагентов —
+1244 |     rows = []
+1245 |     for c in counterparties:
+1246 |         ctype = CLIENT_TYPES.get(str(c.get("client_type")), str(c.get("client_type")))
+1247 |         rows.append(
+1248 |             '<div class="m-card">'
+1249 |             f'<div class="m-top"><b>{esc(c.get("title"))}</b>'
+1250 |             + badge(esc(ctype), "") + "</div>"
+1251 |             f'<span class="meta">ИНН {esc(c.get("inn") or "—")} · '
+1252 |             f'{esc(c.get("legal_name") or "")}</span>'
+1253 |             + (
+1254 |                 f'<span class="meta">Договор № {esc(c["contract_no"])}</span>'
+1255 |                 if c.get("contract_no") else ""
+1256 |             )
+1257 |             + '<div class="row-end">'
+1258 |             + f'<a class="tab" href="/counterparties?edit={esc(c["id"])}">'
+1259 |               "Править</a> "
+1260 |             + action_form(
+1261 |                 "counterparty_toggle", csrf, "/counterparties",
+1262 |                 f'<input type="hidden" name="counterparty_id" value="{esc(c["id"])}">'
+1263 |                 f'<input type="hidden" name="is_active" value="'
+1264 |                 f'{0 if c.get("is_active") else 1}">',
+1265 |                 "Архивировать" if c.get("is_active") else "Вернуть",
+1266 |             )
+1267 |             + "</div></div>"
+1268 |         )
+1269 |     list_block = (
+1270 |         f'<div class="m-grid">{"".join(rows)}</div>'
+1271 |         if rows else '<div class="empty">Контрагентов пока нет — добавьте первого</div>'
+1272 |     )
+1273 | 
+1274 |     # — Форма добавления/правки (поля по типу, CSS :has()) —
+1275 |     types = "".join(
+1276 |         f'<label class="radio"><input type="radio" name="client_type" '
+1277 |         f'value="{esc(key)}"{" checked" if key == cur_type else ""}> '
+1278 |         f"{esc(title)}</label>"
+1279 |         for key, title in CLIENT_TYPES.items()
+1280 |     )
+1281 |     blocks = []
+1282 |     for key in CLIENT_TYPES:
+1283 |         frows = []
+1284 |         if key == cur_type:
+1285 |             frows.append(
+1286 |                 f'<label class="field"><span>ИНН ('
+1287 |                 f'{"10" if key == "llc" else "12"} цифр)</span>'
+1288 |                 f'<input name="inn" value="{esc(cur.get("inn", ""))}" required></label>'
+1289 |             )
+1290 |         for field_key, title, required, hint in fields_of(key):
+1291 |             frows.append(
+1292 |                 f'<label class="field"><span>{esc(title)}'
+1293 |                 f'{" *" if required else ""}</span>'
+1294 |                 f'<input name="cp_{esc(key)}_{esc(field_key)}" '
+1295 |                 f'value="{esc(str(details.get(field_key, "")))}"'
+1296 |                 f'{" required" if required else ""}>'
+1297 |                 + (f"<small>{esc(hint)}</small>" if hint else "")
+1298 |                 + "</label>"
+1299 |             )
+1300 |         blocks.append(f'<fieldset data-type="{esc(key)}">{"".join(frows)}</fieldset>')
+1301 |     form = (
+1302 |         f'<form method="post" action="/actions" class="legal-form">{csrf_field(csrf)}'
+1303 |         '<input type="hidden" name="action" value="counterparty_save">'
+1304 |         '<input type="hidden" name="back" value="/counterparties">'
+1305 |         + (f'<input type="hidden" name="counterparty_id" value="{esc(edit_id)}">' if edit_id else "")
+1306 |         + '<label class="field"><span>Название (как показывать в списках)</span>'
+1307 |         f'<input name="title" value="{esc(cur.get("title", ""))}" required></label>'
+1308 |         + '<label class="field"><span>Наименование для документа (ФИО / ООО)</span>'
+1309 |         f'<input name="legal_name" value="{esc(cur.get("legal_name", ""))}" required></label>'
+1310 |         + f'<div class="radios">{types}</div>'
+1311 |         + "".join(blocks)
+1312 |         + '<label class="field"><span>Номер договора</span>'
+1313 |         f'<input name="contract_no" value="{esc(cur.get("contract_no") or "")}"></label>'
+1314 |         + '<div class="row-end">'
+1315 |         + '<button type="submit" class="btn">'
+1316 |         + ("Сохранить" if edit_id else "Добавить контрагента") + "</button>"
+1317 |         + (
+1318 |             '<a class="tab" href="/counterparties">Отмена</a>' if edit_id else ""
+1319 |         )
+1320 |         + "</div></form>"
+1321 |     )
+1322 |     form_card = card(
+1323 |         ("Правка контрагента" if edit_id else "Новый контрагент"),
+1324 |         (
+1325 |             (f'<div class="flash err">{esc("; ".join(errors))}</div>' if errors else "")
+1326 |             + '<p class="sub">Тип выбирается первым — дальше нужны только его поля. '
+1327 |               "ИНН, ОГРН и ОГРНИП проверяются по контрольной сумме.</p>"
+1328 |             + form
+1329 |         ),
+1330 |     )
+1331 |     return layout(
+1332 |         "Контрагенты", "/counterparties",
+1333 |         page_head("Контрагенты", "Подключённые клиенты — источник данных для счетов и актов",
+1334 |                   None, salons)
+1335 |         + flash_html(flash, flash_error)
+1336 |         + card("Список", list_block)
+1337 |         + form_card,
+1338 |         salons=salons, role=_role(ctx),
+1339 |     )
+1340 | 
+1341 | 
+1342 | def page_pay(
+1343 |     status: dict[str, Any], salon: dict | None, salons: list[dict] | None,
+1344 |     flash: str = "", flash_error: bool = False, ctx: Any | None = None,
+1345 | ) -> str:
+1346 |     """Страница оплаты тарифа: статус, лимиты, история и реквизиты.
+1347 | 
+1348 |     От ``page_billing`` отличается точкой зрения: здесь владелец точки видит,
+1349 |     сколько и за что он должен. Реквизиты команды ( BILLING_* ) показываем —
+1350 |     салон платит по ним. Реквизиты плательщика (ИНН и т.п.) вводятся на
+1351 |     внутренней странице /billing силами нашей команды, поэтому карточки
+1352 |     плательщика здесь нет.
+1353 |     """
+1354 |     csrf = ctx.get("csrf", "") if isinstance(ctx, dict) else ""
+1355 |     # Профиль плательщика — это данные точки: владелец правит свои реквизиты,
+1356 |     # команда может подправить от имени любой точки.
+1357 |     may_pay = _role(ctx) in ("owner", "team")
+1358 |     req = status.get("requisites") or {}
+1359 |     paid_until = status.get("paid_until")
+1360 |     expired = bool(status.get("expired"))
+1361 |     tone = "yellow" if expired else ("accent" if status.get("is_trial") else "green")
+1362 |     head = (
+1363 |         f'<p class="sub">{esc(status.get("status_text") or "Тариф не оплачен")}</p>'
+1364 |         + '<div class="tiles">'
+1365 |         + tile(f'{status.get("price", 0):.0f} руб.', "в месяц", tone, "")
+1366 |         + tile(
+1367 |             f'{paid_until:%d.%m.%Y}' if paid_until else "—",
+1368 |             "оплачено до", "" if not expired else "yellow", "",
+1369 |         )
+1370 |         + tile(str(status.get("plan") or "start"), "тариф", "", "")
+1371 |         + "</div>"
+1372 |     )
+1373 |     history = status.get("history") or []
+1374 |     # Лимиты тарифа: полоски использования + предупреждение при 80% и на исчерпании.
+1375 |     limits_card = _limits_card(status.get("usage"))
+1376 |     pay_cards = [
+1377 |         '<div class="m-card">'
+1378 |         f'<div class="m-top"><b>{float(row["amount"] or 0):.0f} руб.</b>'
+1379 |         + badge(
+1380 |             esc(STATUS_RU.get(str(row["status"]), str(row["status"]))),
+1381 |             "green" if str(row["status"]) == "paid" else "yellow",
+1382 |         ) + "</div>"
+1383 |         f'<span class="meta">Период: {esc(str(row["period_start"]))} — '
+1384 |         f'{esc(str(row["period_end"]))}</span>'
+1385 |         f'<span class="meta">Оплачен: '
+1386 |         f'{esc(str(row["paid_at"])[:10]) if row.get("paid_at") else "—"}</span>'
+1387 |         "</div>"
+1388 |         for row in history
+1389 |     ]
+1390 |     pay_block = (
+1391 |         f'<div class="m-grid">{"".join(pay_cards)}</div>'
+1392 |         if pay_cards else '<div class="empty">Платежей пока не было</div>'
+1393 |     )
+1394 |     requisites_block = card("Реквизиты для оплаты (СБП)", (
+1395 |         '<div class="empty">Задайте BILLING_* в docker/.env — реквизиты появятся здесь'
+1396 |         "</div>"
+1397 |         if not req.get("legal_name") else
+1398 |         '<table><tbody>'
+1399 |         + "".join(
+1400 |             f"<tr><th>{esc(title)}</th><td>{esc(str(req.get(key) or '—'))}</td></tr>"
+1401 |             for key, title in (
+1402 |                 ("legal_name", "Получатель"), ("inn", "ИНН"), ("kpp", "КПП"),
+1403 |                 ("bank", "Банк"), ("bik", "БИК"), ("account", "Р/с"), ("tg", "Вопросы"),
+1404 |             )
+1405 |             if req.get(key)
+1406 |         )
+1407 |         + "</tbody></table>"
+1408 |         + '<p class="sub">Карты не храним, автосписания нет: салон платит переводом '
+1409 |         "раз в месяц, оплату подтверждает менеджер.</p>"
+1410 |     ))
+1411 |     # Онлайн-оплата картой — только когда в .env заданы ключи эквайринга.
+1412 |     # Без них показываем лишь ручной перевод по реквизитам (прежний путь).
+1413 |     card_block = ""
+1414 |     if status.get("card_enabled") and may_pay:
+1415 |         card_block = card(
+1416 |             "Онлайн-оплата картой",
+1417 |             f'<form method="post" action="/pay/card" class="inline">{csrf_field(csrf)}'
+1418 |             '<input type="hidden" name="back" value="/pay">'
+1419 |             f'<button type="submit">Оплатить {status.get("price", 0):.0f} ₽ картой</button></form>'
+1420 |             '<p class="sub">Платёж проходит через ЮKassa. Подтверждение приходит '
+1421 |             "автоматически — статус «оплачено до» обновится сам.</p>"
+1422 |         )
+1423 |     return layout(
+1424 |         "Оплата", "/pay",
+1425 |         page_head("Оплата", "", salon, salons) + flash_html(flash, flash_error) + head
+1426 |         + limits_card
+1427 |         + card("История платежей", pay_block)
+1428 |         + requisites_block
+1429 |         + card_block,
+1430 |         salon=salon, salons=salons, role=_role(ctx),
+1431 |     )
+1432 | 
+1433 | 
+1434 | # Русские подписи ресурсов для индикаторов лимита.
+1435 | _LIMIT_TITLES = {
+1436 |     "clients": "Клиентские карточки",
+1437 |     "services": "Услуги в прайсе",
+1438 |     "masters": "Мастера",
+1439 |     "bookings_per_month": "Записи в этом месяце",
+1440 | }
+1441 | 
+1442 | 
+1443 | def _limits_card(usage: dict[str, Any] | None) -> str:
+1444 |     """Карточка «Лимиты тарифа»: полоски использования и предупреждения.
+1445 | 
+1446 |     При 80% (plans.WARN_PERCENT) строка подсвечивается жёлтым, на исчерпании —
+1447 |     красным и общим текстом «нужен следующий тариф». Без данных или без
+1448 |     лимитов (pro/network) карточка не показывается — не занимать место.
+1449 |     """
+1450 |     if not usage or not usage.get("rows"):
+1451 |         return ""
+1452 |     rows = [row for row in usage["rows"] if row.get("limit") is not None]
+1453 |     if not rows:
+1454 |         return ""
+1455 |     bars = []
+1456 |     for row in rows:
+1457 |         title = _LIMIT_TITLES.get(str(row["resource"]), str(row["resource"]))
+1458 |         bars.append(
+1459 |             f'<div class="limit-row"><span class="limit-name">{esc(title)}</span>'
+1460 |             + usage_bar(int(row["used"]), row["limit"], row.get("percent"))
+1461 |             + "</div>"
+1462 |         )
+1463 |     body = "".join(bars)
+1464 |     at_limit = usage.get("at_limit") or []
+1465 |     near_limit = usage.get("near_limit") or []
+1466 |     if at_limit:
+1467 |         names = ", ".join(_LIMIT_TITLES.get(r, r) for r in at_limit)
+1468 |         body += (
+1469 |             f'<div class="usage-warn at">Лимит исчерпан: {esc(names)}. '
+1470 |             "Добавить больше нельзя — выберите следующий тариф.</div>"
+1471 |         )
+1472 |     elif near_limit:
+1473 |         names = ", ".join(_LIMIT_TITLES.get(r, r) for r in near_limit)
+1474 |         body += (
+1475 |             f'<div class="usage-warn">Близко к лимиту: {esc(names)} — '
+1476 |             "пора подумать о смене тарифа.</div>"
+1477 |         )
+1478 |     return card(f"Лимиты тарифа «{usage.get('plan') or ''}»", body)
+1479 | 
+1480 | 
+1481 | STATUS_RU = {
+1482 |     "issued": "выставлен", "paid": "оплачен",
+1483 |     "overdue": "просрочен", "void": "аннулирован",
+1484 | }

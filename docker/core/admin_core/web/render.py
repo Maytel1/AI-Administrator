@@ -12,20 +12,156 @@ from html import escape
 from typing import Any, Iterable
 from zoneinfo import ZoneInfo
 
+# SVG-иконки навигации сайдбара (16×16, stroke=currentColor наследует цвет текста).
+# Каждая собрана из коротких строк, чтобы не превышать линию длины линтера.
+
+ICON_TODAY = (
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"'
+    ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>'
+    '<line x1="16" y1="2" x2="16" y2="6"/>'
+    '<line x1="8" y1="2" x2="8" y2="6"/>'
+    '<line x1="3" y1="10" x2="21" y2="10"/>'
+    '</svg>'
+)
+
+ICON_BOOKINGS = (
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"'
+    ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>'
+    '<line x1="16" y1="2" x2="16" y2="6"/>'
+    '<line x1="8" y1="2" x2="8" y2="6"/>'
+    '<line x1="3" y1="10" x2="21" y2="10"/>'
+    '<polyline points="8 18 12 22 16 18"/>'
+    '</svg>'
+)
+
+ICON_CLIENTS = (
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"'
+    ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>'
+    '<circle cx="12" cy="7" r="4"/>'
+    '</svg>'
+)
+
+ICON_SERVICES = (
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"'
+    ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    '<path d="M20 6H4l1 11 4-7 4 7 4-7 4 7 1-11z"/>'
+    '<line x1="12" y1="19" x2="12" y2="23"/>'
+    '<line x1="12" y1="11" x2="12" y2="23"/>'
+    '</svg>'
+)
+
+ICON_MASTERS = (
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"'
+    ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    '<circle cx="12" cy="6" r="4"/>'
+    '<path d="M5 20l2 2 4-4"/>'
+    '<path d="M19 20l-2 2-4-4"/>'
+    '<line x1="12" y1="10" x2="12" y2="20"/>'
+    '<line x1="12" y1="4" x2="8.17" y2="8"/>'
+    '<line x1="12" y1="4" x2="15.83" y2="8"/>'
+    '</svg>'
+)
+
+ICON_DIALOGS = (
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"'
+    ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'
+    '</svg>'
+)
+
+ICON_REPORTS = (
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"'
+    ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    '<line x1="18" y1="20" x2="18" y2="10"/>'
+    '<line x1="12" y1="20" x2="12" y2="4"/>'
+    '<line x1="6" y1="20" x2="6" y2="14"/>'
+    '</svg>'
+)
+
+ICON_NETWORK = (
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"'
+    ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    '<circle cx="12" cy="12" r="3"/>'
+    '<path d="M5 9c0 1 1 2 2 2s2-1 2-2-1-2-2-2-2 1-2 2"/>'
+    '<circle cx="19" cy="5" r="2"/>'
+    '<circle cx="5" cy="19" r="2"/>'
+    '<path d="M12 12c0 1-1 2-2 2s-2-1-2-2 1-2 2-2 2 1 2 2"/>'
+    '<path d="M5 9v7M17 16v-3M19 5l-7 7"/>'
+    '</svg>'
+)
+
+ICON_PAY = (
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"'
+    ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    '<rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>'
+    '<line x1="1" y1="10" x2="23" y2="10"/>'
+    '</svg>'
+)
+
+ICON_BILLING = (
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"'
+    ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>'
+    '<polyline points="14 2 14 8 20 8"/>'
+    '<line x1="16" y1="13" x2="8" y2="13"/>'
+    '<line x1="16" y1="17" x2="8" y2="17"/>'
+    '<polyline points="10 9 9 9 8 9"/>'
+    '</svg>'
+)
+
+ICON_COUNTERPARTIES = (
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"'
+    ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>'
+    '<circle cx="9" cy="7" r="4"/>'
+    '<path d="M23 21v-2a4 4 0 0 0-3-3.87"/>'
+    '<path d="M16 3.13a4 4 0 0 1 0 7.75"/>'
+    '</svg>'
+)
+
+ICON_AUDIT = (
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"'
+    ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    '<circle cx="12" cy="12" r="10"/>'
+    '<line x1="12" y1="2" x2="12" y2="22"/>'
+    '<line x1="2" y1="12" x2="22" y2="12"/>'
+    '</svg>'
+)
+
+ICON_SETTINGS = (
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"'
+    ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    '<circle cx="12" cy="12" r="3"/>'
+    '<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0'
+    ' l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0'
+    ' 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1'
+    ' -2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51'
+    ' -1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33'
+    ' -1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82'
+    ' .33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0'
+    ' 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06'
+    ' .06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1'
+    ' -2 2h-.09a1.65 1.65 0 0 0-1.51 1"/>'
+    '</svg>'
+)
+
 NAV = [
-    ("/today", "Сегодня", "◎"),
-    ("/bookings", "Записи", "▦"),
-    ("/clients", "Клиенты", "☺"),
-    ("/services", "Прайс", "₽"),
-    ("/masters", "Мастера", "✂"),
-    ("/dialogs", "Диалоги", "✉"),
-    ("/reports", "Отчёты", "◷"),
-    ("/network", "Сеть", "◈"),
-    ("/pay", "Оплата", "Ⓢ"),
-    ("/billing", "Счета (команда)", "€"),
-    ("/counterparties", "Контрагенты", "☍"),
-    ("/audit", "Аудит", "⚑"),
-    ("/settings", "Настройки", "⚙"),
+    ("/today", "Сегодня", ICON_TODAY),
+    ("/bookings", "Записи", ICON_BOOKINGS),
+    ("/clients", "Клиенты", ICON_CLIENTS),
+    ("/services", "Прайс", ICON_SERVICES),
+    ("/masters", "Мастера", ICON_MASTERS),
+    ("/dialogs", "Диалоги", ICON_DIALOGS),
+    ("/reports", "Отчёты", ICON_REPORTS),
+    ("/network", "Сеть", ICON_NETWORK),
+    ("/pay", "Оплата", ICON_PAY),
+    ("/billing", "Счета (команда)", ICON_BILLING),
+    ("/counterparties", "Контрагенты", ICON_COUNTERPARTIES),
+    ("/audit", "Аудит", ICON_AUDIT),
+    ("/settings", "Настройки", ICON_SETTINGS),
 ]
 
 
@@ -94,12 +230,42 @@ def card(title: str, body: str) -> str:
 
 
 def table(headers: Iterable[str], rows: list[list[str]], empty: str = "Пока пусто") -> str:
-    """Пустую таблицу заменяем подсказкой — пустая сетка выглядит как ошибка."""
+    """Пустую таблицу заменяем скелетоном загрузки — выглядит живей, чем текст."""
     if not rows:
-        return f'<div class="empty">{esc(empty)}</div>'
+        return skeleton("table_row", count=3)
     head = "".join(f"<th>{esc(h)}</th>" for h in headers)
     body = "".join("<tr>" + "".join(f"<td>{c}</td>" for c in r) + "</tr>" for r in rows)
     return f"<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
+
+
+def skeleton(kind: str = "text", count: int = 1) -> str:
+    """Скелетон загрузки: анимированный серый блок вместо пустого состояния.
+
+    kind:
+      text      — одна строка текста (строка в карточке)
+      title     — заголовок карточки/раздела
+      avatar    — квадратная аватарка мастера/клиента
+      badge     — бейдж статуса
+      tile      — плитка метрики (плитки «Сегодня»)
+      table_row — строка таблицы (записи, клиенты, контрагенты)
+      grid      — сетка плиток (count плиток)
+      list      — список строк таблицы (count строк)
+    """
+    if kind == "grid":
+        tiles = "".join('<div class="skeleton-tile"></div>' for _ in range(count))
+        return f'<div class="skeleton-grid">{tiles}</div>'
+    if kind == "list":
+        rows = "".join('<div class="skeleton-table-row"></div>' for _ in range(count))
+        return f'<div class="skeleton-list">{rows}</div>'
+    one = {
+        "text": '<div class="skeleton-text"></div>',
+        "title": '<div class="skeleton-title"></div>',
+        "avatar": '<div class="skeleton-avatar"></div>',
+        "badge": '<div class="skeleton-badge"></div>',
+        "tile": '<div class="skeleton-tile"></div>',
+        "table_row": '<div class="skeleton-table-row"></div>',
+    }[kind]
+    return "".join(one for _ in range(count))
 
 
 def flash(message: str, error: bool = False) -> str:
@@ -164,7 +330,7 @@ def salon_switch(salon: dict | None, salons: list[dict] | None) -> str:
     """
     if not salons:
         return ""
-    sid = salon["id"] if salon else ""
+    sid = str(salon["id"]) if salon else ""
     opts = "".join(
         f'<option value="{esc(s["id"])}"{" selected" if sid == str(s["id"]) else ""}>'
         f'{esc(s["name"])}</option>'
@@ -173,6 +339,75 @@ def salon_switch(salon: dict | None, salons: list[dict] | None) -> str:
     return (
         '<form method="get" action="/salon" class="salon-switch">'
         f'<select name="id" id="salon-select">{opts}</select></form>'
+    )
+
+
+def t(key: str, salon: dict | None, default: str = "") -> str:
+    """Термин интерфейса для вертикали тенанта.
+
+    Берется из ``salon["terms"]`` (jsonb). Если ключа нет — ``default``.
+    """
+    if not salon:
+        return default
+    terms = salon.get("terms") or {}
+    if isinstance(terms, str):
+        import json
+        try:
+            terms = json.loads(terms)
+        except Exception:
+            terms = {}
+    return str(terms.get(key, default))
+
+
+def module_enabled(path: str, salon: dict | None) -> bool:
+    """Раздел ``path`` включён для тенанта?
+
+    Сопоставляет путь с ключом в ``salon["modules"]``:
+    /clients -> clients, /services -> services, /masters -> masters,
+    /bookings -> bookings, /dialogs -> dialogs, /reports -> reports,
+    /pay -> pay, /settings -> settings, /today -> bookings.
+    """
+    if not salon:
+        return True
+    modules = salon.get("modules") or {}
+    if isinstance(modules, str):
+        import json
+        try:
+            modules = json.loads(modules)
+        except Exception:
+            modules = {}
+    key_map = {
+        "/today": "bookings",
+        "/bookings": "bookings",
+        "/clients": "clients",
+        "/services": "services",
+        "/masters": "masters",
+        "/dialogs": "dialogs",
+        "/reports": "reports",
+        "/pay": "pay",
+        "/settings": "settings",
+    }
+    key = key_map.get(path)
+    if key is None:
+        return True
+    return bool(modules.get(key, True))
+
+
+def _theme_css(salon: dict | None) -> str:
+    """Инлайн-стили темы тенанта: акцентный цвет и т.д."""
+    if not salon:
+        return ""
+    theme = salon.get("theme") or {}
+    if isinstance(theme, str):
+        import json
+        try:
+            theme = json.loads(theme)
+        except Exception:
+            theme = {}
+    accent = theme.get("accent", "#c2410c")
+    return (
+        f'<style>body{{--accent:{accent};--accent-hover:{accent};'
+        f'--accent-bg:rgba(194,65,12,.16)}}</style>'
     )
 
 
@@ -198,13 +433,12 @@ def layout(
     # чужую выручку незачем, а ссылка в меню была бы враньём в интерфейсе.
     nav_items = [
         item for item in NAV
-    # /network, /billing и /counterparties видны только нашей команде: счета,
-    # сводка по сети и реестр контрагентов — не клиентские данные салона.
-    if (
-        (item[0] in ("/network", "/billing", "/counterparties") and role == "team")
-        or (item[0] == "/pay" and role in ("owner", "team"))
-        or item[0] not in ("/network", "/billing", "/counterparties", "/pay")
-    )
+        if module_enabled(item[0], salon)
+        if (
+            (item[0] in ("/network", "/billing", "/counterparties") and role == "team")
+            or (item[0] == "/pay" and role in ("owner", "team"))
+            or item[0] not in ("/network", "/billing", "/counterparties", "/pay")
+        )
     ]
     nav = "".join(
         f'<a href="{path}?salon={esc(sid)}" class="{"active" if path == active else ""}">'
@@ -212,15 +446,24 @@ def layout(
         for path, name, icon in nav_items
     )
     switch = salon_switch(salon, salons) if not switch_inside else ""
+    theme_style = _theme_css(salon)
     return (
         '<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        '<meta name="color-scheme" content="dark">'
+        '<style>.skip-link{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}</style>'
         f"<title>{esc(title)} — Дежурный24</title>"
-        '<link rel="stylesheet" href="/static.css"></head><body>'
+        '<link rel="preconnect" href="https://fonts.googleapis.com">'
+        '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+        '<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">'
+        '<link rel="stylesheet" href="/static.css">'
+        f"{theme_style}"
+        '</head><body>'
+        '<a href="#main" class="skip-link">Перейти к основному содержимому</a>'
         '<div class="shell"><aside><div class="brand">Дежурный<span>24</span></div>'
         f"<nav>{nav}</nav>"
         '<div class="foot">MVP · read-only<br>фаза 4</div></aside>'
-        f'<main class="{"inner" if inner_scroll else ""}">'
+        f'<main id="main" class="{"inner" if inner_scroll else ""}">'
         # Контент обязательно в своей обёртке: .top — flex, и без неё все
         # блоки страницы становились его детьми и выстраивались в один ряд
         # (расписание вставало справа от плиток вместо того, чтобы быть под ними).
@@ -229,6 +472,7 @@ def layout(
         # Внешний скрипт (не инлайн — CSP запрещает): дёргает отправку формы
         # переключателя точки по событию change на #salon-select.
         '<script src="/salon.js" defer></script>'
+        '<script src="/modal.js" defer></script>'
         "</body></html>"
     )
 
@@ -262,15 +506,20 @@ def login_page(
         )
     remember_checked = " checked" if remember else ""
     if agreed:
-        # Согласие уже дано в этом POST — пробрасываем дальше скрытыми полями.
+        # Согласие уже дано в этом POST — рисуем чекбоксы уже отмеченными,
+        # чтобы CSS :has(...) увидел их и разблокировал кнопку «Войти».
         consent = (
-            '<input type="hidden" name="agree_oferta" value="1">'
-            '<input type="hidden" name="agree_pdn" value="1">'
-            + (
-                '<input type="hidden" name="remember" value="1">'
-                if remember
-                else ""
-            )
+            '<div class="agree">'
+            '<label class="chk"><input type="checkbox" name="agree_oferta" '
+            'checked> <span>Я принимаю <a href=\"/oferta\" target=\"_blank\" '
+            'rel=\"noopener\">условия публичной оферты</a></span></label>'
+            '<label class="chk"><input type="checkbox" name="agree_pdn" '
+            'checked> <span>Я согласен на <a href=\"/pdn\" target=\"_blank\" '
+            'rel=\"noopener\">обработку персональных данных</a></span></label>'
+            '<label class="chk"><input type="checkbox" name="remember" '
+            f'id="remember" value="1"{remember_checked}> '
+            "<span>Запомнить меня</span></label>"
+            "</div>"
         )
     else:
         consent = (
@@ -289,16 +538,19 @@ def login_page(
     return (
         '<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        '<meta name="color-scheme" content="dark">'
+        '<style>.skip-link{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}</style>'
         "<title>Вход — Дежурный24</title>"
         '<link rel="stylesheet" href="/static.css"></head><body>'
-        '<div class="login"><form method="post" action="/login">'
+        '<a href="#main" class="skip-link">Перейти к основному содержимому</a>'
+        '<div class="login" id="main"><form method="post" action="/login">'
         '<div class="brand" style="padding:0 0 6px">Дежурный<span>24</span></div>'
         '<div class="sub">Панель управления точкой</div>'
         f"{msg}"
         '<label for="login">Логин (e-mail)</label>'
         f'<input id="login" name="login" type="email" autocomplete="username" '
         f'value="{esc(login)}" '
-        f"{'autofocus' if not need_totp else ''} required>"
+        f"required>"
         '<label for="pwd">Пароль</label>'
         # autocomplete="off" по умолчанию: пароль не сохраняется, пока пользователь
         # не поставил «Запомнить меня» (login.js включает сохранение на submit).

@@ -19,6 +19,7 @@ from .render import (
     money,
     page_head,
     salon_switch,
+    skeleton,
     tile,
 )
 from .render import (
@@ -282,10 +283,7 @@ def page_today(
     if cards:
         schedule_body = f'<div class="m-grid">{"".join(cards)}</div>'
     else:
-        schedule_body = (
-            '<div class="empty">На сегодня записей нет. '
-            "Бот продолжает принимать заявки.</div>"
-        )
+        schedule_body = skeleton("list", count=3)
     content = (
         # Слева заголовок, полоса загрузки и переключатель салона, справа —
         # узкие плитки в один ряд. Раньше плитки шли во всю ширину, а
@@ -371,7 +369,7 @@ def page_bookings(
     if cards:
         feed = f'<div class="m-grid">{"".join(cards)}</div>'
     else:
-        feed = '<div class="empty">Под выбранный фильтр записей нет.</div>'
+        feed = skeleton("list", count=3)
     content = (
         # Заголовок вкладки — общий для всех (page_head), а ниже панель с
         # фильтрами и карточками. Раньше «Записи» были единственной вкладкой

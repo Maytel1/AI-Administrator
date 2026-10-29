@@ -748,6 +748,16 @@ def build_app(
             content_type="application/javascript",
         )
 
+    async def modal_js(_request: Any) -> Any:
+        """Скрипт доступности модальных окон: Esc закрывает, фокус переходит внутрь.
+
+        Отдельный файл, а не инлайн — CSP запрещает inline-скрипты.
+        """
+        return web.Response(
+            text=(STATIC_DIR / "modal.js").read_text(encoding="utf-8"),
+            content_type="application/javascript",
+        )
+
     async def oferta(_request: Any) -> Any:
         """Публичная оферта — доступна без входа (ссылка на форме логина)."""
         return web.Response(text=oferta_page(), content_type="text/html")
@@ -882,6 +892,7 @@ def build_app(
     app.router.add_get("/static.css", static_css)
     app.router.add_get("/login.js", login_js)
     app.router.add_get("/salon.js", salon_js)
+    app.router.add_get("/modal.js", modal_js)
     app.router.add_get("/oferta", oferta)
     app.router.add_get("/pdn", pdn)
     app.router.add_get("/export.csv", export_csv)

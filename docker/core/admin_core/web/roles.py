@@ -33,6 +33,7 @@ P_REPORTS = "reports"                # отчёты
 P_BILLING = "billing"               # счета и оплаты (ручной счёт + СБП): выручка, загрузка, конверсия
 P_PAY = "pay"                        # оплата своего тарифа: профиль плательщика точки (ИНН и т.п.)
 P_COUNTERPARTIES = "counterparties"  # реестр контрагентов (подключённые клиенты): общий на команду
+P_TENANT_SETTINGS = "tenant_settings"  # настройка внешнего вида точки (вертикаль, цвет, термины): только команда
 
 ROLE_PERMISSIONS: dict[str, set[str]] = {
     "owner": {
@@ -44,7 +45,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
     "team": {
         P_READ, P_BOOKING_STATUS, P_PRICING, P_CATALOG, P_CLIENT_FLAGS,
         P_CLIENT_CREATE, P_SCHEDULE, P_USERS, P_ALL_SALONS, P_REPORTS, P_BILLING,
-        P_PAY, P_COUNTERPARTIES,
+        P_PAY, P_COUNTERPARTIES, P_TENANT_SETTINGS,
     },
 }
 
@@ -81,6 +82,8 @@ ACTION_PERMISSION = {
     "password_change": P_READ,
     # сброс чужого пароля — то же право, что и управление доступом
     "password_reset": P_USERS,
+    # оформление точки (вертикаль, цвет, термины) — только наша команда
+    "theme_change": P_TENANT_SETTINGS,
 }
 
 # Роли, которые владелец точки может выдать из панели. Роль `team` — наша
@@ -118,6 +121,7 @@ def permissions_of(role: str) -> list[str]:
         P_BILLING: "счета и оплаты",
         P_PAY: "оплата своего тарифа",
         P_COUNTERPARTIES: "реестр контрагентов",
+        P_TENANT_SETTINGS: "внешний вид точки (вертикаль, цвет)",
     }
     return sorted(names[p] for p in ROLE_PERMISSIONS.get(role, set()) if p in names)
 

@@ -1,0 +1,16 @@
+ 448 |     else:
+ 449 |         body = '<div class="empty">Мастера не заведены.</div>'
+ 450 |     add_form = ""
+ 451 |     if may_add:
+ 452 |         add_form = (
+ 453 |             '<form method="post" action="/actions" class="stack" style="margin-top:14px">'
+ 454 |             '<input type="hidden" name="action" value="master_create">'
+ 455 |             f'<input type="hidden" name="back" value="{back}">'
+ 456 |             f"{csrf_field(csrf)}"
+ 457 |             '<div class="cell"><span>Новый мастер</span>'
+ 458 |             '<input type="text" name="name" placeholder="Имя" required></div>'
+ 459 |             '<div class="cell"><span>&nbsp;</span>'
+ 460 |             '<button type="submit">Добавить</button></div>'
+ 461 |             "</form>"
+ 462 |         )
+ 463 |     content = (

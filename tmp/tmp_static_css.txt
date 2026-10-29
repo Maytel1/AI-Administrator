@@ -1,0 +1,516 @@
+/* Панель «Дежурный24» — стиль как у демо-панели avto-panel: тёмная база #0c0d11,
+   карточки #16171d, радиусы 6/10/14. Акцент наш, фирменный #4f46e5. */
+*,*::before,*::after{box-sizing:border-box}
+:root{
+  --bg:#0c0d11; --surface:#16171d; --surface-2:#1c1e26; --hover:#23252f;
+  --border:rgba(255,255,255,.09); --border-strong:rgba(255,255,255,.18);
+  --text:#f2f3f5; --muted:#a0a1a4; --subtle:#707174;
+  --accent:#4f46e5; --accent-hover:#4338ca; --accent-bg:rgba(79,70,229,.16);
+  --green:#34c77b; --green-bg:rgba(52,199,123,.14);
+  --yellow:#e5b53e; --yellow-bg:rgba(229,181,62,.14);
+  --red:#e5534b; --red-bg:rgba(229,83,75,.14);
+  --r-sm:6px; --r-md:10px; --r-lg:14px; --shadow:0 4px 16px rgba(0,0,0,.45);
+}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--text);
+  font:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  font-size:14px; line-height:1.5;
+}
+a{color:inherit;text-decoration:none}
+.shell{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
+aside{
+  background:var(--surface); border-right:1px solid var(--border);
+  padding:18px 14px; display:flex; flex-direction:column; gap:6px;
+  position:sticky; top:0; height:100vh;
+}
+.brand{font-weight:700;font-size:16px;padding:4px 10px 14px}
+.brand span{color:var(--accent)}
+aside nav a{
+  display:flex; gap:10px; align-items:center; padding:9px 11px;
+  border-radius:var(--r-sm); color:var(--muted);
+}
+aside nav a:hover{background:var(--hover);color:var(--text)}
+aside nav a.active{
+  background:var(--accent-bg); color:var(--text);
+  box-shadow:inset 0 0 0 1px rgba(79,70,229,.42);
+}
+aside nav a i{font-style:normal;opacity:.75;width:16px;text-align:center}
+.foot{margin-top:auto;color:var(--subtle);font-size:12px;padding:10px}
+/* Ширину не ограничиваем: таблица записей должна занять всё свободное
+   место, а не упираться в 1180px и оставлять пустое поле справа. */
+main{padding:22px 26px;min-width:0}
+h1{font-size:21px;margin:0 0 4px}
+.sub{color:var(--muted);margin:0 0 20px;font-size:13px}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+/* Обёртка контента: без неё блоки страницы становились детьми flex-строки .top
+   и вставали рядом друг с другом вместо того, чтобы идти сверху вниз. */
+.top>.content{flex:1;min-width:0}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:12px;margin-bottom:20px}
+.tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:14px 16px}
+.tile b{display:block;font-size:24px;font-weight:650;letter-spacing:-.4px}
+.tile span{color:var(--muted);font-size:12px}
+.card{
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--r-lg); padding:16px 18px; margin-bottom:16px;
+}
+.card h2{
+  font-size:12px; margin:0 0 12px; color:var(--muted); font-weight:600;
+  text-transform:uppercase; letter-spacing:.6px;
+}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{
+  text-align:left; color:var(--subtle); font-weight:500; font-size:12px;
+  padding:7px 10px; border-bottom:1px solid var(--border);
+}
+td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.05)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--surface-2)}
+.badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11.5px;border:1px solid transparent}
+.b-accent{background:var(--accent-bg);color:#a5b4fc}
+.b-green{background:var(--green-bg);color:var(--green)}
+.b-red{background:var(--red-bg);color:var(--red)}
+.b-yellow{background:var(--yellow-bg);color:var(--yellow)}
+.b-gray{background:rgba(255,255,255,.06);color:var(--muted)}
+.bar{height:6px;border-radius:99px;background:var(--surface-2);overflow:hidden;margin-top:8px}
+.bar>div{height:100%;background:var(--accent)}
+.empty{color:var(--subtle);padding:22px;text-align:center;font-size:13px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.msg{
+  background:var(--red-bg); color:#fca5a5; border:1px solid rgba(229,83,75,.3);
+  border-radius:var(--r-sm); padding:9px 12px; margin-bottom:14px; font-size:13px;
+}
+.msgs{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md);padding:10px 12px;margin-bottom:10px;font-size:13px}
+.msgs b{color:var(--accent)}
+.flash{border-radius:var(--r-md);padding:10px 13px;margin-bottom:16px;font-size:13px;border:1px solid transparent}
+.flash.ok{background:var(--green-bg);border-color:rgba(52,199,123,.35);color:var(--green)}
+.flash.err{background:var(--red-bg);border-color:rgba(229,83,75,.35);color:#fca5a5}
+form.inline{display:inline-flex;gap:6px;align-items:center;margin:0}
+form.inline input[type=text],form.inline input[type=number],form.inline input[type=time]{width:auto;min-width:74px;padding:5px 8px;font-size:12px}
+form.stack{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;align-items:end}
+form.stack .cell{display:flex;flex-direction:column;gap:4px}
+form.stack .cell span{color:var(--subtle);font-size:11px}
+form.stack button{width:100%}
+.check{display:inline-flex;gap:6px;align-items:center;color:var(--muted);font-size:12px}
+.check input{width:auto}
+.btn-mini{background:var(--surface-2);color:var(--muted);border:1px solid var(--border);padding:5px 10px;font-size:12px;font-weight:500}
+.btn-mini:hover{background:var(--hover);color:var(--text)}
+.chart{display:flex;align-items:flex-end;gap:3px;height:140px;padding-top:8px}
+.chart .bar-col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;min-width:6px}
+.chart .bar-fill{width:100%;background:var(--accent);border-radius:3px 3px 0 0;min-height:2px}
+.chart .bar-col span{color:var(--subtle);font-size:9px;margin-top:4px;white-space:nowrap}
+.chart .bar-col:hover .bar-fill{background:var(--accent-hover)}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 4px}
+.tabs .tab{padding:6px 12px;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:13px;background:var(--surface-2)}
+.tabs .tab:hover{background:var(--hover);color:var(--text)}
+.tabs .tab-active{background:var(--accent);border-color:var(--accent);color:#fff}
+.trend{display:block;font-size:11px;margin-top:4px;color:var(--subtle)}
+.trend.up{color:#34d399}
+.trend.down{color:#f87171}
+.trend.flat,.trend.muted{color:var(--subtle)}
+.login{display:flex;min-height:100vh;align-items:center;justify-content:center}
+.login form{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg);
+  padding:28px; width:340px; box-shadow:var(--shadow);
+}
+input,select{
+  width:100%; background:var(--surface-2); color:var(--text);
+  border:1px solid var(--border); border-radius:var(--r-sm);
+  padding:9px 11px; font:inherit; font-size:13px;
+}
+label{display:block;color:var(--muted);font-size:12px;margin:12px 0 5px}
+button,.btn{
+  background:var(--accent); color:#fff; border:none; border-radius:var(--r-sm);
+  padding:9px 16px; font:inherit; font-weight:550; cursor:pointer; display:inline-block;
+}
+button:hover,.btn:hover{background:var(--accent-hover)}
+@media(max-width:900px){
+  .shell{grid-template-columns:1fr} aside{position:static;height:auto}
+  .grid2{grid-template-columns:1fr} main{padding:16px}
+}
+.row-end{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 2px;justify-content:flex-end}
+/* Карточка плательщика: показываем поля только выбранного типа.
+   Сделано на :has() без JavaScript — панель работает и без скриптов.
+   Это удобство, а не защита: сервер всё равно проверяет только поля типа. */
+.legal-form fieldset{display:none;border:0;padding:0;margin:0 0 4px}
+.legal-form:has(input[name="client_type"][value="ip"]:checked) fieldset[data-type="ip"],
+.legal-form:has(input[name="client_type"][value="llc"]:checked) fieldset[data-type="llc"],
+.legal-form:has(input[name="client_type"][value="self_employed"]:checked) fieldset[data-type="self_employed"]{display:block}
+.legal-form .radios{display:flex;flex-wrap:wrap;gap:16px;margin:10px 0 14px}
+.legal-form .radios label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.legal-form .field{display:grid;gap:4px;margin-bottom:10px;max-width:520px}
+.legal-form .field>span{font-size:12px;color:var(--muted)}
+.legal-form .field small{font-size:11px;color:var(--muted)}
+.legal-form input,.legal-form select{background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:7px 9px}
+.legal-form .check{display:flex;gap:6px;align-items:center;margin:10px 0}
+.tile.yellow b{color:var(--danger)}
+
+/* --- Панель управления лентой записей ---------------------------------------
+   Всё на `<details>`: CSP запрещает инлайновый JS, а открывающееся меню без
+   скрипта надёжнее и не требует обработчика на каждую строку таблицы.
+   Позиционирование вынесено в слой, чтобы выпадающий список не обрезался
+   родителем с overflow:hidden. */
+
+/* Одна строка: фильтры статуса слева, выбор периода справа. */
+.toolbar{
+  display:flex; flex-wrap:wrap; align-items:center; gap:8px;
+  margin:0 0 16px;
+}
+.toolbar .btn{margin-right:0}
+.picker{position:relative; margin-left:auto}
+.picker>summary{
+  list-style:none; cursor:pointer; user-select:none;
+  display:inline-flex; align-items:center; gap:8px;
+  background:var(--surface-2); border:1px solid var(--border-strong);
+  border-radius:var(--r-sm); padding:7px 12px; font-size:13px;
+}
+.picker>summary::-webkit-details-marker{display:none}
+.picker>summary:hover{border-color:var(--accent)}
+/* Каретка нарисована вёрсткой, а не символом: «▾» зависит от шрифта и на
+   некоторых машинах превращается в квадрат. */
+.picker .caret{
+  width:0; height:0; margin-left:2px;
+  border-left:4px solid transparent; border-right:4px solid transparent;
+  border-top:5px solid var(--muted); transition:transform .15s ease;
+}
+.picker[open] .caret{transform:rotate(180deg)}
+.picker-list{
+  position:absolute; z-index:40; right:0; top:calc(100% + 6px);
+  min-width:170px; margin:0; padding:5px; list-style:none;
+  background:var(--surface); border:1px solid var(--border-strong);
+  border-radius:var(--r-md); box-shadow:var(--shadow);
+}
+.picker-list a{
+  display:flex; align-items:center; gap:9px;
+  padding:7px 10px; border-radius:var(--r-sm); font-size:13px;
+}
+.picker-list a:hover{background:var(--hover)}
+.picker-list a[aria-current="true"]{color:var(--text);background:var(--accent-bg)}
+.picker-list .tick{width:12px;color:var(--accent)}
+.picker-list a[aria-current="true"] .tick::before{content:"✓"}
+
+/* Меню действий в строке таблицы. */
+.menu{position:relative}
+.menu-trigger{
+  list-style:none; cursor:pointer; display:inline-block;
+  background:var(--surface-2); border:1px solid var(--border-strong);
+  border-radius:var(--r-sm); padding:5px 11px; font-size:12px; white-space:nowrap;
+}
+.menu-trigger::-webkit-details-marker{display:none}
+.menu-trigger:hover{border-color:var(--accent);color:var(--text)}
+.menu-pop{
+  position:absolute; z-index:40; right:0; top:calc(100% + 6px);
+  min-width:230px; display:grid; gap:3px; padding:6px;
+  background:var(--surface); border:1px solid var(--border-strong);
+  border-radius:var(--r-md); box-shadow:var(--shadow);
+}
+.menu-item{display:contents}
+/* Форма — это строка пункта, а не отдельный блок: иначе между пунктами
+   появляются поля, и список выглядит разрежённым. */
+.menu-item button,.menu-input{
+  width:100%; text-align:left; cursor:pointer;
+  background:transparent; color:var(--text); border:1px solid transparent;
+  border-radius:var(--r-sm); padding:7px 10px; font-size:13px; font:inherit;
+}
+.menu-item button:hover{background:var(--hover);border-color:var(--border)}
+.menu-item button.ok:hover{color:var(--green)}
+.menu-item button.danger:hover{color:var(--red)}
+.menu-label{display:block;padding:8px 10px 2px;font-size:11px;color:var(--muted)}
+.menu-input{
+  background:var(--surface-2); border-color:var(--border);
+  margin:0 10px 6px; width:calc(100% - 20px); cursor:text;
+}
+.menu-input:focus{outline:none;border-color:var(--accent)}
+.menu-item button.primary{
+  margin:0 10px 4px; width:calc(100% - 20px); text-align:center;
+  background:var(--accent); color:#fff;
+}
+.menu-item button.primary:hover{background:var(--accent-hover)}
+.muted-cell{color:var(--subtle);font-size:12px}
+
+/* Узкая колонка действий не должна раздувать таблицу. */
+td:last-child,th:last-child{width:1%;white-space:nowrap}
+
+/* На ноутбуке панелью пользуются с узкого экрана: таблица записей должна
+   прокручиваться по горизонтали, а не ломать сетку. */
+.scroll-x{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.scroll-x table{min-width:860px}
+
+/* Панель таблицы: фильтры живут в шапке над колонками и липнут к верху,
+   поэтому при длинном списке заголовки не уезжают за экран. */
+.panel{
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--r-lg); overflow:visible; margin-bottom:16px;
+}
+.panel-head{
+  display:flex; flex-wrap:wrap; align-items:center; gap:12px;
+  padding:14px 18px; border-bottom:1px solid var(--border);
+  position:sticky; top:0; z-index:6;
+  background:var(--surface); border-radius:var(--r-lg) var(--r-lg) 0 0;
+}
+.panel-title{display:flex; align-items:baseline; gap:12px}
+.panel-title h1{margin:0}
+.panel-head .count{color:var(--muted);font-size:13px}
+/* Фильтры прижаты вправо; на узком экране переносятся под заголовок. */
+.panel-filters{
+  display:flex; flex-wrap:wrap; align-items:center; gap:8px;
+  margin-left:auto;
+}
+.panel-filters .picker{margin-left:0}
+.panel .scroll-x{border-radius:0 0 var(--r-lg) var(--r-lg)}
+/* Меню действий открывается вниз — не подрезаем его нижним скруглением. */
+.panel .scroll-x{padding-bottom:2px}
+/* «Записи» и «Сегодня» — карточки внутри панели: отступы берём на себя,
+   вровень со шапкой, иначе сетка прилипает к краям панели. */
+.panel>.m-grid{padding:14px 18px 16px}
+.panel>.empty{padding:18px}
+.panel-h{font-size:14px;margin:0;font-weight:600}
+
+/* Внутренняя прокрутка: страница целиком не ездит, прокручивается тело.
+   Нужна там, где блоков много (отчёты, настройки): иначе заголовок и
+   переключатель периода уезжают за экран и страницу приходится катать
+   туда-обратно. Высота фиксируется только для main.inner — остальные
+   страницы продолжают прокручиваться как раньше. */
+main.inner{
+  height:100vh; overflow:hidden; padding:22px 26px;
+  display:flex; flex-direction:column;
+}
+main.inner .top{flex:1;min-height:0}
+.page{display:flex;flex-direction:column;height:100%;min-height:0;min-width:0}
+.page-head{flex:0 0 auto}
+.page-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding-right:8px}
+
+/* Формы добавления по-прежнему stack; списки давно стали сетками m-grid. */
+form.stack .cell.wide{grid-column:span 2}
+form.stack .cell.save-cell{min-width:96px}
+form.stack .check-cell{justify-content:flex-end}
+.add-row{
+  margin-top:12px; padding-top:14px; border-top:1px solid var(--border);
+}
+
+/* «Сегодня»: плитки в один горизонтальный ряд. Шесть плиток по 168px в сетке
+   auto-fit переносились на второй ряд и съедали высоту экрана, из-за чего
+   расписание уезжало вниз. Ниже — явно шесть колонок с переносом по одной. */
+/* «Сегодня»: расписание должно стоять сразу под плитками, без зазора.
+   Плитки отдавали вниз margin, а панель добавляла свой — между ними
+   появлялась пустая полоса, и таблица выглядела отдельным блоком ниже. */
+.tiles-row{grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:0}
+.panel-tight{margin-top:10px}
+
+/* Единая шапка вкладки: заголовок с пояснением слева, переключатель салона
+   справа. Раньше переключатель рисовал layout рядом со всем содержимым, из-за
+   чего на разных вкладках он стоял в разных местах и отодвигал заголовки. */
+.page-head{
+  display:flex; align-items:flex-start; gap:16px; margin-bottom:16px;
+}
+.page-head-text{flex:1 1 auto;min-width:0}
+.page-head-text h1{margin-bottom:2px}
+.page-head-text .sub{margin-bottom:0}
+.page-head .salon-switch{flex:0 0 210px;margin-top:2px}
+/* Внутренний блок для страниц с прокруткой: шапка с фильтрами не уезжает,
+   тело ездит. Отдельный класс, потому что .page-head сам flex — вкладывать
+   в него ещё блоки нельзя, они стали бы его соседями по горизонтали. */
+.page-head-inner{flex:0 0 auto;min-width:0}
+.page-head-inner>.page-head{margin-bottom:10px}
+@media (max-width:760px){
+  .page-head{flex-direction:column;gap:10px}
+  .page-head .salon-switch{flex:1 1 auto;width:100%}
+}
+
+/* Шапка «Сегодня»: слева заголовок, полоса загрузки и переключатель салона,
+   справа узкие плитки в один ряд. Плитки намеренно не растягиваются на всю
+   ширину — иначе «4 000 ₽» растягивается на пол-экрана и цифры теряются. */
+.dash-top{display:flex;gap:16px;align-items:flex-start;margin-bottom:14px}
+.dash-side{flex:0 0 216px;min-width:0}
+.dash-side h1{margin-bottom:10px}
+.dash-side .load-line{
+  flex-direction:column; align-items:flex-start; gap:4px; margin:0 0 10px;
+}
+.dash-side .load-line .bar{width:100%;min-width:0}
+.salon-switch{flex:0 0 auto}
+.dash-side .salon-switch{width:100%}
+.tiles-row{flex:1 1 auto;min-width:0}
+
+/* Плитка-столбик: число сверху крупно, подпись под ним мелким в несколько
+   строк. Ширину задаём потолком, а не долей от экрана: плитки не должны
+   растягиваться на всю свободную ширину, но и не должны быть впритык. */
+.tiles-row{
+  flex:1 1 auto; min-width:0;
+  grid-template-columns:repeat(6,minmax(0,1fr));
+  gap:12px; margin-bottom:0;
+}
+.tiles-row .tile{
+  display:flex; flex-direction:column; align-items:center;
+  text-align:center; padding:16px 12px 14px; gap:4px; min-width:0;
+}
+.tiles-row .tile b{font-size:26px;line-height:1.1;margin:0}
+.tiles-row .tile span{
+  font-size:12px;line-height:1.35;margin:0;color:var(--muted);
+  max-width:15ch;
+}
+@media (max-width:1100px){
+  .tiles-row{grid-template-columns:repeat(3,1fr)}
+}
+@media (max-width:680px){
+  .dash-top{flex-direction:column}
+  .dash-side{flex:1 1 auto;width:100%}
+  .tiles-row{grid-template-columns:repeat(2,1fr)}
+}
+/* Полоса загрузки мастеров: раньше это была отдельная карточка «Загрузка» с
+   заголовком и отступом — теперь одна строка под заголовком страницы. */
+.load-line{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  margin:0 0 8px;
+}
+.load-title{font-size:13px;color:var(--muted)}
+.load-count{font-size:13px;font-variant-numeric:tabular-nums}
+.load-line .bar{
+  flex:1 1 160px; min-width:140px; margin-top:0; height:5px;
+}
+/* Адаптив плиток задан один раз выше (ряды 1100/680) — дубли убраны. */
+
+/* ── Мастера: плитки и окна настроек (чистый CSS, без JS) ─────────────
+   Плитка кратко говорит, кто этот человек и чем занимается; кнопка
+   раскрывает окно поверх страницы: чекбокс-тумблер + sibling-селектор. */
+.m-grid{
+  display:grid; gap:14px;
+  grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+}
+/* Флекс-колонка, чтобы .m-actions можно было прижать к низу — кнопки
+   всех карточек строки тогда на одной высоте. */
+.m-card{
+  position:relative;
+  display:flex; flex-direction:column;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--r-lg); padding:16px 18px;
+}
+.m-top{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap}
+.m-top b{font-size:15px}
+.m-card .meta{display:block;color:var(--muted);font-size:12.5px;margin-top:3px}
+/* label «Правка» наследует margin:12px от глобального label{...} — без
+   сброса кнопки вразнобой; align-items центрирует кнопку формы и label.
+   margin-top:auto прижимает строку кнопок к низу карточки: в строке грида
+   у всех карточек одинаковая высота, значит кнопки — на одной линии. */
+.m-actions{display:flex;gap:8px;margin-top:auto;padding-top:12px;flex-wrap:wrap;align-items:center}
+.m-actions .btn{cursor:pointer;margin:0}
+.m-actions form.inline{align-self:center}
+/* Тумблер невидим, но остаётся в потоке рядом со своим окном. */
+.modal-toggle{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.modal{display:none}
+.modal-toggle:checked + .modal{
+  display:block;position:fixed;inset:0;z-index:60;
+}
+/* Штора: клик по фону закрывает окно (label для тумблера). */
+.modal-veil{
+  position:absolute;inset:0;background:rgba(0,0,0,.55);
+  display:block;cursor:pointer;
+}
+.modal-card{
+  position:relative;z-index:1;
+  width:min(460px,calc(100vw - 32px));
+  max-height:calc(100vh - 60px);overflow:auto;
+  margin:5vh auto 0;
+  background:var(--surface);border:1px solid var(--border-strong);
+  border-radius:var(--r-lg);box-shadow:var(--shadow);
+}
+.modal-head{
+  display:flex;justify-content:space-between;align-items:center;gap:10px;
+  padding:14px 16px;border-bottom:1px solid var(--border);
+}
+.modal-head b{font-size:14px}
+.modal-x{cursor:pointer;color:var(--muted);font-size:16px;padding:2px 6px}
+.modal-x:hover{color:var(--text)}
+.modal-body{padding:14px 16px}
+.modal-body.stack{display:grid;gap:8px}
+.modal-foot{
+  display:flex;justify-content:flex-end;gap:8px;align-items:center;
+  padding:12px 16px;border-top:1px solid var(--border);
+}
+/* Неделя в окне графика: день + два времени в одну строку. */
+.wh-head,.wh-row{
+  display:grid;grid-template-columns:1fr 92px 92px;gap:8px;align-items:center;
+}
+.wh-head span{color:var(--subtle);font-size:11px;text-transform:uppercase}
+.wh-row .check{color:var(--text);font-size:13px}
+.wh-row input[type=time]{
+  width:100%;padding:6px 8px;font-size:13px;
+}
+.check.big{color:var(--text);font-size:13.5px;padding:5px 0}
+.btn.ghost{
+  background:transparent;border:1px solid var(--border-strong);
+  color:var(--muted);
+}
+.btn.ghost:hover{background:var(--hover);color:var(--text)}
+/* Карточка клиента в окне: строки статистики и поле заметок. */
+.modal-body .meta{
+  display:block;color:var(--muted);font-size:12.5px
+}
+.modal-body .field{
+  display:grid;gap:4px
+}
+.modal-body .field>span{font-size:11px;color:var(--subtle)}
+.modal-body .field input,.modal-body .field select{width:100%}
+@media (max-width:680px){
+  .m-grid{grid-template-columns:1fr}
+  .modal-card{margin-top:3vh}
+}
+/* Страница входа: согласия и «Запомнить меня».
+   Кнопка активна только когда отмечены ОБЕ обязательные галочки — на :has(),
+   без JavaScript (как и карточка плательщика). Сервер проверяет согласия отдельно. */
+.login .agree{margin:14px 0 2px}
+.login .agree .chk{
+  display:flex;gap:8px;align-items:flex-start;margin:7px 0;
+  color:var(--muted);font-size:12.5px;line-height:1.35
+}
+.login .agree .chk input{width:auto;margin-top:2px;flex:none;accent-color:var(--accent)}
+.login .agree a{color:var(--accent)}
+.login form:not(:has(input[name=agree_oferta]:checked)) button[type=submit],
+.login form:not(:has(input[name=agree_pdn]:checked)) button[type=submit]{
+  opacity:.5;pointer-events:none;cursor:not-allowed
+}
+/* Индикатор использования лимита тарифа (/pay): полоска + «занято из максимума» */
+.usage{display:flex;align-items:center;gap:10px}
+.usage-track{
+  flex:1;height:8px;border-radius:99px;background:var(--surface-2);
+  border:1px solid var(--border);overflow:hidden;min-width:120px
+}
+.usage-fill{height:100%;border-radius:99px;transition:width .2s}
+.usage-fill.u-accent{background:var(--accent)}
+.usage-fill.u-yellow{background:var(--yellow)}
+.usage-fill.u-red{background:var(--red)}
+.usage-text{font-size:12px;color:var(--muted);white-space:nowrap}
+.usage-warn{
+  margin:8px 0 0;padding:8px 12px;border-radius:var(--r-sm);
+  background:var(--yellow-bg);color:var(--yellow);font-size:12.5px
+}
+.usage-warn.at{background:var(--red-bg);color:var(--red)}
+/* Чек-лист онбординга «Первые шаги» на главной: прогресс + список шагов */
+.onb-list{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:2px}
+.onb{display:grid;grid-template-columns:20px 1fr;gap:4px 10px;align-items:baseline;
+  padding:7px 0;border-top:1px solid var(--border)}
+.onb:first-child{border-top:0}
+.onb-mark{color:var(--muted);text-align:center}
+.onb.done .onb-mark{color:var(--green)}
+.onb.done .onb-text{color:var(--muted);text-decoration:line-through}
+.onb-link{color:var(--accent);font-weight:600}
+.onb-link:hover{color:var(--accent-hover);text-decoration:underline}
+.onb-hint{grid-column:2;font-size:12px;color:var(--muted)}
+.onb.done .onb-hint{display:none}
+.limit-row{display:grid;grid-template-columns:180px 1fr;gap:12px;align-items:center;margin:8px 0}
+.limit-name{font-size:12.5px;color:var(--muted)}
+@media (max-width:680px){.limit-row{grid-template-columns:1fr;gap:4px}}
+
+/* Публичные документы (/oferta, /pdn): простая типографика без панельного каркаса */
+.doc{max-width:820px;margin:0 auto;padding:28px 20px 64px;color:var(--text)}
+.doc h1{font-size:22px;margin:10px 0 14px}
+.doc h2{font-size:15px;margin:24px 0 8px;color:var(--text)}
+.doc p,.doc li{font-size:13.5px;line-height:1.55;color:var(--text)}
+.doc ul{padding-left:20px}
+.doc table{width:100%;border-collapse:collapse;margin:10px 0}
+.doc th,.doc td{
+  border:1px solid var(--border);padding:7px 9px;text-align:left;font-size:12.5px
+}
+.doc th{background:var(--surface-2);font-weight:600}
+.doc .meta{color:var(--muted);font-size:12.5px}
+.doc a{color:var(--accent)}

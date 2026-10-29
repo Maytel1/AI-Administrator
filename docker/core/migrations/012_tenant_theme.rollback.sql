@@ -1,0 +1,15 @@
+BEGIN;
+
+ALTER TABLE salons
+    DROP COLUMN IF EXISTS vertical;
+
+ALTER TABLE salons
+    DROP COLUMN IF EXISTS theme;
+
+ALTER TABLE salons
+    DROP COLUMN IF EXISTS modules;
+
+ALTER TABLE salons
+    DROP COLUMN IF EXISTS terms;
+
+COMMIT;

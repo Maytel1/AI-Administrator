@@ -1,0 +1,16 @@
+ 237 |     if may_add:
+ 238 |         add_form = (
+ 239 |             '<form method="post" action="/actions" class="stack" style="margin-top:14px">'
+ 240 |             '<input type="hidden" name="action" value="client_create">'
+ 241 |             f'<input type="hidden" name="back" value="{back}">'
+ 242 |             f"{csrf_field(csrf)}"
+ 243 |             '<div class="cell"><span>Телефон</span>'
+ 244 |             '<input type="tel" name="phone" placeholder="+79001234567" required></div>'
+ 245 |             '<div class="cell"><span>Имя</span>'
+ 246 |             '<input type="text" name="name" placeholder="Как обращаться"></div>'
+ 247 |             '<div class="cell"><span>Заметки</span>'
+ 248 |             '<input type="text" name="notes" placeholder="аллергии, пожелания"></div>'
+ 249 |             '<div class="cell"><span>&nbsp;</span>'
+ 250 |             '<button type="submit">Добавить</button></div>'
+ 251 |             "</form>"
+ 252 |         )

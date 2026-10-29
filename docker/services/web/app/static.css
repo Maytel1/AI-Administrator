@@ -1,30 +1,77 @@
-/* Панель «Дежурный24» — стиль как у демо-панели avto-panel: тёмная база #0c0d11,
-   карточки #16171d, радиусы 6/10/14. Акцент наш, фирменный #4f46e5. */
+/* Панель «Дежурный24» — тёмная база #0c0d11, карточки #16171d, радиусы 6/10/14. Акцент фирменный терракотовый #c2410c. */
 *,*::before,*::after{box-sizing:border-box}
 :root{
   --bg:#0c0d11; --surface:#16171d; --surface-2:#1c1e26; --hover:#23252f;
   --border:rgba(255,255,255,.09); --border-strong:rgba(255,255,255,.18);
   --text:#f2f3f5; --muted:#a0a1a4; --subtle:#707174;
-  --accent:#4f46e5; --accent-hover:#4338ca; --accent-bg:rgba(79,70,229,.16);
+  --accent:#c2410c; --accent-hover:#9a3412; --accent-bg:rgba(194,65,12,.16);
   --green:#34c77b; --green-bg:rgba(52,199,123,.14);
   --yellow:#e5b53e; --yellow-bg:rgba(229,181,62,.14);
   --red:#e5534b; --red-bg:rgba(229,83,75,.14);
   --r-sm:6px; --r-md:10px; --r-lg:14px; --shadow:0 4px 16px rgba(0,0,0,.45);
+  /* Типографика */
+  --font-ui:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  --font-display:"Plus Jakarta Sans",var(--font-ui);
+  --fs-xs:11px;   --fs-sm:12px;   --fs-base:14px;   --fs-lg:16px;
+  --fs-h3:18px;   --fs-h2:22px;   --fs-h1:28px;
+  --fw-regular:400; --fw-medium:500; --fw-semibold:600; --fw-bold:700;
+  --lh-tight:1.25; --lh-base:1.5; --lh-loose:1.7;
 }
-html,body{margin:0;padding:0}
+html,body{margin:0;padding:0;font-family:var(--font-ui);color-scheme:dark}
+h1,h2,h3{font-family:var(--font-display)}
 body{
   background:var(--bg); color:var(--text);
-  font:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
-  font-size:14px; line-height:1.5;
+  font-size:var(--fs-base); line-height:var(--lh-base);
+  font-weight:var(--fw-regular);
 }
 a{color:inherit;text-decoration:none}
+
+/* Типографическая иерархия */
+h1{
+  font-size:var(--fs-h1);
+  font-weight:var(--fw-bold);
+  line-height:var(--lh-tight);
+  margin:0 0 8px;
+  letter-spacing:-0.02em;
+  text-wrap:balance;
+}
+h2{
+  font-size:var(--fs-h2);
+  font-weight:var(--fw-semibold);
+  line-height:var(--lh-tight);
+  margin:0 0 12px;
+  letter-spacing:-0.01em;
+  text-wrap:balance;
+}
+h3{
+  font-size:var(--fs-h3);
+  font-weight:var(--fw-semibold);
+  line-height:var(--lh-tight);
+  margin:0 0 8px;
+  letter-spacing:-0.005em;
+  text-wrap:balance;
+}
+
+/* Вспомогательные классы текста */
+.lead{
+  font-size:var(--fs-lg);
+  line-height:var(--lh-loose);
+  color:var(--muted);
+  margin:0 0 16px;
+  max-width:65ch;
+}
+.text-lg{font-size:var(--fs-lg)}
+.text-sm{font-size:var(--fs-sm)}
+.text-xs{font-size:var(--fs-xs)}
+.text-muted{color:var(--muted)}
+.text-subtle{color:var(--subtle)}
 .shell{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
 aside{
   background:var(--surface); border-right:1px solid var(--border);
   padding:18px 14px; display:flex; flex-direction:column; gap:6px;
   position:sticky; top:0; height:100vh;
 }
-.brand{font-weight:700;font-size:16px;padding:4px 10px 14px}
+.brand{font-weight:var(--fw-bold);font-size:var(--fs-lg);padding:4px 10px 14px}
 .brand span{color:var(--accent)}
 aside nav a{
   display:flex; gap:10px; align-items:center; padding:9px 11px;
@@ -33,29 +80,29 @@ aside nav a{
 aside nav a:hover{background:var(--hover);color:var(--text)}
 aside nav a.active{
   background:var(--accent-bg); color:var(--text);
-  box-shadow:inset 0 0 0 1px rgba(79,70,229,.42);
+  box-shadow:inset 0 0 0 1px var(--accent);
 }
-aside nav a i{font-style:normal;opacity:.75;width:16px;text-align:center}
-.foot{margin-top:auto;color:var(--subtle);font-size:12px;padding:10px}
+aside nav a i{font-style:normal;opacity:.75;width:16px;text-align:center;display:flex;align-items:center;justify-content:center}
+aside nav a svg{width:16px;height:16px;display:block}
+.foot{margin-top:auto;color:var(--subtle);font-size:var(--fs-sm);padding:10px}
 /* Ширину не ограничиваем: таблица записей должна занять всё свободное
    место, а не упираться в 1180px и оставлять пустое поле справа. */
 main{padding:22px 26px;min-width:0}
-h1{font-size:21px;margin:0 0 4px}
-.sub{color:var(--muted);margin:0 0 20px;font-size:13px}
 .top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
 /* Обёртка контента: без неё блоки страницы становились детьми flex-строки .top
    и вставали рядом друг с другом вместо того, чтобы идти сверху вниз. */
 .top>.content{flex:1;min-width:0}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:12px;margin-bottom:20px}
 .tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:14px 16px}
-.tile b{display:block;font-size:24px;font-weight:650;letter-spacing:-.4px}
-.tile span{color:var(--muted);font-size:12px}
+.tile b{display:block;font-size:24px;font-weight:650;letter-spacing:-.4px;font-family:var(--font-display)}
+.tile span{color:var(--text);font-size:12px}
 .card{
   background:var(--surface); border:1px solid var(--border);
   border-radius:var(--r-lg); padding:16px 18px; margin-bottom:16px;
+  max-width:72ch;
 }
 .card h2{
-  font-size:12px; margin:0 0 12px; color:var(--muted); font-weight:600;
+  font-size:12px; margin:0 0 12px; color:var(--text); font-weight:600;
   text-transform:uppercase; letter-spacing:.6px;
 }
 table{width:100%;border-collapse:collapse;font-size:13px}
@@ -67,14 +114,26 @@ td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.05)}
 tr:last-child td{border-bottom:none}
 tr:hover td{background:var(--surface-2)}
 .badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11.5px;border:1px solid transparent}
-.b-accent{background:var(--accent-bg);color:#a5b4fc}
+.b-accent{background:var(--accent-bg);color:#fdba74}
 .b-green{background:var(--green-bg);color:var(--green)}
 .b-red{background:var(--red-bg);color:var(--red)}
 .b-yellow{background:var(--yellow-bg);color:var(--yellow)}
 .b-gray{background:rgba(255,255,255,.06);color:var(--muted)}
 .bar{height:6px;border-radius:99px;background:var(--surface-2);overflow:hidden;margin-top:8px}
 .bar>div{height:100%;background:var(--accent)}
-.empty{color:var(--subtle);padding:22px;text-align:center;font-size:13px}
+.empty{
+  color:var(--text);
+  padding:32px 22px;
+  text-align:center;
+  font-size:14px;
+  max-width:60ch;
+  margin:0 auto;
+  border:1px dashed var(--border);
+  border-radius:var(--r-md);
+  background:var(--surface-2);
+}
+.empty b{color:var(--accent)}
+.empty .btn{margin-top:16px;display:inline-block}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .msg{
@@ -92,7 +151,7 @@ form.stack{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr))
 form.stack .cell{display:flex;flex-direction:column;gap:4px}
 form.stack .cell span{color:var(--subtle);font-size:11px}
 form.stack button{width:100%}
-.check{display:inline-flex;gap:6px;align-items:center;color:var(--muted);font-size:12px}
+.check{display:inline-flex;gap:6px;align-items:center;color:var(--text);font-size:12px}
 .check input{width:auto}
 .btn-mini{background:var(--surface-2);color:var(--muted);border:1px solid var(--border);padding:5px 10px;font-size:12px;font-weight:500}
 .btn-mini:hover{background:var(--hover);color:var(--text)}
@@ -102,7 +161,7 @@ form.stack button{width:100%}
 .chart .bar-col span{color:var(--subtle);font-size:9px;margin-top:4px;white-space:nowrap}
 .chart .bar-col:hover .bar-fill{background:var(--accent-hover)}
 .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 4px}
-.tabs .tab{padding:6px 12px;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:13px;background:var(--surface-2)}
+.tabs .tab{padding:6px 12px;border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;background:var(--surface-2)}
 .tabs .tab:hover{background:var(--hover);color:var(--text)}
 .tabs .tab-active{background:var(--accent);border-color:var(--accent);color:#fff}
 .trend{display:block;font-size:11px;margin-top:4px;color:var(--subtle)}
@@ -119,12 +178,14 @@ input,select{
   border:1px solid var(--border); border-radius:var(--r-sm);
   padding:9px 11px; font:inherit; font-size:13px;
 }
-label{display:block;color:var(--muted);font-size:12px;margin:12px 0 5px}
+label{display:block;color:var(--text);font-size:12px;margin:12px 0 5px}
 button,.btn{
   background:var(--accent); color:#fff; border:none; border-radius:var(--r-sm);
   padding:9px 16px; font:inherit; font-weight:550; cursor:pointer; display:inline-block;
+  touch-action:manipulation;
 }
 button:hover,.btn:hover{background:var(--accent-hover)}
+button:focus-visible,.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @media(max-width:900px){
   .shell{grid-template-columns:1fr} aside{position:static;height:auto}
   .grid2{grid-template-columns:1fr} main{padding:16px}
@@ -140,8 +201,8 @@ button:hover,.btn:hover{background:var(--accent-hover)}
 .legal-form .radios{display:flex;flex-wrap:wrap;gap:16px;margin:10px 0 14px}
 .legal-form .radios label{display:flex;gap:6px;align-items:center;cursor:pointer}
 .legal-form .field{display:grid;gap:4px;margin-bottom:10px;max-width:520px}
-.legal-form .field>span{font-size:12px;color:var(--muted)}
-.legal-form .field small{font-size:11px;color:var(--muted)}
+.legal-form .field>span{font-size:12px;color:var(--text)}
+.legal-form .field small{font-size:11px;color:var(--text)}
 .legal-form input,.legal-form select{background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:7px 9px}
 .legal-form .check{display:flex;gap:6px;align-items:center;margin:10px 0}
 .tile.yellow b{color:var(--danger)}
@@ -216,12 +277,12 @@ button:hover,.btn:hover{background:var(--accent-hover)}
 .menu-item button:hover{background:var(--hover);border-color:var(--border)}
 .menu-item button.ok:hover{color:var(--green)}
 .menu-item button.danger:hover{color:var(--red)}
-.menu-label{display:block;padding:8px 10px 2px;font-size:11px;color:var(--muted)}
+.menu-label{display:block;padding:8px 10px 2px;font-size:11px;color:var(--text)}
 .menu-input{
   background:var(--surface-2); border-color:var(--border);
   margin:0 10px 6px; width:calc(100% - 20px); cursor:text;
 }
-.menu-input:focus{outline:none;border-color:var(--accent)}
+.menu-input:focus-visible{outline:none;border-color:var(--accent)}
 .menu-item button.primary{
   margin:0 10px 4px; width:calc(100% - 20px); text-align:center;
   background:var(--accent); color:#fff;
@@ -243,6 +304,7 @@ td:last-child,th:last-child{width:1%;white-space:nowrap}
   background:var(--surface); border:1px solid var(--border);
   border-radius:var(--r-lg); overflow:visible; margin-bottom:16px;
 }
+.panel .prose{max-width:72ch}
 .panel-head{
   display:flex; flex-wrap:wrap; align-items:center; gap:12px;
   padding:14px 18px; border-bottom:1px solid var(--border);
@@ -250,8 +312,8 @@ td:last-child,th:last-child{width:1%;white-space:nowrap}
   background:var(--surface); border-radius:var(--r-lg) var(--r-lg) 0 0;
 }
 .panel-title{display:flex; align-items:baseline; gap:12px}
-.panel-title h1{margin:0}
-.panel-head .count{color:var(--muted);font-size:13px}
+.panel-title h1{margin:0;font-size:var(--fs-h3)}
+.panel-head .count{color:var(--text);font-size:13px}
 /* Фильтры прижаты вправо; на узком экране переносятся под заголовок. */
 .panel-filters{
   display:flex; flex-wrap:wrap; align-items:center; gap:8px;
@@ -323,7 +385,7 @@ form.stack .check-cell{justify-content:flex-end}
    ширину — иначе «4 000 ₽» растягивается на пол-экрана и цифры теряются. */
 .dash-top{display:flex;gap:16px;align-items:flex-start;margin-bottom:14px}
 .dash-side{flex:0 0 216px;min-width:0}
-.dash-side h1{margin-bottom:10px}
+.dash-side h1{margin-bottom:10px;font-size:var(--fs-h3)}
 .dash-side .load-line{
   flex-direction:column; align-items:flex-start; gap:4px; margin:0 0 10px;
 }
@@ -344,7 +406,7 @@ form.stack .check-cell{justify-content:flex-end}
   display:flex; flex-direction:column; align-items:center;
   text-align:center; padding:16px 12px 14px; gap:4px; min-width:0;
 }
-.tiles-row .tile b{font-size:26px;line-height:1.1;margin:0}
+.tiles-row .tile b{font-size:26px;line-height:1.1;margin:0;font-family:var(--font-display)}
 .tiles-row .tile span{
   font-size:12px;line-height:1.35;margin:0;color:var(--muted);
   max-width:15ch;
@@ -363,7 +425,7 @@ form.stack .check-cell{justify-content:flex-end}
   display:flex; align-items:center; gap:10px; flex-wrap:wrap;
   margin:0 0 8px;
 }
-.load-title{font-size:13px;color:var(--muted)}
+.load-title{font-size:13px;color:var(--text)}
 .load-count{font-size:13px;font-variant-numeric:tabular-nums}
 .load-line .bar{
   flex:1 1 160px; min-width:140px; margin-top:0; height:5px;
@@ -397,28 +459,42 @@ form.stack .check-cell{justify-content:flex-end}
 .m-actions form.inline{align-self:center}
 /* Тумблер невидим, но остаётся в потоке рядом со своим окном. */
 .modal-toggle{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
-.modal{display:none}
-.modal-toggle:checked + .modal{
-  display:block;position:fixed;inset:0;z-index:60;
+.modal{
+  position:fixed;inset:0;z-index:60;
+  opacity:0;visibility:hidden;
+  transition:opacity .18s ease, visibility .18s ease;
+  overscroll-behavior:contain;
+}
+.modal-toggle:checked ~ .modal{
+  opacity:1;visibility:visible;
 }
 /* Штора: клик по фону закрывает окно (label для тумблера). */
 .modal-veil{
   position:absolute;inset:0;background:rgba(0,0,0,.55);
-  display:block;cursor:pointer;
+  cursor:pointer;opacity:0;
+  transition:opacity .18s ease;
 }
+.modal-toggle:checked ~ .modal .modal-veil{opacity:1}
 .modal-card{
   position:relative;z-index:1;
   width:min(460px,calc(100vw - 32px));
   max-height:calc(100vh - 60px);overflow:auto;
   margin:5vh auto 0;
   background:var(--surface);border:1px solid var(--border-strong);
+  border-left:4px solid var(--accent);
   border-radius:var(--r-lg);box-shadow:var(--shadow);
+  opacity:0;transform:translateY(-10px) scale(0.97);
+  transition:opacity .18s ease, transform .18s ease;
+}
+.modal-body{padding:14px 16px;max-width:65ch}
+.modal-toggle:checked ~ .modal .modal-card{
+  opacity:1;transform:translateY(0) scale(1);
 }
 .modal-head{
   display:flex;justify-content:space-between;align-items:center;gap:10px;
   padding:14px 16px;border-bottom:1px solid var(--border);
 }
-.modal-head b{font-size:14px}
+.modal-head b{font-size:14px;color:var(--text)}
 .modal-x{cursor:pointer;color:var(--muted);font-size:16px;padding:2px 6px}
 .modal-x:hover{color:var(--text)}
 .modal-body{padding:14px 16px}
@@ -439,9 +515,9 @@ form.stack .check-cell{justify-content:flex-end}
 .check.big{color:var(--text);font-size:13.5px;padding:5px 0}
 .btn.ghost{
   background:transparent;border:1px solid var(--border-strong);
-  color:var(--muted);
+  color:var(--text);
 }
-.btn.ghost:hover{background:var(--hover);color:var(--text)}
+.btn.ghost:hover{background:var(--hover);color:var(--text);border-color:var(--accent)}
 /* Карточка клиента в окне: строки статистики и поле заметок. */
 .modal-body .meta{
   display:block;color:var(--muted);font-size:12.5px
@@ -533,3 +609,71 @@ table.counterparties td{padding:9px 10px;border-bottom:1px solid rgba(255,255,25
 table.counterparties tr:last-child td{border-bottom:none}
 table.counterparties tr:hover td{background:var(--surface-2)}
 table.counterparties .row-end{display:flex;gap:8px;align-items:center}
+
+/* Скелетоны загрузки: анимированные серые блоки вместо пустых состояний */
+.skeleton{
+  background:linear-gradient(90deg, var(--surface-2) 25%, var(--hover) 50%, var(--surface-2) 75%);
+  background-size:200% 100%;
+  animation:skeleton-pulse 1.4s ease infinite;
+  border-radius:var(--r-sm);
+}
+@keyframes skeleton-pulse{
+  0%{background-position:200% 0}
+  100%{background-position:-200% 0}
+}
+.skeleton-text{height:12px;margin:6px 0;border-radius:4px}
+.skeleton-text.short{width:60%}
+.skeleton-title{height:18px;width:45%;margin:8px 0}
+.skeleton-avatar{width:26px;height:26px;border-radius:50%}
+.skeleton-badge{width:70px;height:14px;border-radius:99px}
+.skeleton-tile{height:110px;border-radius:var(--r-md)}
+.skeleton-table-row{height:48px;margin:4px 0;border-radius:var(--r-sm)}
+.skeleton-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px}
+.skeleton-grid .skeleton-tile{min-height:110px}
+.skeleton-list{display:flex;flex-direction:column;gap:10px}
+.skeleton-list .skeleton-table-row{width:100%}
+.staff-item{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:12px;padding:10px 14px;border:1px solid var(--border);
+  border-radius:var(--r-md);background:var(--surface);margin-bottom:8px
+}
+.staff-item b{font-size:13px}
+.staff-item .sub{font-size:12px;color:var(--muted)}
+.staff-actions{display:flex;gap:6px}
+.staff-actions button{font-size:12px;padding:4px 10px}
+
+@media(prefers-reduced-motion:reduce){
+  .modal,.modal-veil,.skeleton{animation:none!important;transition:none!important}
+}
+
+/* Две колонки рядом для страниц оплаты и настроек */
+.two-cols{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:16px;
+  margin-top:16px;
+  align-items:start;
+}
+.two-cols > .m-card,
+.two-cols > .empty{
+  display:flex;
+  flex-direction:column;
+}
+@media (max-width:760px){
+  .two-cols{grid-template-columns:1fr}
+}
+
+/* Тарифы на странице оплаты: переключатель с описанием */
+.tariffs{display:flex;flex-direction:column;gap:10px}
+.tariff-row{
+  display:flex;align-items:center;gap:12px;
+  padding:10px 14px;border:1px solid var(--border);
+  border-radius:var(--r-md);background:var(--surface);
+}
+.tariff-row .check{cursor:pointer}
+.tariff-row .meta{margin-left:auto;white-space:nowrap;color:var(--muted);font-size:12.5px}
+.tariff-row .sub{flex:1 1 auto;font-size:12.5px;color:var(--text-secondary);line-height:1.4;margin-left:12px}
+.tariff-row input[type=radio]{accent-color:var(--accent)}
+.tariff-row:has(input[type=radio]:checked){
+  border-color:var(--accent);background:var(--accent-bg);
+}

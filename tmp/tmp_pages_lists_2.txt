@@ -1,0 +1,297 @@
+ 404 |     csrf, may_edit = _ctx_parts(ctx, "schedule")
+ 405 |     _, may_add = _ctx_parts(ctx, "catalog")
+ 406 |     sid = esc(salon["id"]) if salon else ""
+ 407 |     back = f"/masters?salon={sid}"
+ 408 |     services = services or []
+ 409 |     cards = []
+ 410 |     for m in rows:
+ 411 |         mid = esc(m["id"])
+ 412 |         hours_raw = m["hours"]
+ 413 |         if isinstance(hours_raw, str):
+ 414 |             hours_raw = json.loads(hours_raw or "[]")
+ 415 |         svc_raw = m.get("services") or []
+ 416 |         if isinstance(svc_raw, str):
+ 417 |             svc_raw = json.loads(svc_raw or "[]")
+ 418 |         # ── кратко на плитке: чем занимается и когда работает ──────────
+ 419 |         titles = [str(s["title"]) for s in svc_raw]
+ 420 |         work = ", ".join(titles[:3])
+ 421 |         if len(titles) > 3:
+ 422 |             work += f" +{len(titles) - 3}"
+ 423 |         summary = ", ".join(
+ 424 |             f"{WEEKDAY_RU[int(h['weekday'])]} {str(h['start'])[:5]}–{str(h['end'])[:5]}"
+ 425 |             for h in sorted(hours_raw, key=lambda x: int(x["weekday"]))
+ 426 |         )
+ 427 |         # ── кнопки и окна настроек (только у роли с правом) ────────────
+ 428 |         buttons, windows = "", ""
+ 429 |         if may_edit:
+ 430 |             buttons += f'<label class="btn" for="mh-{mid}">График работы</label>'
+ 431 |             windows += f'<input type="checkbox" id="mh-{mid}" class="modal-toggle">'
+ 432 |             windows += _hours_window(m, hours_raw, mid, csrf, back)
+ 433 |         if may_add:
+ 434 |             buttons += f'<label class="btn" for="ms-{mid}">Услуги мастера</label>'
+ 435 |             windows += f'<input type="checkbox" id="ms-{mid}" class="modal-toggle">'
+ 436 |             windows += _services_window(m, svc_raw, services, mid, csrf, back)
+ 437 |         actions = f'<div class="m-actions">{buttons}</div>' if buttons else ""
+ 438 |         off = "" if m.get("is_active", True) else '<span class="badge b-gray">отключён</span>'
+ 439 |         cards.append(
+ 440 |             '<div class="m-card">'
+ 441 |             f'<div class="m-top"><b>{esc(m["name"])}</b>{off}</div>'
+ 442 |             f'<span class="meta">Делает: {esc(work or "услуги не назначены")}</span>'
+ 443 |             f'<span class="meta">Когда: {esc(summary or "график не задан")}</span>'
+ 444 |             f"{actions}{windows}</div>"
+ 445 |         )
+ 446 |     if cards:
+ 447 |         body = '<div class="m-grid">' + "".join(cards) + "</div>"
+ 448 |     else:
+ 449 |         body = '<div class="empty">Мастера не заведены.</div>'
+ 450 |     add_form = ""
+ 451 |     if may_add:
+ 452 |         add_form = (
+ 453 |             '<form method="post" action="/actions" class="stack" style="margin-top:14px">'
+ 454 |             '<input type="hidden" name="action" value="master_create">'
+ 455 |             f'<input type="hidden" name="back" value="{back}">'
+ 456 |             f"{csrf_field(csrf)}"
+ 457 |             '<div class="cell"><span>Новый мастер</span>'
+ 458 |             '<input type="text" name="name" placeholder="Имя" required></div>'
+ 459 |             '<div class="cell"><span>&nbsp;</span>'
+ 460 |             '<button type="submit">Добавить</button></div>'
+ 461 |             "</form>"
+ 462 |         )
+ 463 |     content = (
+ 464 |         page_head(
+ 465 |             "Мастера",
+ 466 |             "График — источник слотов: сузили окно, время исчезло у клиентов",
+ 467 |             salon, salons,
+ 468 |         )
+ 469 |         + flash_html(flash, flash_error)
+ 470 |         + body
+ 471 |         + add_form
+ 472 |     )
+ 473 |     return layout("Мастера", "/masters", content, salon=salon, salons=salons, role=_role(ctx))
+ 474 | 
+ 475 | 
+ 476 | def _hours_window(
+ 477 |     m: dict[str, Any],
+ 478 |     hours_raw: list[dict[str, Any]],
+ 479 |     mid: str,
+ 480 |     csrf: str,
+ 481 |     back: str,
+ 482 | ) -> str:
+ 483 |     """Окно графика: вся неделя одной формой, одна кнопка «Сохранить».
+ 484 | 
+ 485 |     Чекбокс дня выключен → день нерабочий (время в форме всё равно стоит
+ 486 |     по умолчанию — пригодится, когда включат обратно).
+ 487 |     """
+ 488 |     from .queries import WEEKDAY_RU
+ 489 | 
+ 490 |     by_day = {int(h["weekday"]): h for h in hours_raw}
+ 491 |     rows = []
+ 492 |     for wd in range(7):
+ 493 |         h = by_day.get(wd)
+ 494 |         checked = " checked" if h else ""
+ 495 |         start = str((h or {}).get("start", "10:00:00"))[:5]
+ 496 |         end = str((h or {}).get("end", "20:00:00"))[:5]
+ 497 |         rows.append(
+ 498 |             '<div class="wh-row">'
+ 499 |             f'<label class="check"><input type="checkbox" name="d{wd}" value="1"{checked}>'
+ 500 |             f"{WEEKDAY_RU[wd]}</label>"
+ 501 |             f'<input type="time" name="s{wd}" value="{start}">'
+ 502 |             f'<input type="time" name="e{wd}" value="{end}">'
+ 503 |             "</div>"
+ 504 |         )
+ 505 |     return (
+ 506 |         '<div class="modal">'
+ 507 |         f'<label class="modal-veil" for="mh-{mid}"></label>'
+ 508 |         '<form method="post" action="/actions" class="modal-card">'
+ 509 |         '<div class="modal-head">'
+ 510 |         f"<b>График — {esc(m['name'])}</b>"
+ 511 |         f'<label class="modal-x" for="mh-{mid}">✕</label></div>'
+ 512 |         '<div class="modal-body stack">'
+ 513 |         '<div class="wh-head"><span>День</span><span>с</span><span>по</span></div>'
+ 514 |         + "".join(rows)
+ 515 |         + "</div>"
+ 516 |         '<div class="modal-foot">'
+ 517 |         '<input type="hidden" name="action" value="hours_save_week">'
+ 518 |         f'<input type="hidden" name="master_id" value="{mid}">'
+ 519 |         f'<input type="hidden" name="back" value="{back}">'
+ 520 |         f"{csrf_field(csrf)}"
+ 521 |         f'<label class="btn ghost" for="mh-{mid}">Отмена</label>'
+ 522 |         '<button type="submit">Сохранить</button></div></form></div>'
+ 523 |     )
+ 524 | 
+ 525 | 
+ 526 | def _services_window(
+ 527 |     m: dict[str, Any],
+ 528 |     svc_raw: list[dict[str, Any]],
+ 529 |     services: list[dict[str, Any]],
+ 530 |     mid: str,
+ 531 |     csrf: str,
+ 532 |     back: str,
+ 533 | ) -> str:
+ 534 |     """Окно услуг мастера: чекбоксы прайса, отмечено — то, что делает."""
+ 535 |     mine = {str(s["id"]) for s in svc_raw}
+ 536 |     items = []
+ 537 |     for s in services:
+ 538 |         checked = " checked" if str(s["id"]) in mine else ""
+ 539 |         title = esc(s["title"])
+ 540 |         if not s.get("is_active", True):
+ 541 |             title += ' <span class="badge b-gray">в архиве</span>'
+ 542 |         items.append(
+ 543 |             '<label class="check big">'
+ 544 |             f'<input type="checkbox" name="service_id" value="{esc(s["id"])}"{checked}>'
+ 545 |             f"{title}</label>"
+ 546 |         )
+ 547 |     body = (
+ 548 |         "".join(items)
+ 549 |         if items
+ 550 |         else '<div class="empty">В прайсе нет услуг — сначала добавьте их во вкладке «Прайс».</div>'
+ 551 |     )
+ 552 |     return (
+ 553 |         '<div class="modal">'
+ 554 |         f'<label class="modal-veil" for="ms-{mid}"></label>'
+ 555 |         '<form method="post" action="/actions" class="modal-card">'
+ 556 |         '<div class="modal-head">'
+ 557 |         f"<b>Услуги — {esc(m['name'])}</b>"
+ 558 |         f'<label class="modal-x" for="ms-{mid}">✕</label></div>'
+ 559 |         f'<div class="modal-body stack">{body}</div>'
+ 560 |         '<div class="modal-foot">'
+ 561 |         '<input type="hidden" name="action" value="master_services_save">'
+ 562 |         f'<input type="hidden" name="master_id" value="{mid}">'
+ 563 |         f'<input type="hidden" name="back" value="{back}">'
+ 564 |         f"{csrf_field(csrf)}"
+ 565 |         f'<label class="btn ghost" for="ms-{mid}">Отмена</label>'
+ 566 |         '<button type="submit">Сохранить</button></div></form></div>'
+ 567 |     )
+ 568 | def page_dialogs(
+ 569 |     rows: list[dict[str, Any]],
+ 570 |     messages: list[dict[str, Any]] | None,
+ 571 |     tz: ZoneInfo,
+ 572 |     salon: dict | None,
+ 573 |     salons: list[dict] | None,
+ 574 |     ctx: Any | None = None,
+ 575 | ) -> str:
+ 576 |     """Диалоги бота — видно, как бот отвечает клиенту (контроль качества ответов)."""
+ 577 |     from .queries import CHANNEL_RU
+ 578 | 
+ 579 |     sid = salon["id"] if salon else ""
+ 580 |     cards = []
+ 581 |     for d in rows:
+ 582 |         cards.append(
+ 583 |             '<div class="m-card">'
+ 584 |             f'<div class="m-top"><b>{esc(d["client_name"] or d["client_phone"] or "аноним")}</b>'
+ 585 |             + badge(esc(CHANNEL_RU.get(d["channel"], d["channel"] or "—")), "accent")
+ 586 |             + "</div>"
+ 587 |             f'<span class="meta">{esc(dt_local(d["started_at"], tz, "%d.%m %H:%M"))} · '
+ 588 |             f'реплик: {d["messages"]}</span>'
+ 589 |             f'<span class="meta">Итог: {esc(d["outcome"] or "—")}</span>'
+ 590 |             f'<div class="m-actions">'
+ 591 |             f'<a class="btn" href="/dialogs?salon={esc(sid)}&id={esc(d["id"])}">Открыть</a>'
+ 592 |             "</div></div>"
+ 593 |         )
+ 594 |     if cards:
+ 595 |         feed = f'<div class="m-grid">{"".join(cards)}</div>'
+ 596 |     else:
+ 597 |         feed = '<div class="empty">Диалогов пока нет — бот ещё не общался с клиентами.</div>'
+ 598 |     content = (
+ 599 |         page_head(
+ 600 |             "Диалоги",
+ 601 |             "Что бот отвечает клиентам — источник для контроля качества",
+ 602 |             salon, salons,
+ 603 |         )
+ 604 |         + card("Лента диалогов", feed)
+ 605 |     )
+ 606 |     if messages is not None:
+ 607 |         bubbles = []
+ 608 |         for m in messages:
+ 609 |             who = {"user": "Клиент", "assistant": "Анна (бот)", "system": "Система",
+ 610 |                    "tool": "Инструмент"}.get(m["role"], m["role"])
+ 611 |             bubbles.append(
+ 612 |                 f'<div class="msgs"><b>{esc(who)}</b> · '
+ 613 |                 f'{esc(dt_local(m["created_at"], tz, "%d.%m %H:%M"))}'
+ 614 |                 f"<br>{esc(m['content'])}</div>"
+ 615 |             )
+ 616 |         content += card("Переписка", "".join(bubbles) or '<div class="empty">Сообщений нет</div>')
+ 617 |     return layout("Диалоги", "/dialogs", content, salon=salon, salons=salons, role=_role(ctx))
+ 618 | 
+ 619 | 
+ 620 | def page_audit(
+ 621 |     rows: list[dict[str, Any]],
+ 622 |     tz: ZoneInfo,
+ 623 |     salon: dict | None,
+ 624 |     salons: list[dict] | None,
+ 625 |     ctx: Any | None = None,
+ 626 | ) -> str:
+ 627 |     """Журнал аудита: кто и что сделал — основа для разбора споров."""
+ 628 |     cards = []
+ 629 |     for a in rows:
+ 630 |         details = a["details"]
+ 631 |         if isinstance(details, str):
+ 632 |             details = json.loads(details or "{}")
+ 633 |         cards.append(
+ 634 |             '<div class="m-card">'
+ 635 |             f'<div class="m-top"><b>{esc(a["action"])}</b>{badge(str(a["actor"]), "accent")}</div>'
+ 636 |             f'<span class="meta">{esc(dt_local(a["ts"], tz, "%d.%m.%Y %H:%M"))}</span>'
+ 637 |             f'<span class="meta">{esc(json.dumps(details, ensure_ascii=False)[:160])}</span>'
+ 638 |             "</div>"
+ 639 |         )
+ 640 |     feed = (
+ 641 |         f'<div class="m-grid">{"".join(cards)}</div>'
+ 642 |         if cards else '<div class="empty">Журнал пуст.</div>'
+ 643 |     )
+ 644 |     content = (
+ 645 |         page_head(
+ 646 |             "Аудит",
+ 647 |             "Каждое значимое действие пишется сюда — бот, человек или система",
+ 648 |             salon, salons,
+ 649 |         )
+ 650 |         + card("Журнал действий", feed)
+ 651 |     )
+ 652 |     return layout("Аудит", "/audit", content, salon=salon, salons=salons, role=_role(ctx))
+ 653 | 
+ 654 | 
+ 655 | def page_settings(
+ 656 |     salon: dict | None,
+ 657 |     salons: list[dict] | None,
+ 658 |     env: dict[str, str],
+ 659 |     session: dict[str, Any] | None = None,
+ 660 |     team: list[dict[str, Any]] | None = None,
+ 661 |     ctx: Any | None = None,
+ 662 |     once: list[dict[str, Any]] | None = None,
+ 663 | ) -> str:
+ 664 |     """Настройки точки: тариф, CRM, кто вошёл, команда и одноразовые секреты."""
+ 665 |     from .pages_core import _ctx_parts
+ 666 |     from .queries import PLAN_RU
+ 667 |     from .roles import ROLE_RU, SELF_ISSUE_ROLES, permissions_of, role_label
+ 668 | 
+ 669 |     info = salon or {}
+ 670 |     me = session or {}
+ 671 |     role = str(me.get("role", "guest"))
+ 672 |     may_users = bool(team is not None)
+ 673 |     csrf, may_edit = _ctx_parts(ctx, "users")
+ 674 |     sid = esc(salon["id"]) if salon else ""
+ 675 |     back = f"/settings?salon={sid}"
+ 676 |     body = [
+ 677 |         ["Кто вошёл", f"{me.get('login', '—')} · {role_label(role)}"],
+ 678 |         ["Права роли", ", ".join(permissions_of(role)) or "только просмотр"],
+ 679 |         ["Название", esc(info.get("name", "—"))],
+ 680 |         ["Тариф", esc(PLAN_RU.get(str(info.get("plan")), str(info.get("plan", "—"))))],
+ 681 |         ["CRM", esc(info.get("crm_provider", "none"))],
+ 682 |         ["Таймзона", esc(info.get("timezone", "—"))],
+ 683 |         ["Режим бота", "Telegram long polling"],
+ 684 |         ["LLM", esc(env.get("LLM_PROVIDER", "—"))],
+ 685 |         ["Версия панели", "MVP 0.3 (HTTPS, роли, 2FA, команда)"],
+ 686 |     ]
+ 687 | 
+ 688 |     secrets_block = ""
+ 689 |     if once:
+ 690 |         parts = []
+ 691 |         for item in once:
+ 692 |             fields = "".join(
+ 693 |                 f'<span class="meta">{esc(k)}: <b>{esc(str(v))}</b></span>'
+ 694 |                 for k, v in item.items()
+ 695 |                 if k != "note" and v
+ 696 |             )
+ 697 |             parts.append(
+ 698 |                 '<div class="m-card">'
+ 699 |                 '<div class="m-top"><b>Новый доступ</b>'
+ 700 |                 + badge("показать один раз", "yellow") + "</div>"

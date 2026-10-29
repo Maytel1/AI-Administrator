@@ -8,10 +8,12 @@
 from __future__ import annotations
 
 import uuid
+import json
 from datetime import datetime, time
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from .auth import hash_password, random_password
 from admin_core.crm.internal import InternalCRM
 
 MIN_PRICE = 0
@@ -488,6 +490,72 @@ async def apply_form(
                 "note": "Новый пароль показывается один раз — передайте сотруднику лично",
             },
         }
+
+    if action == "tariff_change":
+        from .queries import PLAN_RU
+
+        plan = str(form.get("plan", "")).strip()
+        valid = {"start", "standard", "pro"}
+        if plan not in valid:
+            return fail("bad_plan", "Неизвестный тариф")
+        crm = InternalCRM(pool)
+        result = await crm.change_plan(salon_id, plan, actor=actor)
+        if not result["ok"]:
+            return fail(result.get("error", "save_failed"), result.get("message", "Не удалось сменить тариф"))
+        return ok(f"Тариф изменён на «{PLAN_RU.get(plan, plan)}»")
+
+
+    if action == "theme_change":
+        vertical = str(form.get("vertical", "")).strip()
+        accent = str(form.get("accent", "")).strip()
+        valid_verticals = {"beauty", "auto", "dental", "cleaning"}
+        if vertical not in valid_verticals:
+            return fail("bad_vertical", "Неизвестное направление бизнеса")
+        if not accent or not accent.startswith("#") or len(accent) != 7:
+            return fail("bad_accent", "Некорректный цвет")
+        theme = {"accent": accent}
+        async with pool.acquire() as conn:
+            # Получаем preset для выбранной вертикали
+            preset = await conn.fetchrow(
+                "SELECT label, default_plan, services, roles, modules, terms, theme FROM vertical_presets WHERE vertical = $1",
+                vertical,
+            )
+            if not preset:
+                return fail("bad_vertical", "Пресет для направления не найден")
+            # Сохраняем вертикаль и тему
+            await conn.execute(
+                "UPDATE salons SET vertical = $1, theme = $2::jsonb WHERE id = $3",
+                vertical, json.dumps(theme), salon_id,
+            )
+            # Применяем preset: модули, термины, тариф по умолчанию
+            await conn.execute(
+                "UPDATE salons SET modules = $1, terms = $2, plan = $3 WHERE id = $4",
+                preset["modules"], preset["terms"], preset["default_plan"], salon_id,
+            )
+            # Создаём услуги по preset (если их ещё нет)
+            for svc in preset["services"]:
+                await conn.execute(
+                    "INSERT INTO services (salon_id, title, duration_min, price, is_active) "
+                    "SELECT $1, $2, $3, $4, true "
+                    "WHERE NOT EXISTS (SELECT 1 FROM services WHERE salon_id = $1 AND title = $2)",
+                    salon_id, svc["title"], svc.get("duration_min", 60), svc.get("price", 0),
+                )
+            # Создаём пользователей по preset (если в салоне ещё нет ни одного пользователя)
+            existing = await conn.fetchval(
+                "SELECT count(*) FROM panel_users WHERE salon_id = $1", salon_id
+            )
+            if existing == 0:
+                for r in preset["roles"]:
+                    await conn.execute(
+                        "INSERT INTO panel_users (salon_id, login, name, role, password_hash, is_active) "
+                        "VALUES ($1, $2, $3, $4, $5, true)",
+                        salon_id,
+                        f"staff-{vertical}-{r['role']}@dezhurny24.local",
+                        r["name"],
+                        r["role"],
+                        hash_password(random_password()),
+                    )
+        return ok(f"Оформление сохранено: направление «{preset['label']}», акцент {accent}")
 
     return fail("save_failed", "Неизвестное действие формы")
 

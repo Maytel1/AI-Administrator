@@ -1,0 +1,17 @@
+ 316 |     if may_add:
+ 317 |         add_form = (
+ 318 |             '<form method="post" action="/actions" class="stack add-row">'
+ 319 |             '<input type="hidden" name="action" value="service_create">'
+ 320 |             f'<input type="hidden" name="back" value="{back}">'
+ 321 |             f"{csrf_field(csrf)}"
+ 322 |             '<div class="cell wide"><span>Новая услуга</span>'
+ 323 |             '<input type="text" name="title" placeholder="название" required></div>'
+ 324 |             '<div class="cell"><span>Цена, ₽</span>'
+ 325 |             '<input type="number" name="price" min="0" step="50" required></div>'
+ 326 |             '<div class="cell"><span>Длительность, мин</span>'
+ 327 |             '<input type="number" name="duration_min" value="60" min="5" max="600" '
+ 328 |             'step="5" required></div>'
+ 329 |             '<div class="cell save-cell"><span>&nbsp;</span>'
+ 330 |             '<button type="submit">Добавить</button></div>'
+ 331 |             "</form>"
+ 332 |         )

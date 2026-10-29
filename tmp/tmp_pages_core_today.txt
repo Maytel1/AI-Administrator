@@ -1,0 +1,16 @@
+ 255 |     cards = [
+ 256 |         '<div class="m-card">'
+ 257 |         f'<div class="m-top"><b>{esc(dt_local(b["starts_at"], tz))}</b>'
+ 258 |         + _status_badge(b["status"]) + "</div>"
+ 259 |         f'<span class="meta">{esc(b["client_name"] or "Без имени")}'
+ 260 |         f'{(" · " + esc(b["client_phone"])) if b["client_phone"] else ""}</span>'
+ 261 |         f'<span class="meta">{esc(b["service_title"])} · {esc(b["master_name"])}</span>'
+ 262 |         f'<span class="meta">{money(b["price"])}</span>'
+ 263 |         '<div class="m-actions">'
+ 264 |         + _action_menu(
+ 265 |             str(b["id"]), b["status"], csrf, may_status, f"/today{sid}",
+ 266 |             prepay_status=b.get("prepayment_status") or "not_required",
+ 267 |         )
+ 268 |         + "</div></div>"
+ 269 |         for b in schedule
+ 270 |     ]

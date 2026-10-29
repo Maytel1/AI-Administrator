@@ -656,3 +656,25 @@ class InternalCRM(CRMProvider):
             )
         return {"ok": True, "id": str(client["id"]), "phone": client["phone"],
                 "name": client.get("name")}
+
+    async def change_plan(
+        self, salon_id: str, plan: str, *, actor: str = "owner:panel"
+    ) -> dict[str, Any]:
+        """Смена тарифа точки: план в таблице salons + запись в audit_log."""
+        valid = {"trial", "start", "standard", "pro", "network"}
+        if plan not in valid:
+            return {"ok": False, "error": "bad_plan", "message": "Неизвестный тариф"}
+        row = await self.pool.fetchrow(
+            "SELECT name, plan FROM salons WHERE id = $1", salon_id
+        )
+        if not row:
+            return {"ok": False, "error": "not_found", "message": "Точка не найдена"}
+        old_plan = str(row["plan"])
+        await self.pool.execute(
+            "UPDATE salons SET plan = $2 WHERE id = $1", salon_id, plan
+        )
+        await self._audit(
+            salon_id, actor, "change_plan",
+            {"salon": row["name"], "old_plan": old_plan, "new_plan": plan},
+        )
+        return {"ok": True, "plan": plan, "old_plan": old_plan}

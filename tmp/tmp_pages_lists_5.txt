@@ -1,0 +1,114 @@
+ 219 |         buttons, windows = "", ""
+ 220 |         if may_edit:
+ 221 |             buttons = f'<label class="btn" for="ck-{cid}">Карточка</label>'
+ 222 |             windows = f'<input type="checkbox" id="ck-{cid}" class="modal-toggle">'
+ 223 |             windows += _client_window(c, cid, csrf, back, tz)
+ 224 |         actions = f'<div class="m-actions">{buttons}</div>' if buttons else ""
+ 225 |         cards.append(
+ 226 |             '<div class="m-card">'
+ 227 |             f'<div class="m-top"><b>{name}</b>{prepay_badge}</div>'
+ 228 |             f'<span class="meta">{phone} · визитов: {visits} · в очереди: {queued}</span>'
+ 229 |             f'<span class="meta">Был(а): {esc(dt_local(c["last_visit"], tz, "%d.%m.%Y"))}</span>'
+ 230 |             f"{actions}{windows}</div>"
+ 231 |         )
+ 232 |     if cards:
+ 233 |         body = '<div class="m-grid">' + "".join(cards) + "</div>"
+ 234 |     else:
+ 235 |         body = '<div class="empty">Клиентов пока нет — они появятся после первых заявок.</div>'
+ 236 |     add_form = ""
+ 237 |     if may_add:
+ 238 |         add_form = (
+ 239 |             '<form method="post" action="/actions" class="stack" style="margin-top:14px">'
+ 240 |             '<input type="hidden" name="action" value="client_create">'
+ 241 |             f'<input type="hidden" name="back" value="{back}">'
+ 242 |             f"{csrf_field(csrf)}"
+ 243 |             '<div class="cell"><span>Телефон</span>'
+ 244 |             '<input type="tel" name="phone" placeholder="+79001234567" required></div>'
+ 245 |             '<div class="cell"><span>Имя</span>'
+ 246 |             '<input type="text" name="name" placeholder="Как обращаться"></div>'
+ 247 |             '<div class="cell"><span>Заметки</span>'
+ 248 |             '<input type="text" name="notes" placeholder="аллергии, пожелания"></div>'
+ 249 |             '<div class="cell"><span>&nbsp;</span>'
+ 250 |             '<button type="submit">Добавить</button></div>'
+ 251 |             "</form>"
+ 252 |         )
+ 253 |     content = (
+ 254 |         page_head(
+ 255 |             "Клиенты",
+ 256 |             f"Карточек: {len(rows)}. Опознание «своих» — по номеру телефона",
+ 257 |             salon, salons,
+ 258 |         )
+ 259 |         + flash_html(flash, flash_error)
+ 260 |         + body
+ 261 |         + add_form
+ 262 |         + "<!--WAITLIST-->"
+ 263 |     )
+ 264 |     return layout("Клиенты", "/clients", content, salon=salon, salons=salons, role=_role(ctx))
+ 265 | 
+ 266 | 
+ 267 | def page_services(
+ 268 |     rows: list[dict[str, Any]],
+ 269 |     salon: dict | None,
+ 270 |     salons: list[dict] | None,
+ 271 |     ctx: Any | None = None,
+ 272 |     flash: str = "",
+ 273 |     flash_error: bool = False,
+ 274 | ) -> str:
+ 275 |     """Прайс плитками: кратко на карточке, правка — окном поверх.
+ 276 | 
+ 277 |     Карточка говорит, что за услуга и сколько стоит; цена, длительность
+ 278 |     и «в прайсе» меняются окном на чистом CSS — как у мастеров и клиентов,
+ 279 |     JS в панели нет. Бот читает эти же данные в диалоге.
+ 280 |     """
+ 281 |     csrf, may_edit = _ctx_parts(ctx, "pricing")
+ 282 |     _, may_add = _ctx_parts(ctx, "catalog")
+ 283 |     sid = esc(salon["id"]) if salon else ""
+ 284 |     back = f"/services?salon={sid}"
+ 285 |     cards = []
+ 286 |     for s in rows:
+ 287 |         sv = esc(s["id"])
+ 288 |         # ── кратко на плитке: название, цена, длительность ───────────────
+ 289 |         off = "" if s["is_active"] else badge("в архиве", "gray")
+ 290 |         buttons, windows = "", ""
+ 291 |         if may_edit:
+ 292 |             buttons = f'<label class="btn" for="sv-{sv}">Правка</label>'
+ 293 |             windows = f'<input type="checkbox" id="sv-{sv}" class="modal-toggle">'
+ 294 |             windows += _service_window(s, sv, csrf, back)
+ 295 |         if may_add:
+ 296 |             buttons += action_form(
+ 297 |                 "service_archive", csrf, back,
+ 298 |                 f'<input type="hidden" name="service_id" value="{sv}">'
+ 299 |                 f'<input type="hidden" name="active" value="{"0" if s["is_active"] else "1"}">',
+ 300 |                 "Вернуть в прайс" if not s["is_active"] else "В архив",
+ 301 |             )
+ 302 |         actions = f'<div class="m-actions">{buttons}</div>' if buttons else ""
+ 303 |         cards.append(
+ 304 |             '<div class="m-card">'
+ 305 |             f'<div class="m-top"><b>{esc(s["title"])}</b>{off}</div>'
+ 306 |             f'<span class="meta">{s["duration_min"]} мин · {money(s["price"])}'
+ 307 |             + (" · в прайсе" if s["is_active"] else "")
+ 308 |             + "</span>"
+ 309 |             f"{actions}{windows}</div>"
+ 310 |         )
+ 311 |     if cards:
+ 312 |         body = '<div class="m-grid">' + "".join(cards) + "</div>"
+ 313 |     else:
+ 314 |         body = '<div class="empty">Прайс не загружен: docker compose run --rm cli python cli.py --seed</div>'
+ 315 |     add_form = ""
+ 316 |     if may_add:
+ 317 |         add_form = (
+ 318 |             '<form method="post" action="/actions" class="stack add-row">'
+ 319 |             '<input type="hidden" name="action" value="service_create">'
+ 320 |             f'<input type="hidden" name="back" value="{back}">'
+ 321 |             f"{csrf_field(csrf)}"
+ 322 |             '<div class="cell wide"><span>Новая услуга</span>'
+ 323 |             '<input type="text" name="title" placeholder="название" required></div>'
+ 324 |             '<div class="cell"><span>Цена, ₽</span>'
+ 325 |             '<input type="number" name="price" min="0" step="50" required></div>'
+ 326 |             '<div class="cell"><span>Длительность, мин</span>'
+ 327 |             '<input type="number" name="duration_min" value="60" min="5" max="600" '
+ 328 |             'step="5" required></div>'
+ 329 |             '<div class="cell save-cell"><span>&nbsp;</span>'
+ 330 |             '<button type="submit">Добавить</button></div>'
+ 331 |             "</form>"
+ 332 |         )

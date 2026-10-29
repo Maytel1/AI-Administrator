@@ -182,7 +182,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    profiles: ["tools"]     # не запускается в общем стеке: только docker compose run --rm cli
+    restart: unless-stopped
     stdin_open: true
     tty: true
 

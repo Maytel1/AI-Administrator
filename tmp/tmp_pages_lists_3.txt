@@ -1,0 +1,301 @@
+ 700 |                 + badge("показать один раз", "yellow") + "</div>"
+ 701 |                 + fields
+ 702 |                 + f'<span class="meta">{esc(item.get("note", ""))}</span>'
+ 703 |                 + "</div>"
+ 704 |             )
+ 705 |         secrets_block = card(
+ 706 |             "Показываем один раз — запишите или передайте сотруднику сейчас",
+ 707 |             f'<div class="m-grid">{"".join(parts)}</div>',
+ 708 |         )
+ 709 | 
+ 710 |     people = ""
+ 711 |     if may_users:
+ 712 |         rows = []
+ 713 |         for u in team or []:
+ 714 |             if not may_edit:
+ 715 |                 rows.append(
+ 716 |                     [esc(u["login"]), esc(u["name"] or "—"), role_label(str(u["role"])),
+ 717 |                      badge("2FA включена", "green") if u["totp_enabled"]
+ 718 |                      else badge("без 2FA", "yellow"),
+ 719 |                      esc(dt_local(u["last_login_at"], ZoneInfo("UTC"), "%d.%m.%Y %H:%M"))]
+ 720 |                 )
+ 721 |                 continue
+ 722 |             hidden = f'<input type="hidden" name="login" value="{esc(u["login"])}">'
+ 723 |             hidden_id = f'<input type="hidden" name="user_id" value="{esc(u["id"])}">'
+ 724 |             buttons = (
+ 725 |                 action_form("user_totp", csrf, back, hidden, "Включить 2FA")
+ 726 |                 + " " + action_form("password_reset", csrf, back, hidden, "Сбросить пароль")
+ 727 |                 + " " + action_form("user_disable", csrf, back, hidden_id, "Отключить")
+ 728 |             )
+ 729 |             rows.append(
+ 730 |                 [esc(u["login"]), esc(u["name"] or "—"), role_label(str(u["role"])),
+ 731 |                  badge("2FA включена", "green") if u["totp_enabled"]
+ 732 |                  else badge("без 2FA", "yellow"),
+ 733 |                  esc(dt_local(u["last_login_at"], ZoneInfo("UTC"), "%d.%m.%Y %H:%M")),
+ 734 |                  buttons]
+ 735 |             )
+ 736 |         options = "".join(
+ 737 |             f'<option value="{esc(r)}">{esc(ROLE_RU[r])}</option>' for r in SELF_ISSUE_ROLES
+ 738 |         )
+ 739 |         add_form = ""
+ 740 |         if may_edit:
+ 741 |             add_form = (
+ 742 |                 f'<label class="btn" for="us-new" style="margin-top:12px">'
+ 743 |                 "Добавить сотрудника</label>"
+ 744 |                 '<input type="checkbox" id="us-new" class="modal-toggle">'
+ 745 |                 '<div class="modal">'
+ 746 |                 '<label class="modal-veil" for="us-new"></label>'
+ 747 |                 '<form method="post" action="/actions" class="modal-card">'
+ 748 |                 '<div class="modal-head"><b>Новый сотрудник</b>'
+ 749 |                 '<label class="modal-x" for="us-new">✕</label></div>'
+ 750 |                 '<div class="modal-body stack">'
+ 751 |                 '<input type="hidden" name="action" value="user_create">'
+ 752 |                 f'<input type="hidden" name="back" value="{back}">'
+ 753 |                 f"{csrf_field(csrf)}"
+ 754 |                 '<label class="field"><span>Логин (e-mail)</span>'
+ 755 |                 '<input type="email" name="login" placeholder="recept@salon.ru" '
+ 756 |                 "required></label>"
+ 757 |                 '<label class="field"><span>Имя</span>'
+ 758 |                 '<input type="text" name="name" placeholder="Как обращаться"></label>'
+ 759 |                 f'<label class="field"><span>Роль</span><select name="role">{options}'
+ 760 |                 "</select></label>"
+ 761 |                 "</div>"
+ 762 |                 '<div class="modal-foot">'
+ 763 |                 '<label class="btn ghost" for="us-new">Отмена</label>'
+ 764 |                 "<button type=\"submit\">Создать</button></div></form></div>"
+ 765 |             )
+ 766 |         people = card(
+ 767 |             "Команда точки",
+ 768 |             table(
+ 769 |                 ["Логин", "Имя", "Роль", "Второй фактор", "Был(а)", "Действия"],
+ 770 |                 rows, "Пока никого",
+ 771 |             ) + add_form,
+ 772 |         )
+ 773 | 
+ 774 |     # Смена своего пароля — раньше «по плану фазы 4», теперь форма здесь:
+ 775 |     # login приходит из сессии, поэтому сменить можно только свою учётку.
+ 776 |     pwd_card = card(
+ 777 |         "Сменить свой пароль",
+ 778 |         '<form method="post" action="/actions">'
+ 779 |         '<input type="hidden" name="action" value="password_change">'
+ 780 |         f'<input type="hidden" name="back" value="{back}">'
+ 781 |         f"{csrf_field(csrf)}"
+ 782 |         '<label class="field"><span>Текущий пароль</span>'
+ 783 |         '<input type="password" name="old_password" '
+ 784 |         'autocomplete="current-password" required></label>'
+ 785 |         '<label class="field"><span>Новый пароль — минимум 8 символов</span>'
+ 786 |         '<input type="password" name="new_password" minlength="8" '
+ 787 |         'autocomplete="new-password" required></label>'
+ 788 |         '<button type="submit">Сменить пароль</button>'
+ 789 |         "</form>",
+ 790 |     )
+ 791 |     content = (
+ 792 |         '<div class="page">'
+ 793 |         '<div class="page-head-inner">'
+ 794 |         + page_head("Настройки", "Параметры точки и доступ в панель", salon, salons)
+ 795 |         + "</div>"
+ 796 |         '<div class="page-body">'
+ 797 |         + secrets_block
+ 798 |         + card("Точка и доступ", table(["Параметр", "Значение"], body))
+ 799 |         + people
+ 800 |         + pwd_card
+ 801 |         + "</div></div>"
+ 802 |     )
+ 803 |     return layout(
+ 804 |         "Настройки", "/settings", content,
+ 805 |         salon=salon, salons=salons, role=_role(ctx), inner_scroll=True,
+ 806 |     )
+ 807 | def _bar_chart(rows: list[dict[str, Any]], tz: ZoneInfo) -> str:
+ 808 |     """Столбики выручки по дням — без JS и внешних библиотек.
+ 809 | 
+ 810 |     Высота считается от максимума периода, поэтому дни сравнимы между собой.
+ 811 |     """
+ 812 |     if not rows:
+ 813 |         return '<div class="empty">За период записей не было</div>'
+ 814 |     peak = max(float(r["revenue"] or 0) for r in rows) or 1.0
+ 815 |     bars = []
+ 816 |     for row in rows:
+ 817 |         height = max(2, int(100 * float(row["revenue"] or 0) / peak))
+ 818 |         day = row["day"]
+ 819 |         label = day.strftime("%d.%m") if isinstance(day, datetime) else str(day)[-5:]
+ 820 |         bars.append(
+ 821 |             f'<div class="bar-col" title="{esc(label)}: {esc(money(row["revenue"]))}">'
+ 822 |             f'<div class="bar-fill" style="height:{height}%"></div>'
+ 823 |             f'<span>{esc(label)}</span></div>'
+ 824 |         )
+ 825 |     return f'<div class="chart">{"".join(bars)}</div>'
+ 826 | 
+ 827 | 
+ 828 | def _trend(diff: dict[str, Any] | None, good_down: bool = False) -> str:
+ 829 |     """Изменение к прошлому периоду под плиткой: «+100.0 % к прошлому».
+ 830 | 
+ 831 |     ``good_down=True`` — для показателей, где спад это хорошо (отмены, долг).
+ 832 |     Без ненулевой базы (было 0) процента нет — пишем «не с чем сравнить»,
+ 833 |     а не «+∞»: деление на ноль это не рост.
+ 834 |     """
+ 835 |     if not isinstance(diff, dict):
+ 836 |         return ""
+ 837 |     percent = diff.get("percent")
+ 838 |     if percent is None:
+ 839 |         return '<i class="trend flat">не с чем сравнить</i>'
+ 840 |     if percent == 0:
+ 841 |         return '<i class="trend flat">0.0 % к прошлому</i>'
+ 842 |     up = percent > 0
+ 843 |     good = up != good_down
+ 844 |     return (
+ 845 |         f'<i class="trend {"up" if good else "down"}">'
+ 846 |         f"{percent:+.1f} % к прошлому</i>"
+ 847 |     )
+ 848 | 
+ 849 | 
+ 850 | def _period_tabs(
+ 851 |     periods: list[tuple[str, str, int | None]], period_key: str, salon: dict | None,
+ 852 | ) -> str:
+ 853 |     """Вкладки выбора периода отчёта: /reports?period=7 | 30 | 90 | month.
+ 854 | 
+ 855 |     Точка в ссылке сохраняется явно: у нашей команды салон переключается,
+ 856 |     и без ``salon=`` вкладка открыла бы прежнюю точку.
+ 857 |     """
+ 858 |     if not periods:
+ 859 |         return ""
+ 860 |     salon_id = str((salon or {}).get("id") or "")
+ 861 |     tabs = "".join(
+ 862 |         f'<a class="tab{" tab-active" if key == period_key else ""}" '
+ 863 |         f'href="/reports?period={esc(key)}'
+ 864 |         f'{"&amp;salon=" + esc(salon_id) if salon_id else ""}">{esc(label)}</a>'
+ 865 |         for key, label, _days in periods
+ 866 |     )
+ 867 |     return f'<div class="tabs">{tabs}</div>'
+ 868 | 
+ 869 | 
+ 870 | def _compare_table(
+ 871 |     diff: dict[str, Any], prev_label: str, prev_days: int | None = None,
+ 872 | ) -> str:
+ 873 |     """Таблица «сейчас / было / изменение» по воронке и потерям.
+ 874 | 
+ 875 |     Колонка «Изменение» — абсолютные цифры (деньги, штуки), а не проценты:
+ 876 |     проценты уже висят под плитками, здесь владелец сверяет величины.
+ 877 |     """
+ 878 |     rows: list[list[str]] = []
+ 879 |     for key, title, is_money in (
+ 880 |         ("revenue", "Выручка", True),
+ 881 |         ("bookings", "Записей", False),
+ 882 |         ("dialogs", "Диалогов", False),
+ 883 |         ("conversion", "Конверсия", False),
+ 884 |         ("avg_check", "Средний чек", True),
+ 885 |         ("lost_rate", "Отмен и неявок", False),
+ 886 |         ("new_clients", "Новых клиентов", False),
+ 887 |     ):
+ 888 |         item = diff.get(key)
+ 889 |         if not isinstance(item, dict):
+ 890 |             continue
+ 891 |         fmt = money if is_money else (lambda v: str(v))
+ 892 |         change = item.get("change")
+ 893 |         if change is None:
+ 894 |             change_text = "—"
+ 895 |         elif is_money:
+ 896 |             change_text = f"{change:+,.0f}".replace(",", " ").replace("-", "−") + " ₽"
+ 897 |         else:
+ 898 |             change_text = f"{change:+g}".replace("-", "−")
+ 899 |         rows.append([
+ 900 |             title,
+ 901 |             fmt(item.get("current") or 0),
+ 902 |             fmt(item.get("previous") or 0),
+ 903 |             change_text,
+ 904 |         ])
+ 905 |     if not rows:
+ 906 |         return '<div class="empty">Сравнение появится вместе с выбором периода</div>'
+ 907 |     prev_col = (
+ 908 |         f"прошлый период ({prev_days} дн.)" if prev_days else f"было ({prev_label})"
+ 909 |     )
+ 910 |     return table(
+ 911 |         ["Показатель", "Сейчас", prev_col, "Изменение"], rows,
+ 912 |     )
+ 913 | 
+ 914 | 
+ 915 | def page_reports(
+ 916 |     data: dict[str, Any],
+ 917 |     salon: dict | None,
+ 918 |     salons: list[dict] | None,
+ 919 |     flash: str = "",
+ 920 |     flash_error: bool = False,
+ 921 |     ctx: Any | None = None,
+ 922 | ) -> str:
+ 923 |     """Отчёт за выбранный период + сравнение с предыдущим таким же."""
+ 924 |     stats = data["funnel"]
+ 925 |     diff = data.get("diff") or {}
+ 926 |     window = data.get("window")
+ 927 |     label = window.label if window else "период"
+ 928 |     prev_window = data.get("previous_window")
+ 929 |     prev_label = prev_window.label if prev_window else "прошлый период"
+ 930 |     tiles = "".join(
+ 931 |         [
+ 932 |             tile(money(stats["revenue"]), f"выручка · {label}", "green",
+ 933 |                  _trend(diff.get("revenue"))),
+ 934 |             tile(str(stats["bookings"]), "записей", "", _trend(diff.get("bookings"))),
+ 935 |             tile(str(stats["dialogs"]), "диалогов с клиентами", "",
+ 936 |                  _trend(diff.get("dialogs"))),
+ 937 |             tile(f'{stats["conversion"]}%', "конверсия диалогов в запись", "accent",
+ 938 |                  _trend(diff.get("conversion"))),
+ 939 |             tile(money(stats["avg_check"]), "средний чек", "",
+ 940 |                  _trend(diff.get("avg_check"))),
+ 941 |             tile(f'{data["loss"]["lost_rate"]}%', "отмен и неявок", "yellow",
+ 942 |                  _trend(diff.get("lost_rate"), good_down=True)),
+ 943 |         ]
+ 944 |     )
+ 945 |     load_cards = [
+ 946 |         '<div class="m-card">'
+ 947 |         f'<div class="m-top"><b>{esc(m["name"])}</b></div>'
+ 948 |         f'<span class="meta">Записей: {m["bookings"]} · '
+ 949 |         f'Занято: {float(m["busy_hours"]):.1f} ч</span>'
+ 950 |         f'<span class="meta">Выручка: {money(m["revenue"])}</span>'
+ 951 |         "</div>"
+ 952 |         for m in data["load"]
+ 953 |     ]
+ 954 |     load_block = (
+ 955 |         f'<div class="m-grid">{"".join(load_cards)}</div>'
+ 956 |         if load_cards else '<div class="empty">Данных пока нет</div>'
+ 957 |     )
+ 958 |     loss_cards = [
+ 959 |         '<div class="m-card"><div class="m-top">'
+ 960 |         f"<b>{esc(str(val))}</b></div>"
+ 961 |         f'<span class="meta">{esc(title)}</span></div>'
+ 962 |         for title, val in (
+ 963 |             ("Всего записей", data["loss"]["total"]),
+ 964 |             ("Отменено клиентом", data["loss"]["cancelled"]),
+ 965 |             ("Не пришёл", data["loss"]["no_show"]),
+ 966 |             ("Новых клиентов", stats["new_clients"]),
+ 967 |             ("Затраты на LLM", money(stats["llm_cost"])),
+ 968 |         )
+ 969 |     ]
+ 970 |     loss_block = f'<div class="m-grid">{"".join(loss_cards)}</div>'
+ 971 |     bot = data.get("bot") or {}
+ 972 |     bot_prev = data.get("bot_previous") or {}
+ 973 |     bot_rows = [
+ 974 |         ["Диалогов", str(bot.get("dialogs", 0)), str(bot_prev.get("dialogs", 0))],
+ 975 |         ["Закончились записью", str(bot.get("dialogs_with_booking", 0)),
+ 976 |          str(bot_prev.get("dialogs_with_booking", 0))],
+ 977 |         ["Конверсия в запись", f'{bot.get("conversion", 0)}%',
+ 978 |          f'{bot_prev.get("conversion", 0)}%'],
+ 979 |         ["Попросили живого человека", str(bot.get("escalations", 0)),
+ 980 |          str(bot_prev.get("escalations", 0))],
+ 981 |         ["Доля уходов к человеку", f'{bot.get("escalation_rate", 0)}%',
+ 982 |          f'{bot_prev.get("escalation_rate", 0)}%'],
+ 983 |         ["Сообщений клиента в среднем", str(bot.get("avg_turns", 0)),
+ 984 |          str(bot_prev.get("avg_turns", 0))],
+ 985 |         ["Записей через бота", str(bot.get("bookings_via_bot", 0)),
+ 986 |          str(bot_prev.get("bookings_via_bot", 0))],
+ 987 |     ]
+ 988 |     content = (
+ 989 |         '<div class="page">'
+ 990 |         '<div class="page-head-inner">'
+ 991 |         + page_head("Отчёты", "", salon, salons)
+ 992 |         + flash_html(flash, flash_error)
+ 993 |         + _period_tabs(data.get("periods") or [], data.get("period_key") or "30", salon)
+ 994 |         + '<div class="row-end">'
+ 995 |         + '<a class="tab" href="/export.csv?kind=daily&amp;period='
+ 996 |         + f'{esc(data.get("period_key") or "30")}">CSV по дням</a> '
+ 997 |         + '<a class="tab" href="/export.csv?kind=masters&amp;period='
+ 998 |         + f'{esc(data.get("period_key") or "30")}">CSV по мастерам</a>'
+ 999 |         + "</div>"
+1000 |         + f'<p class="sub">{esc(label)} · сравнение с {esc(prev_label)}'

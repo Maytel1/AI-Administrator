@@ -18,8 +18,10 @@ from .render import (
     layout,
     money,
     page_head,
+    skeleton,
     table,
     tile,
+    t,
     usage_bar,
 )
 from .render import (
@@ -69,10 +71,23 @@ def waitlist_block(
         f'<option value="{esc(s["id"])}">{esc(s["title"])}</option>'
         for s in services
     )
-    form = (
-        '<form method="post" action="/actions" class="stack" '
-        'style="margin-top:12px">'
-        '<input type="hidden" name="action" value="waitlist_add">'
+    if not queue:
+        body = skeleton("table_row", 3)
+    else:
+        body = table(
+            ["Телефон", "Клиент", "Услуга", "Заметка", "С", "Действие"], rows,
+        )
+    add_btn = (
+        '<label class="btn" for="add-waitlist" style="margin-top:14px">'
+        "В лист ожидания</label>"
+        '<input type="checkbox" id="add-waitlist" class="modal-toggle">'
+        '<div class="modal" role="dialog" aria-modal="true" '
+        'aria-labelledby="modal-add-waitlist-title" tabindex="-1">'
+        '<label class="modal-veil" for="add-waitlist"></label>'
+        '<form method="post" action="/actions" class="modal-card">'
+        '<div class="modal-head"><b id="modal-add-waitlist-title">'
+        "Добавить в лист ожидания</b></div>"
+        f'<input type="hidden" name="action" value="waitlist_add">'
         f'<input type="hidden" name="back" value="{back}">'
         f"{csrf_field(csrf)}"
         '<div class="cell"><span>Телефон</span>'
@@ -84,12 +99,9 @@ def waitlist_block(
         '<div class="cell"><span>&nbsp;</span>'
         '<button type="submit">В лист ожидания</button></div>'
         "</form>"
+        "</div>"
     )
-    body = table(
-        ["Телефон", "Клиент", "Услуга", "Заметка", "С", "Действие"], rows,
-        "Пока никто не ждёт — сюда можно поставить клиента",
-    )
-    return card(f"Лист ожидания ({len(queue)})", body + form)
+    return card(f"Лист ожидания ({len(queue)})", body + add_btn)
 
 
 def page_network(
@@ -817,18 +829,59 @@ def page_settings(
     content = (
         '<div class="page">'
         '<div class="page-head-inner">'
-        + page_head("Настройки", "Параметры точки и доступ в панель", salon, salons)
+        + page_head("Настройки", "Оформление, команда, доступы", salon, salons)
         + "</div>"
         '<div class="page-body">'
+        '<div class="two-cols">'
         + secrets_block
-        + card("Точка и доступ", table(["Параметр", "Значение"], body))
+        + card("Информация", table(["Ключ", "Значение"], body))
         + people
+        + (_theme_block(role, salon) if role == "team" else "")
+        + '</div>'
         + pwd_card
         + "</div></div>"
     )
     return layout(
         "Настройки", "/settings", content,
         salon=salon, salons=salons, role=_role(ctx), inner_scroll=True,
+    )
+
+
+def _theme_block(role: str, salon: dict | None) -> str:
+    """Блок смены оформления (только для роли team)."""
+    VERTICAL_RU = {"beauty": "Красота", "auto": "Авто", "dental": "Стоматология", "cleaning": "Клининг"}
+    THEME_RU = {"dark": "Тёмная", "light": "Светлая"}
+    vertical = str((salon or {}).get("vertical", "beauty"))
+    theme = str((salon or {}).get("theme", "dark"))
+    modules = (salon or {}).get("modules") or {}
+    opts_v = "".join(
+        f'<option value="{v}"{" selected" if v == vertical else ""}>{esc(VERTICAL_RU.get(v, v))}</option>'
+        for v in ("beauty", "auto", "dental", "cleaning")
+    )
+    opts_t = "".join(
+        f'<option value="{t_}"{" selected" if t_ == theme else ""}>{esc(THEME_RU.get(t_, t_))}</option>'
+        for t_ in ("dark", "light")
+    )
+    mods = "".join(
+        f'<label class="check"><input type="checkbox" name="modules" value="{k}"'
+        f'{" checked" if modules.get(k) else ""}>{esc(k)}</label>'
+        for k in ("clients", "services", "masters", "bookings", "dialogs", "reports", "pay", "settings")
+    )
+    return card(
+        "Оформление салона",
+        (
+            f'<form method="post" action="/actions" class="stack">'
+            f'<input type="hidden" name="action" value="theme_change">'
+            f'{csrf_field("")}'
+            '<label class="field"><span>Вертикаль</span>'
+            f'<select name="vertical">{opts_v}</select></label>'
+            '<label class="field"><span>Тема</span>'
+            f'<select name="theme">{opts_t}</select></label>'
+            f'<p class="sub">Модули</p>'
+            f'<div class="checks">{mods}</div>'
+            '<button type="submit" class="btn">Применить пресет</button>'
+            "</form>"
+        ),
     )
 def _bar_chart(rows: list[dict[str, Any]], tz: ZoneInfo) -> str:
     """Столбики выручки по дням — без JS и внешних библиотек.

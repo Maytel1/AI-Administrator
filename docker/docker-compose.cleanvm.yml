@@ -1,0 +1,29 @@
+# Изолированный «чистый VM» прогон прод-compose, не трогая живой стек.
+#
+# Запуск (проект aiclean => свежий том aiclean_pgdata => пустая БД).
+# Порты НЕ задаём тут, а передаём env-переменными (базовый compose их уже
+# параметризует): свободные порты машины dev.
+#
+#   $env:POSTGRES_PORT=5434; $env:WEB_HTTP_PORT=8081; $env:WEB_HEALTH_PORT=3000
+#   docker compose -p aiclean -f docker-compose.yml -f docker-compose.prod.yml \
+#     -f docker-compose.cleanvm.yml up -d postgres web
+#
+# Почему только имена: container_name в базовом compose заданы жёстко и не
+# привязаны к проекту — два стека с одним именем контейнера не сосуществуют,
+# поэтому здесь они уникальны. Порты намеренно оставлены на env: секция ports
+# в override при слиянии СКЛАДЫВАЕТСЯ с базовой, а !reset в этой версии
+# compose обнуляет список вместо замены — проще и надёжнее управлять портами
+# через те самые ${POSTGRES_PORT:-...}/${WEB_HTTP_PORT:-...}.
+
+services:
+  postgres:
+    container_name: aiclean-postgres
+
+  web:
+    container_name: aiclean-web
+
+  worker:
+    container_name: aiclean-worker
+  bot-service:
+    container_name: aiclean-bot
+

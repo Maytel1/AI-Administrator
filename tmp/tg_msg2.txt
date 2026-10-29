@@ -1,0 +1,18 @@
+⚠️ Нет SSH-доступа к серверу 90.151.85.37 — я не могу обновить контейнеры удалённо.
+
+Выполните на сервере (или с машины в сети Tailscale):
+
+cd <папка с docker-compose.yml>
+docker compose pull
+docker compose up -d
+
+Или, если образы собираются локально:
+docker compose build web cli
+docker compose up -d web cli
+
+После этого проверьте:
+https://desktop-1timidk.tailaf5c6c.ts.net/today
+https://desktop-1timidk.tailaf5c6c.ts.net/clients
+https://desktop-1timidk.tailaf5c6c.ts.net/services
+https://desktop-1timidk.tailaf5c6c.ts.net/masters
+https://desktop-1timidk.tailaf5c6c.ts.net/counterparties
