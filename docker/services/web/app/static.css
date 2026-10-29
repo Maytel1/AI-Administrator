@@ -18,7 +18,7 @@
   --lh-tight:1.25; --lh-base:1.5; --lh-loose:1.7;
 }
 html,body{margin:0;padding:0;font-family:var(--font-ui);color-scheme:dark}
-h1,h2,h3{font-family:var(--font-display);font-style:italic}
+h1,h2,h3{font-family:var(--font-display)}
 body{
   background:var(--bg); color:var(--text);
   font-size:18px; line-height:var(--lh-base);
@@ -71,7 +71,7 @@ aside{
   padding:18px 14px; display:flex; flex-direction:column; gap:6px;
   position:sticky; top:0; height:100vh;
 }
-.brand{font-weight:var(--fw-bold);font-size:54px;font-style:italic;padding:4px 10px 14px}
+.brand{font-weight:var(--fw-bold);font-size:48px;padding:4px 10px 14px}
 .brand span{color:var(--accent)}
 aside nav a{
   display:flex; gap:10px; align-items:center; padding:9px 11px;
