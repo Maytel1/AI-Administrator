@@ -11,7 +11,7 @@
   --r-sm:6px; --r-md:10px; --r-lg:14px; --shadow:0 4px 16px rgba(0,0,0,.45);
   /* Типографика */
   --font-ui:"Times New Roman", Times, serif;
-  --font-display:"Plus Jakarta Sans",var(--font-ui);
+  --font-display:"Times New Roman", Times, serif;
   --fs-xs:11px;   --fs-sm:12px;   --fs-base:18px;   --fs-lg:16px;
   --fs-h3:18px;   --fs-h2:22px;   --fs-h1:28px;
   --fw-regular:400; --fw-medium:500; --fw-semibold:600; --fw-bold:700;
