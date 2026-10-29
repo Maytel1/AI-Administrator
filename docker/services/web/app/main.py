@@ -169,6 +169,48 @@ async def _dialogs(
     return page_dialogs(rows, messages, tz, salon, salons, ctx)
 
 
+async def _dialog_messages(panel: Panel, request: Any) -> str:
+    dialog_id = request.match_info.get("id", "")
+    if not dialog_id:
+        return '<div class="empty">Диалог не указан</div>'
+    tz = await queries.salon_tz(panel.pool, "")
+    messages = await queries.dialog_messages(panel.pool, dialog_id)
+    bubbles = []
+    for m in messages:
+        who = {
+            "user": "Клиент",
+            "assistant": "Бот (ИИ)",
+            "system": "Система",
+            "tool": "Инструмент",
+        }.get(m["role"], m["role"])
+        bubbles.append(
+            '<div class="msgs"><b>' + esc(m["role"]) + '</b> '
+            + esc(dt_local(m["created_at"], tz, "%d.%m %H:%M"))
+            + "<br>" + esc(m["content"]) + "</div>"
+        )
+    return "".join(bubbles) or '<div class="empty">Переписки нет</div>'
+
+async def _dialog_messages(panel: Panel, request: Any) -> str:
+    dialog_id = request.match_info.get("id", "")
+    if not dialog_id:
+        return '<div class="empty">Диалог не указан</div>'
+    tz = await queries.salon_tz(panel.pool, "")
+    messages = await queries.dialog_messages(panel.pool, dialog_id)
+    bubbles = []
+    for m in messages:
+        who = {
+            "user": "Клиент",
+            "assistant": "Бот (ИИ)",
+            "system": "Система",
+            "tool": "Инструмент",
+        }.get(m["role"], m["role"])
+        bubbles.append(
+            '<div class="msgs"><b>' + esc(m["role"]) + '</b> '
+            + esc(dt_local(m["created_at"], tz, "%d.%m %H:%M"))
+            + "<br>" + esc(m["content"]) + "</div>"
+        )
+    return "".join(bubbles) or '<div class="empty">Переписки нет</div>'
+
 async def _audit(
     panel: Panel, salon: dict, salons: list[dict], request: Any, ctx: PageCtx | None = None
 ) -> str:
@@ -899,6 +941,7 @@ def build_app(
     app.router.add_get("/accounting.csv", accounting_export)
     for path, builder in sections.items():
         app.router.add_get(path, lambda r, b=builder: page(r, b))
+    app.router.add_get(r"/dialogs/{id}/messages", lambda r, p=panel: _dialog_messages(p, r))
     return app
 async def main() -> None:
     """Старт сервиса: дождаться БД, накатить миграции, поднять панель и health."""

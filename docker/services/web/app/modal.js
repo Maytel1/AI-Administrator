@@ -41,4 +41,28 @@
       }
     }, 50);
   });
+
+  /* Модалка переписки диалога: загружает сообщения через fetch при клике на «Открыть». */
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-dialog-id]');
+    if (!btn) return;
+    e.preventDefault();
+    var dialogId = btn.getAttribute('data-dialog-id');
+    var clientName = btn.getAttribute('data-client-name') || 'Клиент';
+    var toggle = document.getElementById('dialog-modal-toggle');
+    var title = document.getElementById('dialog-modal-title');
+    var body = document.getElementById('dialog-modal-body');
+    if (!toggle || !title || !body) return;
+    title.textContent = 'Переписка — ' + clientName;
+    body.innerHTML = '<div class="empty">Загрузка…</div>';
+    toggle.checked = true;
+    fetch('/dialogs/' + encodeURIComponent(dialogId) + '/messages')
+      .then(function (r) { return r.text(); })
+      .then(function (html) {
+        body.innerHTML = html;
+      })
+      .catch(function () {
+        body.innerHTML = '<div class="empty">Не удалось загрузить переписку</div>';
+      });
+  });
 })();

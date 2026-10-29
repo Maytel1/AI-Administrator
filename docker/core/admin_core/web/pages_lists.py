@@ -626,7 +626,7 @@ def page_dialogs(
             f'реплик: {d["messages"]}</span>'
             f'<span class="meta">Итог: {esc(d["outcome"] or "—")}</span>'
             f'<div class="m-actions">'
-            f'<a class="btn" href="/dialogs?salon={esc(sid)}&id={esc(d["id"])}">Открыть</a>'
+            f'<button class="btn" data-dialog-id="{esc(d["id"])}" data-client-name="{esc(d["client_name"] or d["client_phone"] or "Клиент")}">Открыть</button>'
             "</div></div>"
         )
     if cards:
@@ -652,6 +652,24 @@ def page_dialogs(
                 f"<br>{esc(m['content'])}</div>"
             )
         content += card("Переписка", "".join(bubbles) or '<div class="empty">Сообщений нет</div>')
+    # Модальное окно для просмотра переписки диалога (заполняется через JS)
+    content += (
+        '<input type="checkbox" id="dialog-modal-toggle" class="modal-toggle">'
+        '<div class="modal" role="dialog" aria-modal="true" '
+        'aria-labelledby="dialog-modal-title" tabindex="-1">'
+        '<label class="modal-veil" for="dialog-modal-toggle"></label>'
+        '<div class="modal-card">'
+        '<div class="modal-head">'
+        '<b id="dialog-modal-title">Переписка</b>'
+        '<label class="modal-x" for="dialog-modal-toggle">\u00d7</label>'
+        "</div>"
+        '<div class="modal-body" id="dialog-modal-body">'
+        '<div class="empty">\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0434\u0438\u0430\u043b\u043e\u0433</div>'
+        "</div>"
+        "</div>"
+        "</div>"
+    )
+
     return layout("Диалоги", "/dialogs", content, salon=salon, salons=salons, role=_role(ctx))
 
 
