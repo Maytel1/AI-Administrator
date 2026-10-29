@@ -71,7 +71,7 @@ aside{
   padding:18px 14px; display:flex; flex-direction:column; gap:6px;
   position:sticky; top:0; height:100vh;
 }
-.brand{font-weight:var(--fw-bold);font-size:48px;padding:4px 10px 14px;display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.brand{font-weight:var(--fw-bold);font-size:48px;padding:4px 10px 14px;display:block;word-wrap:break-word}
 .brand span{color:var(--accent)}
 aside nav a{
   display:flex; gap:10px; align-items:center; padding:9px 11px;
