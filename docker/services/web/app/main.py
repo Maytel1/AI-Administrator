@@ -173,7 +173,7 @@ async def _dialog_messages(panel: Panel, request: Any) -> str:
     dialog_id = request.match_info.get("id", "")
     if not dialog_id:
         return '<div class="empty">Диалог не указан</div>'
-    tz = await queries.salon_tz(panel.pool, "")
+    tz = ZoneInfo("Asia/Yekaterinburg")
     messages = await queries.dialog_messages(panel.pool, dialog_id)
     bubbles = []
     for m in messages:
@@ -194,7 +194,7 @@ async def _dialog_messages(panel: Panel, request: Any) -> str:
     dialog_id = request.match_info.get("id", "")
     if not dialog_id:
         return '<div class="empty">Диалог не указан</div>'
-    tz = await queries.salon_tz(panel.pool, "")
+    tz = ZoneInfo("Asia/Yekaterinburg")
     messages = await queries.dialog_messages(panel.pool, dialog_id)
     bubbles = []
     for m in messages:
