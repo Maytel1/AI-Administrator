@@ -922,6 +922,28 @@ def _bar_chart(rows: list[dict[str, Any]], tz: ZoneInfo) -> str:
     return f'<div class="chart">{"".join(bars)}</div>'
 
 
+def _radial_chart(percent: float, label: str) -> str:
+    """Радиальная (donut) диаграмма: показывает долю в процентах."""
+    pct = max(0, min(100, percent))
+    circumference = 2 * 3.14159 * 40
+    offset = circumference * (1 - pct / 100)
+    return (
+        '<div class="radial-card">'
+        f'<div class="radial">'
+        f'<svg width="140" height="140" viewBox="0 0 140 140">'
+        f'<circle cx="70" cy="70" r="40" fill="none" stroke="var(--border)" stroke-width="10"/>'
+        f'<circle cx="70" cy="70" r="40" fill="none" stroke="var(--accent)" stroke-width="10" '
+        f'stroke-dasharray="{circumference}" stroke-dashoffset="{offset}" '
+        f'stroke-linecap="round" transform="rotate(-90 70 70)"/>'
+        f'<text x="70" y="75" text-anchor="middle" font-size="28" font-weight="bold" '
+        f'fill="var(--text)">{pct:.0f}%</text>'
+        f'</svg>'
+        f'<div class="radial-label">{esc(label)}</div>'
+        f'</div>'
+        f'</div>'
+    )
+
+
 def _trend(diff: dict[str, Any] | None, good_down: bool = False) -> str:
     """Изменение к прошлому периоду под плиткой: «+100.0 % к прошлому».
 
@@ -1100,6 +1122,10 @@ def page_reports(
         '<div class="page-body">'
         + f'<div class="tiles">{tiles}</div>'
         + card("Выручка по дням", _bar_chart(data["by_day"], ZoneInfo("UTC")))
+        + card(
+            "Конверсия диалогов",
+            _radial_chart(float(stats.get("conversion", 0)), "диалогов в запись"),
+        )
         + card(
             "Сравнение с прошлым периодом",
             _compare_table(

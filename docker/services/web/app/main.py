@@ -174,43 +174,33 @@ async def _dialog_messages(panel: Panel, request: Any) -> str:
     if not dialog_id:
         return '<div class="empty">Диалог не указан</div>'
     tz = ZoneInfo("Asia/Yekaterinburg")
+    # Аудио-запись разговора (если есть)
+    dialog_row = await panel.pool.fetchrow(
+        "SELECT audio_url FROM dialogs WHERE id = $1", dialog_id
+    )
+    audio_html = ""
+    if dialog_row and dialog_row["audio_url"]:
+        audio_html = (
+            '<div class="cell" style="margin-top:10px">'
+            '<label class="field"><span>Запись разговора</span></label>'
+            f'<audio controls src="{esc(dialog_row["audio_url"])}" style="width:100%"></audio>'
+            "</div>"
+        )
     messages = await queries.dialog_messages(panel.pool, dialog_id)
     bubbles = []
     for m in messages:
         who = {
-            "user": "Клиент",
-            "assistant": "Бот (ИИ)",
-            "system": "Система",
-            "tool": "Инструмент",
+            "user": "\u041aлиент",
+            "assistant": "\u0411от (\u0418И)",
+            "system": "\u0421истема",
+            "tool": "\u0418нструмент",
         }.get(m["role"], m["role"])
         bubbles.append(
             '<div class="msgs"><b>' + esc(m["role"]) + '</b> '
             + esc(dt_local(m["created_at"], tz, "%d.%m %H:%M"))
             + "<br>" + esc(m["content"]) + "</div>"
         )
-    return "".join(bubbles) or '<div class="empty">Переписки нет</div>'
-
-async def _dialog_messages(panel: Panel, request: Any) -> str:
-    dialog_id = request.match_info.get("id", "")
-    if not dialog_id:
-        return '<div class="empty">Диалог не указан</div>'
-    tz = ZoneInfo("Asia/Yekaterinburg")
-    messages = await queries.dialog_messages(panel.pool, dialog_id)
-    bubbles = []
-    for m in messages:
-        who = {
-            "user": "Клиент",
-            "assistant": "Бот (ИИ)",
-            "system": "Система",
-            "tool": "Инструмент",
-        }.get(m["role"], m["role"])
-        bubbles.append(
-            '<div class="msgs"><b>' + esc(m["role"]) + '</b> '
-            + esc(dt_local(m["created_at"], tz, "%d.%m %H:%M"))
-            + "<br>" + esc(m["content"]) + "</div>"
-        )
-    return "".join(bubbles) or '<div class="empty">Переписки нет</div>'
-
+    return audio_html + "".join(bubbles) or '<div class="empty">\u041fереписки \u043dет</div>'
 async def _audit(
     panel: Panel, salon: dict, salons: list[dict], request: Any, ctx: PageCtx | None = None
 ) -> str:

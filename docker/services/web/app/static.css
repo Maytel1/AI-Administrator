@@ -465,7 +465,7 @@ form.stack .check-cell{justify-content:flex-end}
   transition:opacity .18s ease, visibility .18s ease;
   overscroll-behavior:contain;
 }
-.modal-toggle:checked ~ .modal{
+.modal-toggle:checked + .modal{
   opacity:1;visibility:visible;
 }
 /* Штора: клик по фону закрывает окно (label для тумблера). */
@@ -474,7 +474,7 @@ form.stack .check-cell{justify-content:flex-end}
   cursor:pointer;opacity:0;
   transition:opacity .18s ease;
 }
-.modal-toggle:checked ~ .modal .modal-veil{opacity:1}
+.modal-toggle:checked + .modal .modal-veil{opacity:1}
 .modal-card{
   position:relative;z-index:1;
   width:min(460px,calc(100vw - 32px));
@@ -487,7 +487,7 @@ form.stack .check-cell{justify-content:flex-end}
   transition:opacity .18s ease, transform .18s ease;
 }
 .modal-body{padding:14px 16px;max-width:65ch}
-.modal-toggle:checked ~ .modal .modal-card{
+.modal-toggle:checked + .modal .modal-card{
   opacity:1;transform:translateY(0) scale(1);
 }
 .modal-head{
@@ -674,3 +674,14 @@ table.counterparties .row-end{display:flex;gap:8px;align-items:center}
 .tariff-row:has(input[type=radio]:checked){
   border-color:var(--accent);background:var(--accent-bg);
 }
+
+/* Онбординг — плавающий блок в правом верхнем углу дашборда. */
+.onboarding-float{
+  position:absolute;top:18px;right:18px;z-index:55;
+  width:min(320px,90vw);
+}
+
+/* Радиальная диаграмма (donut) для аналитики. */
+.radial-card{display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px}
+.radial-label{font-size:14px;color:var(--subtle);text-align:center}
+.radial svg{width:140px;height:140px}

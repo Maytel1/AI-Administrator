@@ -263,6 +263,15 @@ def page_today(
         f"</div>"
     )
     sid = f"?salon={esc(salon['id'])}" if salon else ""
+    # Карточка техподдержки — номер, с которым можно связаться по любым вопросам.
+    support_card = (
+        '<div class="m-card">'
+        '<div class="m-top"><b>Техподдержка</b></div>'
+        '<span class="meta">Макс · Telegram</span>'
+        '<span class="meta">Телефон: +7 (900) 000-00-00</span>'
+        '<span class="meta">Рабочие часы: 10:00–20:00 Мск</span>'
+        "</div>"
+    )
     cards = [
         '<div class="m-card">'
         f'<div class="m-top"><b>{esc(dt_local(b["starts_at"], tz))}</b>'
@@ -301,7 +310,10 @@ def page_today(
         + flash_html(flash, flash_error)
         # Чек-лист онбординга: только пока владелец не прошёл «первые шаги».
         # Прячем при 100% (onboarding_card вернёт "") — не мозолить глаза потом.
-        + onboarding_card(onboarding, str(salon["id"]) if salon else "")
+        # Расположен в правом верхнем углу (CSS: .onboarding-float).
+        + f'<div class="onboarding-float">{onboarding_card(onboarding, str(salon["id"]) if salon else "")}</div>'
+        # Карточка техподдержки под плитками.
+        + support_card
         + '<div class="panel panel-tight">'
         + '<div class="panel-head"><div class="panel-title"><h2 class="panel-h">'
         + "Расписание на сегодня</h2>"

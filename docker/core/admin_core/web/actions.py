@@ -507,13 +507,13 @@ async def apply_form(
 
     if action == "theme_change":
         vertical = str(form.get("vertical", "")).strip()
-        accent = str(form.get("accent", "")).strip()
+        theme = str(form.get("theme", "")).strip()
         valid_verticals = {"beauty", "auto", "dental", "cleaning"}
         if vertical not in valid_verticals:
             return fail("bad_vertical", "Неизвестное направление бизнеса")
-        if not accent or not accent.startswith("#") or len(accent) != 7:
-            return fail("bad_accent", "Некорректный цвет")
-        theme = {"accent": accent}
+        if theme not in ("dark", "light"):
+            return fail("bad_theme", "Неверная тема оформления")
+        theme_obj = {"theme": theme}
         async with pool.acquire() as conn:
             # Получаем preset для выбранной вертикали
             preset = await conn.fetchrow(
@@ -525,7 +525,7 @@ async def apply_form(
             # Сохраняем вертикаль и тему
             await conn.execute(
                 "UPDATE salons SET vertical = $1, theme = $2::jsonb WHERE id = $3",
-                vertical, json.dumps(theme), salon_id,
+                vertical, json.dumps(theme_obj), salon_id,
             )
             # Применяем preset: модули, термины, тариф по умолчанию
             await conn.execute(

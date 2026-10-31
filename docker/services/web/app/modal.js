@@ -25,7 +25,7 @@
 
     setTimeout(function () {
       if (toggle.checked) {
-        var modal = document.querySelector('.modal-toggle:checked ~ .modal');
+        var modal = document.querySelector('.modal-toggle:checked + .modal');
         if (modal) {
           modal.setAttribute('aria-modal', 'true');
           var focusable = modal.querySelector(
