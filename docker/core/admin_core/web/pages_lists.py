@@ -21,7 +21,6 @@ from .render import (
     skeleton,
     table,
     tile,
-    t,
     usage_bar,
 )
 from .render import (
@@ -278,8 +277,8 @@ def page_clients(
             salon, salons,
         )
         + flash_html(flash, flash_error)
+        + (f'<div class="toolbar">{add_form}</div>' if add_form else "")
         + body
-        + add_form
         + "<!--WAITLIST-->"
     )
     return layout("Клиенты", "/clients", content, salon=salon, salons=salons, role=_role(ctx))
@@ -368,8 +367,8 @@ def page_services(
             salon, salons,
         )
         + flash_html(flash, flash_error)
+        + (f'<div class="toolbar">{add_form}</div>' if add_form else "")
         + body
-        + add_form
     )
     return layout("Прайс", "/services", content, salon=salon, salons=salons, role=_role(ctx))
 
@@ -505,8 +504,8 @@ def page_masters(
             salon, salons,
         )
         + flash_html(flash, flash_error)
+        + (f'<div class="toolbar">{add_form}</div>' if add_form else "")
         + body
-        + add_form
     )
     return layout("Мастера", "/masters", content, salon=salon, salons=salons, role=_role(ctx))
 
