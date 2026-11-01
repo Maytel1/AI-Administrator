@@ -406,7 +406,20 @@ async def _settings(
     if can(session.role, "users"):
         people = await users.list_users(panel.pool, str(salon["id"]))
     once = panel.take_once(request.cookies.get(SESSION_COOKIE, ""))
-    return page_settings(salon, salons, env, who, people, ctx, once)
+    # Тариф и история платежей — рядом на странице настроек
+    salon_row = dict(await panel.pool.fetchrow(
+        "SELECT id, name, plan, paid_until, timezone FROM salons WHERE id = $1",
+        salon["id"],
+    ))
+    from admin_core import billing  # noqa: PLC0415
+    bstatus = await billing.billing_status(panel.pool, salon_row)
+    history = await panel.pool.fetch(
+        "SELECT period_start, period_end, amount, status, paid_at, invoice_no "
+        "FROM payments WHERE salon_id = $1 ORDER BY period_start DESC LIMIT 12",
+        salon["id"],
+    )
+    return page_settings(salon, salons, env, who, people, ctx, once,
+                         status=bstatus, history=history)
 
 
 def build_app(

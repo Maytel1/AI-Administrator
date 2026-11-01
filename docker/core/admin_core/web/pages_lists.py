@@ -716,10 +716,12 @@ def page_settings(
     team: list[dict[str, Any]] | None = None,
     ctx: Any | None = None,
     once: list[dict[str, Any]] | None = None,
+    status: dict[str, Any] | None = None,
+    history: list[dict[str, Any]] | None = None,
 ) -> str:
     """Настройки точки: тариф, CRM, кто вошёл, команда и одноразовые секреты."""
     from .pages_core import _ctx_parts
-    from .queries import PLAN_RU
+    from .queries import PLAN_RU, STATUS_RU
     from .roles import ROLE_RU, SELF_ISSUE_ROLES, permissions_of, role_label
 
     info = salon or {}
@@ -762,6 +764,30 @@ def page_settings(
             "Показываем один раз — запишите или передайте сотруднику сейчас",
             f'<div class="m-grid">{"".join(parts)}</div>',
         )
+
+    # История платежей справа от карточки информации
+    pay_cards = []
+    if history:
+        for row in (history or []):
+            pay_cards.append(
+                '<div class="m-card">'
+                f'<div class="m-top"><b>{float(row["amount"] or 0):.0f} руб.</b>'
+                + badge(
+                    esc(STATUS_RU.get(str(row["status"]), str(row["status"]))),
+                    "green" if str(row["status"]) == "paid" else "yellow",
+                )
+                + "</div>"
+                f'<span class="meta">Период: {esc(str(row["period_start"]))} — '
+                f'{esc(str(row["period_end"]))}</span>'
+                f'<span class="meta">Оплачен: '
+                f'{esc(str(row["paid_at"])[:10]) if row.get("paid_at") else "—"}</span>'
+                "</div>"
+            )
+    pay_block = (
+        f'<div class="m-grid">{"".join(pay_cards)}</div>'
+        if pay_cards else '<div class="empty">Платежей пока не было</div>'
+    )
+    billing_card = card("История платежей", pay_block)
 
     people = ""
     if may_users:
@@ -853,6 +879,7 @@ def page_settings(
         '<div class="two-cols">'
         + secrets_block
         + card("Информация", table(["Ключ", "Значение"], body))
+        + billing_card
         + people
         + (_theme_block(role, salon) if role == "team" else "")
         + '</div>'
