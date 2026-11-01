@@ -944,7 +944,11 @@ def build_app(
     app.router.add_get("/accounting.csv", accounting_export)
     for path, builder in sections.items():
         app.router.add_get(path, lambda r, b=builder: page(r, b))
-    app.router.add_get(r"/dialogs/{id}/messages", lambda r, p=panel: _dialog_messages(p, r))
+    async def _dialog_messages_handler(r: Any) -> Any:
+        html = await _dialog_messages(panel, r)
+        return web.Response(text=html, content_type="text/html")
+
+    app.router.add_get(r"/dialogs/{id}/messages", _dialog_messages_handler)
     return app
 async def main() -> None:
     """Старт сервиса: дождаться БД, накатить миграции, поднять панель и health."""
