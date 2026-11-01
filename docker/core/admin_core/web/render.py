@@ -9,8 +9,12 @@ from __future__ import annotations
 
 from datetime import datetime
 from html import escape
+from os import path
 from typing import Any, Iterable
 from zoneinfo import ZoneInfo
+
+# Версия CSS для кэш-бустинга браузера (mtime файла).
+_CSS_VERSION = str(int(path.getmtime(path.join(path.dirname(__file__), "..", "..", "..", "services", "web", "app", "static.css"))))
 
 # SVG-иконки навигации сайдбара (16×16, stroke=currentColor наследует цвет текста).
 # Каждая собрана из коротких строк, чтобы не превышать линию длины линтера.
@@ -456,7 +460,7 @@ def layout(
         '<link rel="preconnect" href="https://fonts.googleapis.com">'
         '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
         '<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">'
-        '<link rel="stylesheet" href="/static.css">'
+        '<link rel="stylesheet" href="/static.css?v={_CSS_VERSION}">'
         f"{theme_style}"
         '</head><body>'
         '<a href="#main" class="skip-link">Перейти к основному содержимому</a>'
@@ -541,7 +545,7 @@ def login_page(
         '<meta name="color-scheme" content="dark">'
         '<style>.skip-link{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}</style>'
         "<title>Вход — Дежурный24</title>"
-        '<link rel="stylesheet" href="/static.css"></head><body>'
+        '<link rel="stylesheet" href="/static.css?v={_CSS_VERSION}"></head><body>'
         '<a href="#main" class="skip-link">Перейти к основному содержимому</a>'
         '<div class="login" id="main"><form method="post" action="/login">'
         '<div class="brand" style="padding:0 0 6px">Дежурный<span>24</span></div>'
