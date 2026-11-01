@@ -446,7 +446,10 @@ form.stack .check-cell{justify-content:flex-end}
   display:flex; flex-direction:column;
   background:var(--surface); border:1px solid var(--border);
   border-radius:var(--r-lg); padding:16px 18px;
+  overflow:hidden;
 }
+.m-card table{table-layout:fixed;width:100%}
+.m-card td, .m-card th{overflow-wrap:break-word;word-wrap:break-word}
 .m-top{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap}
 .m-top b{font-size:18px}
 .m-card .meta{display:block;color:var(--muted);font-size:18px;margin-top:3px}
