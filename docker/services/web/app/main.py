@@ -950,6 +950,39 @@ def build_app(
         return web.Response(text=html, content_type="text/html")
 
     app.router.add_get(r"/dialogs/{id}/messages", _dialog_messages_handler)
+
+    async def _api_client_dialogs(request: Any) -> Any:
+        """Список диалогов конкретного клиента (JSON). Для модалки на /clients."""
+        session_token = request.cookies.get(SESSION_COOKIE, "")
+        if not await panel.authorized(session_token):
+            return web.json_response({"error": "unauthorized"}, status=401)
+        session = await panel.session_of(session_token)
+        salon, _salons = await panel.salon_for_session(request, session)
+        if salon is None:
+            return web.json_response({"error": "no_salon"}, status=400)
+        client_id = request.query.get("client", "").strip()
+        if not client_id:
+            return web.json_response({"error": "client required"}, status=400)
+        rows = await queries.dialogs_list(
+            panel.pool, str(salon["id"]), client_id=client_id
+        )
+        return web.json_response(
+            [
+                {
+                    "id": str(r["id"]),
+                    "client_name": r.get("client_name") or "",
+                    "client_phone": r.get("client_phone") or "",
+                    "started_at": str(r["started_at"]),
+                    "channel": r.get("channel") or "",
+                    "outcome": r.get("outcome") or "",
+                    "messages": int(r.get("messages") or 0),
+                }
+                for r in rows
+            ]
+        )
+
+    app.router.add_get("/api/client_dialogs", _api_client_dialogs)
+
     return app
 async def main() -> None:
     """Старт сервиса: дождаться БД, накатить миграции, поднять панель и health."""

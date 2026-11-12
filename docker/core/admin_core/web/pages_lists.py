@@ -176,8 +176,10 @@ def _client_window(
         if phone_digits else ""
     )
     dialogs_link = (
-        f' <a href="/dialogs?client={esc(c.get("id"))}" class="btn ghost">'
-        "История общения</a>"
+        f' <button class="btn ghost" data-client-id="{esc(c.get("id"))}" '
+        f'data-client-name="{esc(c.get("name") or "Клиент")}" '
+        f'data-salon-id="{esc(salon["id"]) if salon else ""}">'
+        "История общения</button>"
         if c.get("id") else ""
     )
     stats = (
@@ -292,6 +294,22 @@ def page_clients(
         + (f'<div class="toolbar">{add_form}</div>' if add_form else "")
         + body
         + "<!--WAITLIST-->"
+        # ── модалка истории общения клиента (заполняется через JS) ──
+        + (
+            '<input type="checkbox" id="client-dialog-modal-toggle" class="modal-toggle">'
+            '<div class="modal" role="dialog" aria-modal="true" '
+            'aria-labelledby="client-dialog-modal-title" tabindex="-1">'
+            '<label class="modal-veil" for="client-dialog-modal-toggle"></label>'
+            '<div class="modal-card">'
+            '<div class="modal-head">'
+            '<b id="client-dialog-modal-title">История общения</b>'
+            '<label class="modal-x" for="client-dialog-modal-toggle">✕</label></div>'
+            '<div class="modal-body" id="client-dialog-modal-body">'
+            '<div class="empty">Загрузка…</div>'
+            "</div>"
+            "</div>"
+            "</div>"
+        )
     )
     return layout("Клиенты", "/clients", content, salon=salon, salons=salons, role=_role(ctx))
 
