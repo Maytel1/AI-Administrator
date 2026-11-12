@@ -14,7 +14,8 @@ from typing import Any, Iterable
 from zoneinfo import ZoneInfo
 
 # Версия CSS для кэш-бустинга браузера (mtime файла).
-_CSS_VERSION = str(int(path.getmtime(path.join(path.dirname(__file__), "..", "..", "..", "services", "web", "app", "static.css"))))
+# В контейнере файл лежит по пути /app/app/static.css.
+_CSS_VERSION = str(int(path.getmtime("/app/app/static.css")))
 
 # SVG-иконки навигации сайдбара (16×16, stroke=currentColor наследует цвет текста).
 # Каждая собрана из коротких строк, чтобы не превышать линию длины линтера.
