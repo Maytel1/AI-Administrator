@@ -168,8 +168,15 @@ def _client_window(
     JS в панели нет. Кнопка — label на тумблере, штора и «✕» закрывают.
     """
     prepay = " checked" if c.get("requires_prepayment") else ""
+    phone_raw = c.get("phone") or ""
+    phone_digits = "".join(ch for ch in phone_raw if ch.isdigit())
+    wa_link = (
+        f' <a href="https://wa.me/{phone_digits}" class="btn ghost" '
+        'target="_blank" rel="noopener">Написать</a>'
+        if phone_digits else ""
+    )
     stats = (
-        f'<span class="meta">Телефон: {esc(c.get("phone") or "")}</span>'
+        f'<span class="meta">Телефон: {esc(phone_raw)}{wa_link}</span>'
         f'<span class="meta">Визитов: {int(c.get("completed_visits") or 0)} · '
         f'в очереди: {int(c.get("upcoming") or 0)} · был(а): '
         f'{esc(dt_local(c.get("last_visit"), tz, "%d.%m.%Y"))}</span>'
@@ -230,6 +237,13 @@ def page_clients(
         buttons, windows = "", ""
         if may_edit:
             buttons = f'<label class="btn" for="ck-{cid}">Карточка</label>'
+            phone_raw = c.get("phone") or ""
+            phone_digits = "".join(ch for ch in phone_raw if ch.isdigit())
+            if phone_digits:
+                buttons += (
+                    f' <a href="https://wa.me/{phone_digits}" class="btn ghost" '
+                    'target="_blank" rel="noopener">Написать</a>'
+                )
             windows = f'<input type="checkbox" id="ck-{cid}" class="modal-toggle">'
             windows += _client_window(c, cid, csrf, back, tz)
         actions = f'<div class="m-actions">{buttons}</div>' if buttons else ""
