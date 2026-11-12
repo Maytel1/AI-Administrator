@@ -175,8 +175,13 @@ def _client_window(
         'target="_blank" rel="noopener">Написать</a>'
         if phone_digits else ""
     )
+    dialogs_link = (
+        f' <a href="/dialogs?client={esc(c.get("id"))}" class="btn ghost">'
+        "История общения</a>"
+        if c.get("id") else ""
+    )
     stats = (
-        f'<span class="meta">Телефон: {esc(phone_raw)}{wa_link}</span>'
+        f'<span class="meta">Телефон: {esc(phone_raw)}{wa_link}{dialogs_link}</span>'
         f'<span class="meta">Визитов: {int(c.get("completed_visits") or 0)} · '
         f'в очереди: {int(c.get("upcoming") or 0)} · был(а): '
         f'{esc(dt_local(c.get("last_visit"), tz, "%d.%m.%Y"))}</span>'
@@ -237,13 +242,6 @@ def page_clients(
         buttons, windows = "", ""
         if may_edit:
             buttons = f'<label class="btn" for="ck-{cid}">Карточка</label>'
-            phone_raw = c.get("phone") or ""
-            phone_digits = "".join(ch for ch in phone_raw if ch.isdigit())
-            if phone_digits:
-                buttons += (
-                    f' <a href="https://wa.me/{phone_digits}" class="btn ghost" '
-                    'target="_blank" rel="noopener">Написать</a>'
-                )
             windows = f'<input type="checkbox" id="ck-{cid}" class="modal-toggle">'
             windows += _client_window(c, cid, csrf, back, tz)
         actions = f'<div class="m-actions">{buttons}</div>' if buttons else ""
@@ -623,11 +621,17 @@ def page_dialogs(
     salon: dict | None,
     salons: list[dict] | None,
     ctx: Any | None = None,
+    client_id: str | None = None,
 ) -> str:
     """Диалоги бота — видно, как бот отвечает клиенту (контроль качества ответов)."""
     from .queries import CHANNEL_RU
 
     sid = salon["id"] if salon else ""
+    client_header = ""
+    if client_id:
+        client_row = next((d for d in rows if d.get("client_id") == client_id), None)
+        cname = esc(client_row["client_name"] or client_row["client_phone"] or "Клиент") if client_row else "Клиент"
+        client_header = f'<div class="sub">Диалоги клиента: {cname}</div>'
     cards = []
     for d in rows:
         cards.append(
@@ -652,6 +656,7 @@ def page_dialogs(
             "Что бот отвечает клиентам — источник для контроля качества",
             salon, salons,
         )
+        + client_header
         + card("Лента диалогов", feed)
     )
     if messages is not None:

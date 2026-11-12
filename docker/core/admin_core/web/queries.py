@@ -153,18 +153,34 @@ async def masters_list(pool: Any, salon_id: str) -> list[dict[str, Any]]:
     return [dict(r) for r in rows]
 
 
-async def dialogs_list(pool: Any, salon_id: str, limit: int = 50) -> list[dict[str, Any]]:
-    """Последние диалоги бота: наш главный актив — видно, чему он научился отвечать."""
-    rows = await pool.fetch(
-        """
-        SELECT d.id, d.channel, d.started_at, d.outcome, d.llm_model, d.llm_cost,
-               c.name AS client_name, c.phone AS client_phone,
-               (SELECT count(*) FROM dialog_messages m WHERE m.dialog_id = d.id) AS messages
-        FROM dialogs d LEFT JOIN clients c ON c.id = d.client_id
-        WHERE d.salon_id = $1 ORDER BY d.started_at DESC LIMIT $2
-        """,
-        salon_id, limit,
-    )
+async def dialogs_list(pool: Any, salon_id: str, limit: int = 50, client_id: str | None = None) -> list[dict[str, Any]]:
+    """Последние диалоги бота: наш главный актив — видно, чему он научился отвечать.
+
+    Если передан ``client_id`` — только диалоги этого клиента.
+    """
+    if client_id:
+        rows = await pool.fetch(
+            """
+            SELECT d.id, d.channel, d.started_at, d.outcome, d.llm_model, d.llm_cost,
+                   c.name AS client_name, c.phone AS client_phone, d.client_id,
+                   (SELECT count(*) FROM dialog_messages m WHERE m.dialog_id = d.id) AS messages
+            FROM dialogs d LEFT JOIN clients c ON c.id = d.client_id
+            WHERE d.salon_id = $1 AND d.client_id = $2
+            ORDER BY d.started_at DESC LIMIT $3
+            """,
+            salon_id, client_id, limit,
+        )
+    else:
+        rows = await pool.fetch(
+            """
+            SELECT d.id, d.channel, d.started_at, d.outcome, d.llm_model, d.llm_cost,
+                   c.name AS client_name, c.phone AS client_phone, d.client_id,
+                   (SELECT count(*) FROM dialog_messages m WHERE m.dialog_id = d.id) AS messages
+            FROM dialogs d LEFT JOIN clients c ON c.id = d.client_id
+            WHERE d.salon_id = $1 ORDER BY d.started_at DESC LIMIT $2
+            """,
+            salon_id, limit,
+        )
     return [dict(r) for r in rows]
 
 

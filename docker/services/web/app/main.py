@@ -161,12 +161,13 @@ async def _dialogs(
 ) -> str:
     "ента диалогов; ``?id=<dialog_id>`` — раскрыть переписку."""
     tz = await queries.salon_tz(panel.pool, str(salon["id"]))
-    rows = await queries.dialogs_list(panel.pool, str(salon["id"]))
+    client_id = request.query.get("client", "") or None
+    rows = await queries.dialogs_list(panel.pool, str(salon["id"]), client_id=client_id)
     messages = None
     dialog_id = request.query.get("id", "")
     if dialog_id:
         messages = await queries.dialog_messages(panel.pool, dialog_id)
-    return page_dialogs(rows, messages, tz, salon, salons, ctx)
+    return page_dialogs(rows, messages, tz, salon, salons, ctx, client_id=client_id)
 
 
 async def _dialog_messages(panel: Panel, request: Any) -> str:
