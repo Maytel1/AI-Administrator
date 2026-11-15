@@ -161,6 +161,7 @@ def _client_window(
     csrf: str,
     back: str,
     tz: ZoneInfo,
+    salon: dict | None = None,
 ) -> str:
     """Окно карточки клиента: визиты — строками, правка — формой под ними.
 
@@ -245,7 +246,7 @@ def page_clients(
         if may_edit:
             buttons = f'<label class="btn" for="ck-{cid}">Карточка</label>'
             windows = f'<input type="checkbox" id="ck-{cid}" class="modal-toggle">'
-            windows += _client_window(c, cid, csrf, back, tz)
+            windows += _client_window(c, cid, csrf, back, tz, salon)
         actions = f'<div class="m-actions">{buttons}</div>' if buttons else ""
         cards.append(
             '<div class="m-card">'
