@@ -908,7 +908,8 @@ def page_settings(
         "</form>",
     )
     content = (
-        '<div class="page">'
+        '<div class="page">"
+        '<style>td{overflow-wrap:anywhere !important;word-wrap:anywhere !important;word-break:break-all !important}.two-cols td:first-child{width:26ch !important}.two-cols td:last-child{max-width:calc(100% - 26ch) !important}</style>'
         '<div class="page-head-inner">'
         + page_head("Настройки", "Оформление, команда, доступы", salon, salons)
         + "</div>"
