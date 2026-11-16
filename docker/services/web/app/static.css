@@ -92,6 +92,7 @@ main{padding:22px 26px;min-width:0}
 /* Обёртка контента: без неё блоки страницы становились детьми flex-строки .top
    и вставали рядом друг с другом вместо того, чтобы идти сверху вниз. */
 .top>.content{flex:1;min-width:0}
+main.inner .top > .content{overflow-y:auto;min-height:0;max-height:calc(100vh - 140px)}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:12px;margin-bottom:20px}
 .tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:14px 16px}
 .tile b{display:block;font-size:18px;font-weight:650;letter-spacing:-.4px;font-family:var(--font-display)}
@@ -110,7 +111,7 @@ th{
   text-align:left; color:var(--subtle); font-weight:500; font-size:18px;
   padding:7px 10px; border-bottom:1px solid var(--border);
 }
-td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.05);overflow-wrap:break-word;word-wrap:break-word;word-break:break-word}
+td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.05);overflow-wrap:anywhere;word-wrap:anywhere;word-break:break-all}
 tr:last-child td{border-bottom:none}
 tr:hover td{background:var(--surface-2)}
 .badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:18px;border:1px solid transparent}
