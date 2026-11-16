@@ -107,6 +107,7 @@ main.inner .top > .content{overflow-y:auto;min-height:0;max-height:calc(100vh - 
   text-transform:uppercase; letter-spacing:.6px;
 }
 table{width:100%;border-collapse:collapse;font-size:18px}
+.two-cols table{table-layout:fixed}
 th{
   text-align:left; color:var(--subtle); font-weight:500; font-size:18px;
   padding:7px 10px; border-bottom:1px solid var(--border);
