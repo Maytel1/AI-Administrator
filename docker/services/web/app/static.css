@@ -1,18 +1,20 @@
-/* Панель «Дежурный24» — тёмная база #0c0d11, карточки #16171d, радиусы 6/10/14. Акцент фирменный терракотовый #c2410c. */
+/* Панель «Дежурный24» — тёмная база #0c0d11, карточки #16171d, радиусы 6/10/14.
+   Акцент фирменный терракотовый #c2410c. Шрифт — Plus Jakarta Sans (подключён
+   в render.py), до его загрузки и в офлайне — системный sans-serif. */
 *,*::before,*::after{box-sizing:border-box}
 :root{
   --bg:#0c0d11; --surface:#16171d; --surface-2:#1c1e26; --hover:#23252f;
   --border:rgba(255,255,255,.09); --border-strong:rgba(255,255,255,.18);
-  --text:#f2f3f5; --muted:#a0a1a4; --subtle:#707174;
+  --text:#f2f3f5; --muted:#a0a1a4; --subtle:#8a8b8f;
   --accent:#c2410c; --accent-hover:#9a3412; --accent-bg:rgba(194,65,12,.16);
   --green:#34c77b; --green-bg:rgba(52,199,123,.14);
   --yellow:#e5b53e; --yellow-bg:rgba(229,181,62,.14);
   --red:#e5534b; --red-bg:rgba(229,83,75,.14);
   --r-sm:6px; --r-md:10px; --r-lg:14px; --shadow:0 4px 16px rgba(0,0,0,.45);
-  /* Типографика */
-  --font-ui:"Times New Roman", Times, serif;
-  --font-display:"Times New Roman", Times, serif;
-  --fs-xs:11px;   --fs-sm:12px;   --fs-base:18px;   --fs-lg:16px;
+  /* Типографика: шкала монотонна, каждый размер в правилах берётся из неё. */
+  --font-ui:"Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
+  --font-display:"Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
+  --fs-xs:11px;   --fs-sm:12px;   --fs-md:14px;   --fs-base:18px;   --fs-lg:20px;
   --fs-h3:18px;   --fs-h2:22px;   --fs-h1:28px;
   --fw-regular:400; --fw-medium:500; --fw-semibold:600; --fw-bold:700;
   --lh-tight:1.25; --lh-base:1.5; --lh-loose:1.7;
@@ -21,14 +23,14 @@ html,body{margin:0;padding:0;font-family:var(--font-ui);color-scheme:dark}
 h1,h2,h3{font-family:var(--font-display)}
 body{
   background:var(--bg); color:var(--text);
-  font-size:18px; line-height:var(--lh-base);
+  font-size:var(--fs-base); line-height:var(--lh-base);
   font-weight:var(--fw-regular);
 }
 a{color:inherit;text-decoration:none}
 
 /* Типографическая иерархия */
 h1{
-  font-size:18px;
+  font-size:var(--fs-h1);
   font-weight:var(--fw-bold);
   line-height:var(--lh-tight);
   margin:0 0 8px;
@@ -36,7 +38,7 @@ h1{
   text-wrap:balance;
 }
 h2{
-  font-size:18px;
+  font-size:var(--fs-h2);
   font-weight:var(--fw-semibold);
   line-height:var(--lh-tight);
   margin:0 0 12px;
@@ -44,7 +46,7 @@ h2{
   text-wrap:balance;
 }
 h3{
-  font-size:18px;
+  font-size:var(--fs-h3);
   font-weight:var(--fw-semibold);
   line-height:var(--lh-tight);
   margin:0 0 8px;
@@ -95,16 +97,16 @@ main{padding:22px 26px;min-width:0}
 main.inner .top > .content{overflow-y:auto;min-height:0;max-height:calc(100vh - 140px)}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:12px;margin-bottom:20px}
 .tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:14px 16px}
-.tile b{display:block;font-size:18px;font-weight:650;letter-spacing:-.4px;font-family:var(--font-display)}
-.tile span{color:var(--text);font-size:18px}
+.tile b{display:block;font-size:var(--fs-lg);font-weight:700;letter-spacing:-.4px;font-family:var(--font-display)}
+.tile span{color:var(--muted);font-size:var(--fs-md)}
 .card{
   background:var(--surface); border:1px solid var(--border);
   border-radius:var(--r-lg); padding:16px 18px; margin-bottom:16px;
   max-width:72ch;
 }
 .card h2{
-  font-size:18px; margin:0 0 12px; color:var(--text); font-weight:600;
-  text-transform:uppercase; letter-spacing:.6px;
+  font-size:var(--fs-h2); margin:0 0 12px; color:var(--text); font-weight:600;
+  text-transform:uppercase; letter-spacing:.3px;
 }
 table{width:100%;border-collapse:collapse;font-size:18px}
 .two-cols table{table-layout:fixed}
@@ -409,11 +411,13 @@ form.stack .check-cell{justify-content:flex-end}
    ширину — иначе «4 000 ₽» растягивается на пол-экрана и цифры теряются. */
 .dash-top{display:flex;gap:16px;align-items:flex-start;margin-bottom:14px}
 .dash-side{flex:0 0 216px;min-width:0}
-.dash-side h1{margin-bottom:10px;font-size:18px}
+.dash-side h1{margin-bottom:10px}
 .dash-side .load-line{
   flex-direction:column; align-items:flex-start; gap:4px; margin:0 0 10px;
 }
-.dash-side .load-line .bar{width:100%;min-width:0}
+/* Внутри column-флекса flex-basis работает по вертикали: без фиксации
+   высоты бар «1 1 160px» растягивался на 160px вниз — пустой овал. */
+.dash-side .load-line .bar{width:100%;min-width:0;flex:0 0 5px}
 .salon-switch{flex:0 0 auto}
 .dash-side .salon-switch{width:100%}
 .tiles-row{flex:1 1 auto;min-width:0}
@@ -430,9 +434,9 @@ form.stack .check-cell{justify-content:flex-end}
   display:flex; flex-direction:column; align-items:center;
   text-align:center; padding:16px 12px 14px; gap:4px; min-width:0;
 }
-.tiles-row .tile b{font-size:18px;line-height:1.1;margin:0;font-family:var(--font-display)}
+.tiles-row .tile b{font-size:var(--fs-lg);line-height:1.1;margin:0;font-family:var(--font-display)}
 .tiles-row .tile span{
-  font-size:18px;line-height:1.35;margin:0;color:var(--muted);
+  font-size:var(--fs-md);line-height:1.35;margin:0;color:var(--muted);
   max-width:15ch;
 }
 @media (max-width:1100px){
@@ -484,6 +488,37 @@ form.stack .check-cell{justify-content:flex-end}
 .m-actions{display:flex;gap:8px;margin-top:auto;padding-top:12px;flex-wrap:wrap;align-items:center}
 .m-actions .btn{cursor:pointer;margin:0}
 .m-actions form.inline{align-self:center}
+/* Лента диалогов: одна карточка на всю ширину, каждый диалог — строка
+   (имя · канал · время · итог · «Открыть»). Строки вместо высоких карточек:
+   лента помещается в один столбец до правого края страницы. */
+.wide .card{max-width:none}
+.dlg-count{color:var(--subtle);font-size:var(--fs-sm);margin:0 0 6px}
+.dlg-row{
+  display:flex;align-items:center;gap:12px;
+  padding:11px 8px;border-bottom:1px solid var(--border);
+  border-radius:var(--r-sm);
+}
+.dlg-row:last-child{border-bottom:none}
+.dlg-row:hover{background:var(--surface-2)}
+.dlg-name{
+  flex:0 1 200px;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.dlg-meta{color:var(--muted);white-space:nowrap}
+.dlg-outcome{
+  flex:1 1 auto;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  color:var(--muted);
+}
+.dlg-row .btn{flex:none;margin-left:auto}
+@media (max-width:760px){
+  .dlg-row{flex-wrap:wrap;row-gap:6px}
+  .dlg-name{flex:1 1 auto}
+  /* Строка 1: имя · канал · «Открыть»; строка 2: время · итог. */
+  .dlg-row .btn{order:4}
+  .dlg-meta{order:5}
+  .dlg-outcome{flex:1 1 auto;order:6;min-width:0}
+}
 /* Тумблер невидим, но остаётся в потоке рядом со своим окном. */
 .modal-toggle{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 .modal{

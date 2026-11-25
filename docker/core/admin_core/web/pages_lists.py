@@ -650,23 +650,28 @@ def page_dialogs(
         client_row = next((d for d in rows if d.get("client_id") == client_id), None)
         cname = esc(client_row["client_name"] or client_row["client_phone"] or "Клиент") if client_row else "Клиент"
         client_header = f'<div class="sub">Диалоги клиента: {cname}</div>'
-    cards = []
+    # Лента — плотные строки на всю ширину карточки: имя · канал · время ·
+    # итог · «Открыть» в один ряд. modal.js ловит кнопку по data-dialog-id,
+    # поэтому класс кнопки не важен.
+    items = []
     for d in rows:
-        cards.append(
-            '<div class="m-card">'
-            f'<div class="m-top"><b>{esc(d["client_name"] or d["client_phone"] or "аноним")}</b>'
+        items.append(
+            '<div class="dlg-row">'
+            f'<b class="dlg-name">{esc(d["client_name"] or d["client_phone"] or "аноним")}</b>'
             + badge(esc(CHANNEL_RU.get(d["channel"], d["channel"] or "—")), "accent")
-            + "</div>"
-            f'<span class="meta">{esc(dt_local(d["started_at"], tz, "%d.%m %H:%M"))} · '
+            + f'<span class="dlg-meta">{esc(dt_local(d["started_at"], tz, "%d.%m %H:%M"))} · '
             f'реплик: {d["messages"]}</span>'
-            f'<span class="meta">Итог: {esc(d["outcome"] or "—")}</span>'
-            f'<div class="m-actions">'
-            f'<button class="btn" data-dialog-id="{esc(d["id"])}"'
+            f'<span class="dlg-outcome">Итог: {esc(d["outcome"] or "—")}</span>'
+            f'<button class="btn ghost" type="button" data-dialog-id="{esc(d["id"])}"'
             f' data-client-name="{esc(d["client_name"] or d["client_phone"] or "Клиент")}">Открыть</button>'
-            "</div></div>"
+            "</div>"
         )
-    if cards:
-        feed = f'<div class="m-grid">{"".join(cards)}</div>'
+    if items:
+        feed = (
+            f'<div class="dlg-count">Диалогов: {len(items)} · нажмите «Открыть», '
+            "чтобы прочитать переписку</div>"
+            '<div class="dlg-list">' + "".join(items) + "</div>"
+        )
     else:
         feed = '<div class="empty">Диалогов пока нет — бот ещё не общался с клиентами.</div>'
     content = (
@@ -676,7 +681,8 @@ def page_dialogs(
             salon, salons,
         )
         + client_header
-        + card("Лента диалогов", feed)
+        # wide: ленте из строк нужна вся ширина ряда, без лимита 72ch
+        + '<div class="wide">' + card("Лента диалогов", feed) + "</div>"
     )
     if messages is not None:
         bubbles = []
