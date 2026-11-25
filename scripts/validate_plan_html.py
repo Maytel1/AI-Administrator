@@ -4,7 +4,7 @@
 чек-пунктов с Markdown-источником, отсутствие остаточной разметки и наличие
 ключевых данных v2.0 (YandexGPT, Yandex Cloud, экономика, первые клиенты).
 
-Запуск: python validate_plan_html.py (exit 0 = OK)
+Запуск: python scripts/validate_plan_html.py (из корня репозитория, exit 0 = OK)
 """
 import pathlib
 import re
@@ -13,7 +13,7 @@ from html.parser import HTMLParser
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-ROOT = pathlib.Path(__file__).resolve().parent
+ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 class V(HTMLParser):
     VOID = {'meta', 'link', 'br', 'input', 'img', 'hr', 'source', 'wbr'}

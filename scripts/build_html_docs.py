@@ -8,7 +8,7 @@ OPEN_QUESTIONS, GAP_ANALYSIS, TEXT_BOT, VOICE_BOT).
 документов (DEVELOPMENT_PLAN.html / COMPETITORS_TYUMEN.html) и прогоняет
 валидацию: баланс тегов, якоря оглавления, число таблиц, остатки разметки.
 
-Запуск:  python build_html_docs.py
+Запуск:  python scripts/build_html_docs.py  (из корня репозитория)
 Выход:   *.html рядом с *.md для каждого файла из DOCS (перезаписывает).
 """
 
@@ -20,7 +20,7 @@ from html.parser import HTMLParser
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-ROOT = pathlib.Path(__file__).resolve().parent
+ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 # md -> (kicker, заголовок H1, lead, цвет точки статуса, текст статуса)
 DOCS = {

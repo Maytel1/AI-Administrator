@@ -167,7 +167,7 @@ jobs:
           python-version: "3.12"
       - name: build 13 документов + validate
         run: |
-          python build_html_docs.py
-          python validate_plan_html.py
+          python scripts/build_html_docs.py
+          python scripts/validate_plan_html.py
       - name: сгенерированный HTML совпадает с репозиторием
         run: git diff --exit-code -- "*.html"

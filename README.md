@@ -55,8 +55,8 @@ python -m http.server 8090 --directory landing
 ## Перегенерация
 
 ```bash
-python build_html_docs.py     # 14 документов md -> html + валидация разметки
-python validate_plan_html.py  # паритет DEVELOPMENT_PLAN.html ↔ DEVELOPMENT_PLAN.md
+python scripts/build_html_docs.py     # 14 документов md -> html + валидация разметки
+python scripts/validate_plan_html.py  # паритет DEVELOPMENT_PLAN.html ↔ DEVELOPMENT_PLAN.md
 ```
 
 Markdown — источник истины (`DEVELOPMENT_PLAN.html` генерируется из MD: раздел,

@@ -6,9 +6,11 @@
 а `build_html_docs.py` подставлял сегодняшнюю дату. Один скрипт убирает
 этот разрыв: что он проверяет, то же проверяет и GitHub Actions.
 
-    python verify.py            # линтеры + документы + тесты
-    python verify.py --fast     # без тестов: только линтеры и документы
-    python verify.py --ci       # плюс статус последнего прогона GitHub Actions
+    python scripts/verify.py            # линтеры + документы + тесты
+    python scripts/verify.py --fast     # без тестов: только линтеры и документы
+    python scripts/verify.py --ci       # плюс статус последнего прогона GitHub Actions
+
+Запускается из корня репозитория: пути в шагах заданы относительно него.
 
 Каждая проверка печатает «OK»/«СБОЙ» и, если упала, — последние строки вывода:
 больше двух экранов лога не помогает, мешает найти причину.
@@ -26,7 +28,8 @@ import sys
 import time
 from dataclasses import dataclass
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+# Скрипт лежит в scripts/, а проверяет репозиторий — его корень уровнем выше.
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCKER_DIR = os.path.join(ROOT, "docker")
 
 RESET = "\033[0m"
@@ -143,10 +146,13 @@ def steps_for(fast: bool) -> list[Step]:
         ),
         Step(
             "документы: сборка HTML",
-            [sys.executable, "build_html_docs.py"],
-            hint="После правки .md запустите build_html_docs.py и закоммитьте HTML вместе с ним.",
+            [sys.executable, os.path.join("scripts", "build_html_docs.py")],
+            hint="После правки .md запустите scripts/build_html_docs.py и закоммитьте HTML вместе с ним.",
         ),
-        Step("документы: валидация", [sys.executable, "validate_plan_html.py"]),
+        Step(
+            "документы: валидация",
+            [sys.executable, os.path.join("scripts", "validate_plan_html.py")],
+        ),
         Step(
             "документы: HTML совпадает с репозиторием",
             ["git", "diff", "--exit-code", "--", "*.html"],
