@@ -108,6 +108,18 @@ main.inner .top > .content{overflow-y:auto;min-height:0;max-height:calc(100vh - 
 }
 table{width:100%;border-collapse:collapse;font-size:18px}
 .two-cols table{table-layout:fixed}
+/* Команда точки: шесть колонок не равные — auto делит по содержимому,
+   а не на шестые доли карточки (иначе кнопочная колонка голодает).
+   Карточка занимает весь ряд (.span-2): таблице из шести колонок место
+   только в полную ширину. break-word вместо everywhere сохраняет
+   min-content по словам — колонки на узком экране не схлопываются
+   до одного знака. */
+.team-wrap table{table-layout:auto}
+.team-wrap td,.team-wrap th{overflow-wrap:break-word}
+/* Широкая карточка занимает весь ряд и без лимита 72ch — иначе
+   «Команда точки» снова упирается в 646px и колонки голодают. */
+.two-cols .span-2{grid-column:1/-1}
+.two-cols .span-2 .card{max-width:none}
 th{
   text-align:left; color:var(--subtle); font-weight:500; font-size:18px;
   padding:7px 10px; border-bottom:1px solid var(--border);
@@ -189,6 +201,7 @@ button,.btn{
   background:var(--accent); color:#fff; border:none; border-radius:var(--r-sm);
   padding:9px 16px; font:inherit; font-weight:550; cursor:pointer; display:inline-block;
   touch-action:manipulation;
+  white-space:nowrap;
 }
 button:hover,.btn:hover{background:var(--accent-hover)}
 button:focus-visible,.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -540,6 +553,10 @@ form.stack .check-cell{justify-content:flex-end}
 }
 .modal-body .field>span{font-size:18px;color:var(--subtle)}
 .modal-body .field input,.modal-body .field select{width:100%}
+/* Модалка «Настроить сотрудника»: действия учётки — во всю ширину окна,
+   каждое своим блоком (обычные form.inline в ячейках таблицы не трогаем). */
+.modal-body form.inline{display:block}
+.modal-body form.inline button{width:100%}
 @media (max-width:680px){
   .m-grid{grid-template-columns:1fr}
   .modal-card{margin-top:3vh}

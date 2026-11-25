@@ -261,20 +261,30 @@ def test_page_audit_renders_json_details():
 
 
 def test_page_settings_shows_plan_and_roadmap():
+    """Служебная карточка «Информация» — только роли team (разработка)."""
+    team_data = [{"id": "u1", "login": "boss@test.ru", "name": "Иван", "role": "owner",
+                  "totp_enabled": True, "last_login_at": None}]
     html = page_settings(
         SALON, [SALON], {"LLM_PROVIDER": "yandexgpt"},
-        session={"login": "boss@test.ru", "role": "owner"},
-        team=[{"id": "u1", "login": "boss@test.ru", "name": "Иван", "role": "owner",
-               "totp_enabled": True, "last_login_at": None}],
-        ctx=PageCtx(csrf="f" * 32, role="owner"),
+        session={"login": "dev@dezhurny24.ru", "role": "team"},
+        team=team_data,
+        ctx=PageCtx(csrf="f" * 32, role="team"),
     )
     assert "Пробный" in html
     assert "yandexgpt" in html
-    assert "Владелец точки" in html  # кто вошёл и его роль
+    assert "Наша команда" in html  # кто вошёл и его роль
     assert "цены и услуги" in html  # права роли показаны
     assert "Команда точки" in html  # список команды
     assert "2FA включена" in html
     assert "MVP 0.3" in html
+    owner_html = page_settings(
+        SALON, [SALON], {"LLM_PROVIDER": "yandexgpt"},
+        session={"login": "boss@test.ru", "role": "owner"},
+        team=team_data,
+        ctx=PageCtx(csrf="f" * 32, role="owner"),
+    )
+    assert "MVP 0.3" not in owner_html  # служебная карточка владельцу не показывается
+    assert "Команда точки" in owner_html  # а состав команды — показывается
 
 
 def test_tile_escapes_value():
@@ -675,7 +685,11 @@ async def test_disable_second_owner_works(demo, pool):
 
 
 def test_settings_page_shows_team_management():
-    """Владелец видит форму создания и кнопки 2FA/отключения, администратор — нет."""
+    """Владелец ведёт команду через окно «Настроить», администратор — нет.
+
+    Действия по учётке (2FA, сброс пароля, отключение) живут в CSS-модалке,
+    а не кнопками в строке: колонка «Действия» остаётся узкой, таблице
+    не нужна горизонтальная прокрутка."""
     team = [{"id": "u1", "login": "staff@test.ru", "name": "Пётр", "role": "staff",
              "totp_enabled": False, "last_login_at": None}]
     owner_html = page_settings(
@@ -687,6 +701,21 @@ def test_settings_page_shows_team_management():
     assert 'value="user_disable"' in owner_html
     assert 'value="password_reset"' in owner_html    # сброс чужого пароля
     assert 'value="password_change"' in owner_html   # смена своего пароля
+    # Модалка «Настроить сотрудника»: тумблер с уникальным id на строку,
+    # внутри — все три действия; в самой строке кнопок больше нет.
+    assert "Настроить сотрудника" in owner_html
+    assert '<label class="btn ghost" for="us-0">Настроить</label>' in owner_html
+    assert 'id="us-0" class="modal-toggle"' in owner_html
+    assert owner_html.count('class="modal-toggle"') == 2  # окно строки + «Новый сотрудник»
+    assert 'scroll-x' not in owner_html.split("Команда точки")[1].split("</table>")[0]
+    # Служебная карточка «Информация» (сессия, права, LLM, версия) — только
+    # для роли team: владельцу и сотрудникам она ни к чему.
+    assert "Кто вошёл" not in owner_html
+    team_html = page_settings(
+        SALON, [SALON], {}, session={"login": "dev@dezhurny24.ru", "role": "team"},
+        team=team, ctx=OWNER_CTX,
+    )
+    assert "Кто вошёл" in team_html  # разработчики служебное видят
     staff_html = page_settings(
         SALON, [SALON], {}, session={"login": "p@test.ru", "role": "staff"},
         team=team, ctx=STAFF_CTX,
@@ -695,6 +724,8 @@ def test_settings_page_shows_team_management():
     assert 'value="password_reset"' not in staff_html  # и чужие пароли не сбрасывает
     assert 'value="password_change"' in staff_html  # но свой пароль меняет
     assert "Пётр" in staff_html  # но состав команды видит
+    assert "Настроить сотрудника" not in staff_html  # и окно действий ему недоступно
+    assert "Кто вошёл" not in staff_html  # служебная карточка тоже не для него
 
 
 def test_settings_page_shows_one_time_secret_once():

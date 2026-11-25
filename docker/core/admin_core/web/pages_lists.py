@@ -779,6 +779,12 @@ def page_settings(
         ["LLM", esc(env.get("LLM_PROVIDER", "—"))],
         ["Версия панели", "MVP 0.3 (HTTPS, роли, 2FA, команда)"],
     ]
+    # Карточка «Информация» — служебная: сессия, права, таймзона, LLM,
+    # версия сборки. Владельцу и сотрудникам точки она ни к чему —
+    # показываем только роли team (наша команда), как историю платежей.
+    info_card = (
+        card("Информация", table(["Ключ", "Значение"], body)) if role == "team" else ""
+    )
 
     secrets_block = ""
     if once:
@@ -831,7 +837,7 @@ def page_settings(
     people = ""
     if may_users:
         rows = []
-        for u in team or []:
+        for idx, u in enumerate(team or []):
             if not may_edit:
                 rows.append(
                     [esc(u["login"]), esc(u["name"] or "—"), role_label(str(u["role"])),
@@ -842,17 +848,40 @@ def page_settings(
                 continue
             hidden = f'<input type="hidden" name="login" value="{esc(u["login"])}">'
             hidden_id = f'<input type="hidden" name="user_id" value="{esc(u["id"])}">'
-            buttons = (
-                action_form("user_totp", csrf, back, hidden, "Включить 2FA")
-                + " " + action_form("password_reset", csrf, back, hidden, "Сбросить пароль")
-                + " " + action_form("user_disable", csrf, back, hidden_id, "Отключить")
+            # Действия по учётке переехали из колонки кнопок в модалку:
+            # колонка остаётся узкой, таблице не нужна горизонтальная
+            # прокрутка. id модалки уникален на странице — по номеру строки.
+            m = f"us-{idx}"
+            totp_label = (
+                "Выдать новый секрет 2FA" if u["totp_enabled"] else "Включить 2FA"
+            )
+            cell = (
+                f'<label class="btn ghost" for="{m}">Настроить</label>'
+                f'<input type="checkbox" id="{m}" class="modal-toggle">'
+                '<div class="modal">'
+                f'<label class="modal-veil" for="{m}"></label>'
+                '<div class="modal-card">'
+                '<div class="modal-head"><b>Настроить сотрудника</b>'
+                f'<label class="modal-x" for="{m}">✕</label></div>'
+                '<div class="modal-body stack">'
+                f'<span class="meta">{esc(u["login"])} · {role_label(str(u["role"]))} · '
+                + (badge("2FA включена", "green") if u["totp_enabled"]
+                   else badge("без 2FA", "yellow"))
+                + "</span>"
+                + action_form("user_totp", csrf, back, hidden, totp_label)
+                + action_form("password_reset", csrf, back, hidden, "Сбросить пароль")
+                + action_form("user_disable", csrf, back, hidden_id, "Отключить доступ")
+                + "</div>"
+                '<div class="modal-foot">'
+                f'<label class="btn ghost" for="{m}">Готово</label>'
+                "</div></div></div>"
             )
             rows.append(
                 [esc(u["login"]), esc(u["name"] or "—"), role_label(str(u["role"])),
                  badge("2FA включена", "green") if u["totp_enabled"]
                  else badge("без 2FA", "yellow"),
                  esc(dt_local(u["last_login_at"], ZoneInfo("UTC"), "%d.%m.%Y %H:%M")),
-                 buttons]
+                 cell]
             )
         options = "".join(
             f'<option value="{esc(r)}">{esc(ROLE_RU[r])}</option>' for r in SELF_ISSUE_ROLES
@@ -884,17 +913,22 @@ def page_settings(
                 '<label class="btn ghost" for="us-new">Отмена</label>'
                 "<button type=\"submit\">Создать</button></div></form></div>"
             )
-        people = card(
-            "Команда точки",
-            # scroll-x: шесть колонок с кнопками не помещаются в карточку —
-            # таблица прокручивается внутри карточки, а не вылезает за неё.
-            '<div class="scroll-x">'
-            + table(
-                ["Логин", "Имя", "Роль", "Второй фактор", "Был(а)", "Действия"],
-                rows, "Пока никого",
+        people = (
+            # span-2: шесть колонок — широкая таблица, карточке нужна вся
+            # ширина ряда. team-wrap снимает table-layout:fixed из .two-cols:
+            # колонки распределяются по содержимому, а не на шестые доли.
+            '<div class="span-2">'
+            + card(
+                "Команда точки",
+                '<div class="team-wrap">'
+                + table(
+                    ["Логин", "Имя", "Роль", "Второй фактор", "Был(а)", "Действия"],
+                    rows, "Пока никого",
+                )
+                + "</div>"
+                + add_form,
             )
             + "</div>"
-            + add_form,
         )
 
     # Смена своего пароля — раньше «по плану фазы 4», теперь форма здесь:
@@ -922,7 +956,7 @@ def page_settings(
         '<div class="page-body">'
         '<div class="two-cols">'
         + secrets_block
-        + card("Информация", table(["Ключ", "Значение"], body))
+        + info_card
         + billing_card
         + people
         + (_theme_block(role, salon) if role == "team" else "")
