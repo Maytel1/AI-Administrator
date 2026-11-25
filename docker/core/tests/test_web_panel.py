@@ -77,8 +77,8 @@ def test_dt_local_converts_utc_to_salon_time():
 
 
 def test_table_empty_shows_hint():
-    assert "Пока пусто" in table(["Колонка"], [])
-    assert "Пока пусто" not in table(["Колонка"], [["ячейка"]])
+    assert "skeleton-table-row" in table(["Колонка"], [])
+    assert "skeleton-table-row" not in table(["Колонка"], [["ячейка"]])
 
 
 def test_layout_marks_active_section():
@@ -113,7 +113,7 @@ def test_page_today_shows_kpi_and_schedule():
 
 def test_page_today_empty_schedule_has_hint():
     html = page_today({**STATS, "total": 0, "revenue": 0}, [], TZ, SALON, [SALON])
-    assert "На сегодня записей нет" in html
+    assert "skeleton-table-row" in html
 
 
 def test_page_bookings_filters_and_escape():
@@ -227,9 +227,10 @@ def test_clients_page_shows_cards_and_window():
     assert 'modal-veil" for="ck-c1"' in html
     assert 'modal-x" for="ck-c1"' in html
 
-    # Без права правки — карточка краткая, окна и кнопки нет.
+    # Без права правки — карточка краткая, окна правки нет. Модалка «История
+    # общения» — общий элемент страницы, поэтому ищем именно окно карточки.
     ro = page_clients(rows, TZ, SALON, [SALON], PageCtx(csrf="", role="guest"))
-    assert "client_save" not in ro and "modal-toggle" not in ro
+    assert "client_save" not in ro and 'id="ck-c1"' not in ro
     assert "+79001234567 · визитов: 3" in ro  # просмотр не заблокирован
 
     # Пустая вкладка — не ошибка: подсказка вместо пустой сетки.
@@ -840,8 +841,9 @@ def test_today_schedule_uses_action_menu():
     html = page_today(dict(STATS), [row], TZ, SALON, [SALON], OWNER_CTX)
     assert 'class="m-card"' in html
     assert "menu-pop" in html and "booking_reschedule" in html
-    # Одна карточка → одно меню и одна форма переноса внутри него.
-    assert html.count('class="m-card"') == 1
+    # Карточки: запись + техподдержка (общая карточка «Сегодня»). Меню одно на
+    # карточку записи, форма переноса — внутри него.
+    assert html.count('class="m-card"') == 2
     assert html.count('name="new_start"') == html.count("menu-pop")
 
 
@@ -861,10 +863,10 @@ def test_reports_and_settings_scroll_inside():
         },
         SALON, [SALON], ctx=OWNER_CTX,
     )
-    assert '<main class="inner">' in reports
+    assert 'id="main" class="inner"' in reports
     assert 'class="page-head"' in reports and 'class="page-body"' in reports
     settings = page_settings(SALON, [SALON], {"LLM_PROVIDER": "stub"})
-    assert '<main class="inner">' in settings
+    assert 'id="main" class="inner"' in settings
     assert 'class="page-body"' in settings
 
 
@@ -1213,13 +1215,17 @@ def test_login_page_requires_two_consents():
     assert 'name="remember"' in html  # «Запомнить меня» — на той же форме
 
 
-def test_login_page_agreed_hides_checkboxes_behind_hidden_fields():
-    """После POST (шаг 2FA) согласия пробрасываются скрытыми полями, без галочек."""
+def test_login_page_agreed_prechecks_consent_checkboxes():
+    """После POST (шаг 2FA) согласия рендерятся уже отмеченными галочками.
+
+    Кнопку «Войти» разблокирует CSS :has(...:checked), поэтому скрытые поля не
+    подходят: галочки должны быть в форме и стоять — следующий POST проходит
+    серверную проверку без повторных кликов."""
     html = login_page(need_totp=True, login="boss@test.ru", agreed=True, remember=True)
-    assert 'name="agree_oferta"' in html and 'name="agree_pdn"' in html
-    assert 'type="hidden" name="agree_oferta"' in html
-    assert 'type="checkbox"' not in html  # повторные клики не требуются
-    assert 'type="hidden" name="remember"' in html  # remember тоже пробрасывается
+    assert 'name="agree_oferta" ' in html and 'name="agree_pdn" ' in html
+    assert 'name="agree_oferta" checked' in html
+    assert 'name="agree_pdn" checked' in html
+    assert 'id="remember" value="1" checked' in html  # remember пробрасывается тоже
 
     # Без remember скрытого поля нет — не отмеченную галочку пробрасывать нечего.
     plain = login_page(need_totp=True, login="boss@test.ru", agreed=True)

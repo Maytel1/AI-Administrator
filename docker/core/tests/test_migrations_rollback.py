@@ -48,20 +48,21 @@ async def test_rollback_migrations_reverts_and_reapplies(pool) -> None:
         try:
             scoped = _TxPool(conn)
             rolled = await rollback_migrations(scoped, steps=1)
-            assert rolled == ["011_counterparties.sql"]
-            # откат 011 удалил таблицу counterparties, 010 не трогал.
+            # Последняя миграция — 013; откатывается именно она.
+            assert rolled == ["013_vertical_presets.sql"]
+            # откат 013 удалил таблицу пресетов, остальные не тронуты.
+            assert await conn.fetchval(
+                "SELECT to_regclass('public.vertical_presets') IS NOT NULL"
+            ) is False, "таблица vertical_presets должна быть удалена"
             assert await conn.fetchval(
                 "SELECT to_regclass('public.counterparties') IS NOT NULL"
-            ) is False, "таблица counterparties должна быть удалена"
-            assert await conn.fetchval(
-                "SELECT to_regclass('public.client_legal') IS NOT NULL"
             ) is True, "остальные миграции не трогаются"
 
             reapplied = await run_migrations(scoped)
-            assert "011_counterparties.sql" in reapplied
+            assert "013_vertical_presets.sql" in reapplied
             assert await conn.fetchval(
-                "SELECT to_regclass('public.counterparties') IS NOT NULL"
-            ) is True, "таблица counterparties должна быть восстановлена"
+                "SELECT to_regclass('public.vertical_presets') IS NOT NULL"
+            ) is True, "таблица vertical_presets должна быть восстановлена"
         finally:
             # Не коммитим: схема и данные должны вернуться как до теста.
             await tx.rollback()
@@ -88,8 +89,9 @@ async def test_rollback_keeps_baseline_intact(pool) -> None:
             scoped = _TxPool(conn)
             rolled = await rollback_migrations(scoped, steps=99)
             assert rolled == [
-                "011_counterparties.sql", "010_payments_acquiring.sql", "009_legal.sql", "008_billing.sql",
-                "007_inbound.sql", "006_ops.sql", "005_panel_users.sql",
+                "013_vertical_presets.sql", "012_tenant_theme.sql",
+                "011_counterparties.sql", "010_payments_acquiring.sql", "009_legal.sql",
+                "008_billing.sql", "007_inbound.sql", "006_ops.sql", "005_panel_users.sql",
             ]
             assert await conn.fetchval(
                 "SELECT to_regclass('public.salons') IS NOT NULL"

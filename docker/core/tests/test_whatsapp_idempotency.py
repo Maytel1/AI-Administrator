@@ -5,6 +5,8 @@
 вторую бронь.
 """
 
+import uuid
+
 import pytest
 from admin_core.channels.inbound import claim, link, seen
 from admin_core.channels.whatsapp_payload import extract, is_duplicate
@@ -71,26 +73,33 @@ def test_duplicate_detection() -> None:
 
 
 async def test_claim_message_is_idempotent(pool) -> None:
-    """Второй webhook с тем же wamid не проходит: ни ответа, ни второй брони."""
-    assert await claim(pool, "whatsapp", "wamid.X", "первое") is True
-    assert await claim(pool, "whatsapp", "wamid.X", "первое") is False
-    assert await seen(pool, "whatsapp", "wamid.X") is True
+    """Второй webhook с тем же wamid не проходит: ни ответа, ни второй брони.
+
+    Идентификатор уникален на прогон: на долго живущей базе (пилотный стенд)
+    фиксированный wamid от прошлых запусков тестов уже занят — тест ловил бы
+    не свою регрессию, а старые строки."""
+    wamid = f"wamid.test-{uuid.uuid4().hex[:10]}"
+    assert await claim(pool, "whatsapp", wamid, "первое") is True
+    assert await claim(pool, "whatsapp", wamid, "первое") is False
+    assert await seen(pool, "whatsapp", wamid) is True
 
 
 async def test_claim_is_per_channel(pool) -> None:
     """Один и тот же id из разных каналов — разные сообщения."""
-    assert await claim(pool, "whatsapp", "same") is True
-    assert await claim(pool, "vk", "same") is True
+    external_id = f"same-{uuid.uuid4().hex[:10]}"
+    assert await claim(pool, "whatsapp", external_id) is True
+    assert await claim(pool, "vk", external_id) is True
 
 
 async def test_claim_stores_preview_and_salon(demo, pool) -> None:
     """Превью обрезается: полный текст живёт в диалоге и имеет свой срок."""
     salon_id = str(demo["salon"]["id"])
-    assert await claim(pool, "whatsapp", "wamid.P", "x" * 500) is True
-    await link(pool, "whatsapp", "wamid.P", salon_id)
+    wamid = f"wamid.P-{uuid.uuid4().hex[:10]}"
+    assert await claim(pool, "whatsapp", wamid, "x" * 500) is True
+    await link(pool, "whatsapp", wamid, salon_id)
     row = await pool.fetchrow(
         "SELECT preview, salon_id FROM inbound_messages WHERE external_id = $1",
-        "wamid.P",
+        wamid,
     )
     assert len(row["preview"]) == 120
     assert str(row["salon_id"]) == salon_id

@@ -1,8 +1,9 @@
+-- Без BEGIN/COMMIT: транзакцию ставит run_migrations (см. db.py),
+-- а вложенная обёртка в файле завершала бы чужую транзакцию.
 -- AI-администратор: пресеты вертикалей (дефолтные услуги, роли, тарифы, модули, термины, тема).
 -- Применяются при смене ``vertical`` в ``theme_change`` (actions.py).
 -- Миграция идемпотентна.
 
-BEGIN;
 
 CREATE TABLE IF NOT EXISTS vertical_presets (
     id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -100,5 +101,3 @@ VALUES (
     '{"staff": "менеджер", "staff_plural": "менеджеры", "client": "заказчик", "service": "услуга", "appointment": "заявка", "booking": "заявка"}'::jsonb,
     '{"accent": "#7c3aed"}'::jsonb
 ) ON CONFLICT (vertical) DO NOTHING;
-
-COMMIT;

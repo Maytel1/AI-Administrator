@@ -179,16 +179,16 @@ async def test_billing_page_opens_for_team(demo, pool):
         await http.close()
 
 
-async def test_pay_page_opens_for_owner(client):
-    """/pay — страница салона: владелец видит статус и реквизиты для оплаты."""
+async def test_pay_page_is_hidden_from_owner(client):
+    """Оплата тарифа оформляется вручную: владелец получает отказ, не реквизиты."""
     http, _panel, _token, _demo = client
     response = await http.get("/pay")
     assert response.status == 200
     body = await response.text()
     assert LOGIN_MARK not in body
-    assert "Недостаточно прав" not in body
-    assert "Оплата" in body
-    assert 'name="client_type"' not in body, "карточка плательщика убрана с /pay"
+    assert "Недостаточно прав" in body
+    assert "БИК" not in body, "реквизиты не должны утекать владельцу"
+    assert 'name="client_type"' not in body
 
 
 async def test_pay_page_is_hidden_from_staff(client, demo, pool):
@@ -237,6 +237,43 @@ async def test_pay_page_opens_for_team(demo, pool):
         assert LOGIN_MARK not in body
         assert "Недостаточно прав" not in body
         assert "Оплата" in body
+    finally:
+        await http.close()
+
+
+async def test_onboard_page_is_hidden_from_owner(client):
+    """Подключение точек — зона команды: владелец получает отказ, а не форму."""
+    http, _panel, _token, _demo = client
+    response = await http.get("/onboard")
+    assert response.status == 200
+    body = await response.text()
+    assert LOGIN_MARK not in body
+    assert "Недостаточно прав" in body
+    assert 'name="salon_name"' not in body, "форму онбординга владелец не видит"
+
+
+async def test_onboard_page_opens_for_team(demo, pool):
+    """У команды /onboard открывается: форма создания точки с CSRF-полем."""
+    from admin_core.web.session import Panel  # noqa: PLC0415
+    from aiohttp.test_utils import TestClient, TestServer  # noqa: PLC0415
+    from app.main import build_app  # noqa: PLC0415
+
+    panel = Panel(pool, metrics=None)
+    app = build_app(panel)
+    http = TestClient(TestServer(app))
+    await http.start_server()
+    token = await panel.open_session(
+        role="team", login="admin@test.ru", salon_id=None
+    )
+    http.session.cookie_jar.update_cookies({"dz24_session": token})
+    try:
+        response = await http.get("/onboard")
+        assert response.status == 200
+        body = await response.text()
+        assert LOGIN_MARK not in body
+        assert "Недостаточно прав" not in body
+        assert "Онбординг точки" in body
+        assert 'value="onboard_save"' in body
     finally:
         await http.close()
 

@@ -1,5 +1,3 @@
-BEGIN;
-
 ALTER TABLE salons
     DROP COLUMN IF EXISTS vertical;
 
@@ -11,5 +9,3 @@ ALTER TABLE salons
 
 ALTER TABLE salons
     DROP COLUMN IF EXISTS terms;
-
-COMMIT;

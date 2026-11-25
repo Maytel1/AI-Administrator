@@ -1,3 +1,5 @@
+-- Без BEGIN/COMMIT: транзакцию ставит run_migrations (см. db.py),
+-- а вложенная обёртка в файле завершала бы чужую транзакцию.
 -- AI-администратор: разделение по вертикалям (гибрид Варианта 5).
 -- Добавляет в salons колонки для мульти-направленности:
 --   vertical      — направление бизнеса (beauty | auto | dental | cleaning | ...)
@@ -6,7 +8,6 @@
 --   terms         — словарь терминов (мастер/клиент/услуга и т.д.)
 -- Миграция идемпотентна.
 
-BEGIN;
 
 ALTER TABLE salons
     ADD COLUMN IF NOT EXISTS vertical text NOT NULL DEFAULT 'beauty';
@@ -19,5 +20,3 @@ ALTER TABLE salons
 
 ALTER TABLE salons
     ADD COLUMN IF NOT EXISTS terms jsonb NOT NULL DEFAULT '{"staff": "мастер", "staff_plural": "мастера", "client": "клиент", "service": "услуга", "appointment": "запись", "booking": "запись"}'::jsonb;
-
-COMMIT;

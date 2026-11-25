@@ -86,7 +86,7 @@ def test_waitlist_block_renders_form_even_when_empty():
     """Пустая очередь — не повод прятать возможность добавить клиента."""
     html = waitlist_block([], [{"id": "s1", "title": "Стрижка"}], _Ctx("owner"), SALON)
     assert "Лист ожидания (0)" in html
-    assert "Никто не ждёт" in html or "никто не ждёт" in html
+    assert "skeleton-table-row" in html
     assert "waitlist_add" in html
     assert "+79001234567" in html
     assert "Стрижка" in html

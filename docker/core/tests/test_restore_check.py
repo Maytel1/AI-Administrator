@@ -14,7 +14,7 @@ _HERE = Path(__file__).resolve().parent
 # Локально тест лежит в docker/core/tests => скрипт в docker/scripts.
 # В контейнере (cli) тест лежит в /app/tests => скрипт в /app/scripts.
 _CANDIDATES = [
-    _HERE.parent.parent.parent / "scripts" / "restore_check.py",
+    _HERE.parent.parent / "scripts" / "restore_check.py",
     _HERE.parent / "scripts" / "restore_check.py",
 ]
 _SCRIPT = next(p for p in _CANDIDATES if p.exists())
