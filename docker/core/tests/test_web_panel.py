@@ -3,6 +3,7 @@
 Рендер проверяется без БД и без HTTP; запросы — на фикстуре ``demo``.
 """
 
+import uuid
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
@@ -1214,6 +1215,14 @@ async def test_salon_for_session_isolates_tenant(demo, pool):
 async def test_team_session_sees_all_salons(demo, pool):
     from admin_core.web.session import Panel, Session
 
+    # Тест самодостаточен: вторую точку создаём сами. Раньше ассерт «> 1»
+    # опирался на салоны живой базы — на чистой CI-базе салон один, и тест
+    # падал (маскировалось красным CI времён сломанного docs-шага).
+    second = await pool.fetchrow(
+        "INSERT INTO salons (name, timezone) VALUES ($1, 'Asia/Yekaterinburg') "
+        "RETURNING *",
+        f"test-{uuid.uuid4().hex[:8]}",
+    )
     panel = Panel(pool=pool, password="")
     session = Session(
         user=None, role="team", login="admin@test.ru", salon_id=None,
@@ -1224,8 +1233,15 @@ async def test_team_session_sees_all_salons(demo, pool):
         query: dict[str, str] = {}
         cookies: dict[str, str] = {}
 
-    salon, salons = await panel.salon_for_session(_Req(), session)
-    assert salon is not None and len(salons) > 1  # команда видит все точки
+    try:
+        salon, salons = await panel.salon_for_session(_Req(), session)
+        assert salon is not None  # команда получает точку по умолчанию
+        # команда видит все точки — обе, созданные в этом тесте
+        assert {str(s["id"]) for s in salons} >= {
+            str(demo["salon"]["id"]), str(second["id"])
+        }
+    finally:
+        await pool.execute("DELETE FROM salons WHERE id = $1", second["id"])
 
 
 def test_login_page_has_login_password_and_totp_fields():
