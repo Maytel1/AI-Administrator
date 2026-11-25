@@ -9,13 +9,30 @@ from __future__ import annotations
 
 from datetime import datetime
 from html import escape
-from os import path
+from pathlib import Path
 from typing import Any, Iterable
 from zoneinfo import ZoneInfo
 
-# Версия CSS для кэш-бустинга браузера (mtime файла).
-# В контейнере файл лежит по пути /app/app/static.css.
-_CSS_VERSION = str(int(path.getmtime("/app/app/static.css")))
+
+def _css_version() -> str:
+    """Версия CSS для кэш-бустинга браузера — mtime файла стилей.
+
+    В контейнере файл лежит по пути /app/app/static.css, в репозитории — рядом
+    с сервисом. Если файла нет (тесты ядра без собранного образа), версия 0:
+    импорт модуля не должен зависеть от того, где его запустили.
+    """
+    for candidate in (
+        Path("/app/app/static.css"),
+        Path(__file__).resolve().parents[3] / "services" / "web" / "app" / "static.css",
+    ):
+        try:
+            return str(int(candidate.stat().st_mtime))
+        except OSError:
+            continue
+    return "0"
+
+
+_CSS_VERSION = _css_version()
 
 # SVG-иконки навигации сайдбара (16×16, stroke=currentColor наследует цвет текста).
 # Каждая собрана из коротких строк, чтобы не превышать линию длины линтера.
@@ -136,6 +153,12 @@ ICON_AUDIT = (
     '</svg>'
 )
 
+ICON_ONBOARD = (
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"'
+    ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    '<path d="M21 12a9 9 0 0 0-9-9 9 9 0 0 0-9 9c0 4.9 3.9 8.9 8.9 8.9s8.9-3.9 8.9-8.9"/></svg>'
+)
+
 ICON_SETTINGS = (
     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"'
     ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
@@ -167,6 +190,7 @@ NAV = [
     ("/counterparties", "Контрагенты", ICON_COUNTERPARTIES),
     ("/audit", "Аудит", ICON_AUDIT),
     ("/settings", "Настройки", ICON_SETTINGS),
+    ("/onboard", "Онбординг", ICON_ONBOARD),
 ]
 
 
@@ -440,9 +464,8 @@ def layout(
         item for item in NAV
         if module_enabled(item[0], salon)
         if (
-            (item[0] in ("/network", "/billing", "/counterparties") and role == "team")
-            or (item[0] == "/pay" and role in ("owner", "team"))
-            or item[0] not in ("/network", "/billing", "/counterparties", "/pay")
+            item[0] in ("/network", "/billing", "/counterparties", "/pay", "/onboard") and role == "team"
+            or item[0] not in ("/network", "/billing", "/counterparties", "/pay", "/onboard")
         )
     ]
     nav = "".join(
@@ -460,7 +483,8 @@ def layout(
         f"<title>{esc(title)} — Дежурный24</title>"
         '<link rel="preconnect" href="https://fonts.googleapis.com">'
         '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
-        '<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">'
+        '<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:'
+        'wght@500;600;700&display=swap" rel="stylesheet">'
         '<link rel="stylesheet" href="/static.css?v={_CSS_VERSION}">'
         f"{theme_style}"
         '</head><body>'
@@ -510,21 +534,26 @@ def login_page(
             'pattern="[0-9]{6}" maxlength="6" autofocus required>'
         )
     remember_checked = " checked" if remember else ""
+    remember_field = (
+        '<label class="chk"><input type="checkbox" name="remember" '
+        f'id="remember" value="1"{remember_checked}> '
+        "<span>Запомнить меня</span></label>"
+    )
     if agreed:
         # Согласие уже дано в этом POST — рисуем чекбоксы уже отмеченными,
         # чтобы CSS :has(...) увидел их и разблокировал кнопку «Войти».
+        # «Запомнить меня» показываем только если галочка была отмечена:
+        # на шаге 2FA заново предлагать её незачем.
         consent = (
             '<div class="agree">'
             '<label class="chk"><input type="checkbox" name="agree_oferta" '
-            'checked> <span>Я принимаю <a href=\"/oferta\" target=\"_blank\" '
-            'rel=\"noopener\">условия публичной оферты</a></span></label>'
+            'checked> <span>Я принимаю <a href="/oferta" target="_blank" '
+            'rel="noopener">условия публичной оферты</a></span></label>'
             '<label class="chk"><input type="checkbox" name="agree_pdn" '
-            'checked> <span>Я согласен на <a href=\"/pdn\" target=\"_blank\" '
-            'rel=\"noopener\">обработку персональных данных</a></span></label>'
-            '<label class="chk"><input type="checkbox" name="remember" '
-            f'id="remember" value="1"{remember_checked}> '
-            "<span>Запомнить меня</span></label>"
-            "</div>"
+            'checked> <span>Я согласен на <a href="/pdn" target="_blank" '
+            'rel="noopener">обработку персональных данных</a></span></label>'
+            + (remember_field if remember else "")
+            + "</div>"
         )
     else:
         consent = (
@@ -535,10 +564,8 @@ def login_page(
             '<label class="chk"><input type="checkbox" name="agree_pdn" '
             'required> <span>Я согласен на <a href="/pdn" target="_blank" '
             'rel="noopener">обработку персональных данных</a></span></label>'
-            '<label class="chk"><input type="checkbox" name="remember" '
-            f'id="remember" value="1"{remember_checked}> '
-            "<span>Запомнить меня</span></label>"
-            "</div>"
+            + remember_field
+            + "</div>"
         )
     return (
         '<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8">'

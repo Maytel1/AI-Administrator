@@ -38,7 +38,7 @@ from admin_core.web.pages_lists import (
     page_services,
     page_settings,
 )
-from admin_core.web.render import layout, login_page, esc, dt_local
+from admin_core.web.render import dt_local, esc, layout, login_page
 from admin_core.web.roles import audit_actor, can, can_action, role_label
 from admin_core.web.security import (
     cookie_secure_flag,
@@ -197,7 +197,7 @@ async def _dialog_messages(panel: Panel, request: Any) -> str:
             "tool": "\u0418нструмент",
         }.get(m["role"], m["role"])
         bubbles.append(
-            '<div class="msgs"><b>' + esc(m["role"]) + '</b> '
+            '<div class="msgs"><b>' + esc(who) + '</b> '
             + esc(dt_local(m["created_at"], tz, "%d.%m %H:%M"))
             + "<br>" + esc(m["content"]) + "</div>"
         )
@@ -330,8 +330,8 @@ async def _pay(
     from admin_core import billing  # noqa: PLC0415
 
     role = ctx.role if ctx else "guest"
-    # владелец платит сам (pay), команда управляет всем (billing)
-    if not (can(role, "pay") or can(role, "billing")):
+    # Оплата тарифа пока оформляется вручную — раздел виден только команде.
+    if not can(role, "billing"):
         panel.metrics.errors.labels("forbidden").inc()
         return page_pay(
             {"status_text": "Недостаточно прав: раздел для владельца точки",
@@ -407,20 +407,48 @@ async def _settings(
     if can(session.role, "users"):
         people = await users.list_users(panel.pool, str(salon["id"]))
     once = panel.take_once(request.cookies.get(SESSION_COOKIE, ""))
-    # Тариф и история платежей — рядом на странице настроек
+    # Тариф и история платежей — рядом на странице настроек.
+    # История платежей — только для команды; владельцу показываем только тариф.
     salon_row = dict(await panel.pool.fetchrow(
         "SELECT id, name, plan, paid_until, timezone FROM salons WHERE id = $1",
         salon["id"],
     ))
     from admin_core import billing  # noqa: PLC0415
     bstatus = await billing.billing_status(panel.pool, salon_row)
-    history = await panel.pool.fetch(
-        "SELECT period_start, period_end, amount, status, paid_at, invoice_no "
-        "FROM payments WHERE salon_id = $1 ORDER BY period_start DESC LIMIT 12",
-        salon["id"],
-    )
+    if can(session.role, "billing"):
+        history = await panel.pool.fetch(
+            "SELECT period_start, period_end, amount, status, paid_at, invoice_no "
+            "FROM payments WHERE salon_id = $1 ORDER BY period_start DESC LIMIT 12",
+            salon["id"],
+        )
+    else:
+        history = []
     return page_settings(salon, salons, env, who, people, ctx, once,
                          status=bstatus, history=history)
+
+
+async def _onboard(
+    panel: Panel, salon: dict, salons: list[dict], request: Any, ctx: PageCtx | None = None
+) -> str:
+    """Онбординг новой точки: создание салона, мастера, услуг, учётной записи.
+
+    Доступно только роли «наша команда» (team). Владелец точки не должен
+    видеть этот раздел — он создаётся через панели команды при подключении
+    нового клиента.
+    """
+    from admin_core.web.pages_lists import page_onboard  # noqa: PLC0415
+
+    role = ctx.role if ctx else "guest"
+    # То же право, что у действия onboard_save и реестра контрагентов:
+    # подключение новой точки — зона команды (см. ACTION_PERMISSION).
+    if not can(role, "counterparties"):
+        panel.metrics.errors.labels("forbidden").inc()
+        return page_onboard(
+            msg="Недостаточно прав на раздел «Онбординг»",
+            err=True, ctx=ctx,
+        )
+    msg, err = _flash_from(request)
+    return page_onboard(msg=msg, err=err, ctx=ctx)
 
 
 def build_app(
@@ -924,6 +952,7 @@ def build_app(
         "/counterparties": _counterparties,
         "/pay": _pay,
         "/network": _network,
+        "/onboard": _onboard,
     }
     check_builder_signatures(sections)  # падаем на старте, а не в HTTP
     app = web.Application(middlewares=[trace, security])

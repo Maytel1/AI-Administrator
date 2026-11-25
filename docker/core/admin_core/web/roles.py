@@ -38,7 +38,7 @@ P_TENANT_SETTINGS = "tenant_settings"  # настройка внешнего в�
 ROLE_PERMISSIONS: dict[str, set[str]] = {
     "owner": {
         P_READ, P_BOOKING_STATUS, P_PRICING, P_CATALOG, P_CLIENT_FLAGS,
-        P_CLIENT_CREATE, P_SCHEDULE, P_USERS, P_REPORTS, P_PAY,
+        P_CLIENT_CREATE, P_SCHEDULE, P_USERS, P_REPORTS,
     },
     # администратор ведёт рутину на фронте: статусы, карточки клиентов, отчёты
     "staff": {P_READ, P_BOOKING_STATUS, P_CLIENT_FLAGS, P_CLIENT_CREATE, P_REPORTS},
@@ -60,14 +60,18 @@ ACTION_PERMISSION = {
     "client_create": P_CLIENT_CREATE,
     "booking_reschedule": P_BOOKING_STATUS,
     "prepayment_set": P_BOOKING_STATUS,
-    # профиль плательщика владелец правит сам (свой салон, action изолирован
-    # по salon_id сессии); staff по-прежнему не достаётся.
-    "legal_save": P_PAY,
+    # Профиль плательщика (ИНН, реквизиты) — оплата, виден только команде.
+    "legal_save": P_BILLING,
     # реестр контрагентов — общий на команду, правит только team
     "counterparty_save": P_COUNTERPARTIES,
     "counterparty_toggle": P_COUNTERPARTIES,
+    # подключение новой точки — та же командная зона, что и контрагенты
+    "onboard_save": P_COUNTERPARTIES,
     "invoice_issue": P_BILLING,
     "payment_mark_paid": P_BILLING,
+    # смена тарифа — та же командная зона, что и счета (без записи в матрице
+    # действие было недоступно ни одной роли)
+    "tariff_change": P_BILLING,
     "waitlist_add": P_CLIENT_CREATE,
     "waitlist_drop": P_CLIENT_CREATE,
     "client_save": P_CLIENT_FLAGS,

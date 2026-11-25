@@ -7,14 +7,17 @@
 
 from __future__ import annotations
 
-import uuid
 import json
+import uuid
 from datetime import datetime, time
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from .auth import hash_password, random_password
+import asyncpg
+
 from admin_core.crm.internal import InternalCRM
+
+from .auth import hash_password, random_password
 
 MIN_PRICE = 0
 MAX_PRICE = 10_000_000
@@ -517,7 +520,8 @@ async def apply_form(
         async with pool.acquire() as conn:
             # Получаем preset для выбранной вертикали
             preset = await conn.fetchrow(
-                "SELECT label, default_plan, services, roles, modules, terms, theme FROM vertical_presets WHERE vertical = $1",
+                "SELECT label, default_plan, services, roles, modules, terms, theme "
+                "FROM vertical_presets WHERE vertical = $1",
                 vertical,
             )
             if not preset:
@@ -555,7 +559,126 @@ async def apply_form(
                         r["role"],
                         hash_password(random_password()),
                     )
-        return ok(f"Оформление сохранено: направление «{preset['label']}», акцент {accent}")
+        theme_ru = "тёмная" if theme == "dark" else "светлая"
+        return ok(f"Оформление сохранено: направление «{preset['label']}», тема {theme_ru}")
+
+    if action == "onboard_save":
+        from .roles import SELF_ISSUE_ROLES  # noqa: PLC0415
+
+        salon_name = str(form.get("salon_name", "")).strip()
+        city = str(form.get("city", "")).strip()
+        timezone = str(form.get("timezone", "Asia/Yekaterinburg")).strip() or "Asia/Yekaterinburg"
+        plan = str(form.get("plan", "trial")).strip()
+        master_name = str(form.get("master_name", "")).strip()
+        service_name = str(form.get("service_name", "")).strip()
+        service_duration = _int(form, "service_duration", 60)
+        service_price = _decimal(form.get("service_price"))
+        owner_login = str(form.get("owner_login", "")).strip().lower()
+        owner_name = str(form.get("owner_name", "")).strip()
+        owner_password = str(form.get("owner_password", ""))
+        owner_role = str(form.get("owner_role", "owner")).strip()
+
+        if not salon_name:
+            return fail("bad_title", "Введите название салона")
+        if not city:
+            return fail("bad_title", "Введите город")
+        if not master_name:
+            return fail("bad_title", "Введите имя мастера")
+        if not service_name:
+            return fail("bad_title", "Введите название услуги")
+        if service_price is None or service_price < 0:
+            return fail("bad_price", "Некорректная цена услуги")
+        if not service_duration or service_duration < 5 or service_duration > 600:
+            return fail("bad_duration", "Длительность услуги от 5 до 600 минут")
+        if "@" not in owner_login or "." not in owner_login.split("@")[-1]:
+            return fail("bad_login", "Логин должен быть e-mail")
+        if not owner_password or len(owner_password) < 8:
+            return fail("weak_password", "Пароль минимум 8 символов")
+        if owner_role not in SELF_ISSUE_ROLES:
+            return fail("bad_role", "Недопустимая роль")
+
+        # Все вставки — в одной транзакции: сбой на середине (например, занятый
+        # логин владельца) не должен оставлять «полусалон» без учётной записи.
+        try:
+            async with pool.acquire() as conn:
+                async with conn.transaction():
+                    # Создаём салон. Город в схеме не хранится (колонки нет),
+                    # поэтому уходит только в аудит; phone не трогаем.
+                    row = await conn.fetchrow(
+                        "INSERT INTO salons (name, timezone, plan, crm_provider, is_active) "
+                        "VALUES ($1, $2, $3, 'internal', true) RETURNING id, name",
+                        salon_name, timezone, plan,
+                    )
+                    salon_id = str(row["id"])
+
+                    # Создаём мастера
+                    master_row = await conn.fetchrow(
+                        "INSERT INTO masters (salon_id, name, is_active) "
+                        "VALUES ($1, $2, true) RETURNING id",
+                        salon_id, master_name,
+                    )
+                    master_id = str(master_row["id"])
+
+                    # Создаём услугу
+                    svc_row = await conn.fetchrow(
+                        "INSERT INTO services (salon_id, title, duration_min, price, is_active) "
+                        "VALUES ($1, $2, $3, $4, true) RETURNING id",
+                        salon_id, service_name, service_duration, service_price,
+                    )
+                    service_id = str(svc_row["id"])
+
+                    # Связываем мастера с услугой
+                    await conn.execute(
+                        "INSERT INTO master_services (master_id, service_id) VALUES ($1, $2)",
+                        master_id, service_id,
+                    )
+
+                    # График работы: все дни, 10:00–20:00 по умолчанию
+                    for wd in range(7):
+                        start = form.get(f"ws{wd}", "10:00")
+                        end = form.get(f"we{wd}", "20:00")
+                        enabled = form.get(f"wd{wd}") == "1"
+                        if enabled and start and end:
+                            await conn.execute(
+                                "INSERT INTO working_hours (master_id, weekday, start_time, end_time) "
+                                "VALUES ($1, $2, $3, $4) ON CONFLICT (master_id, weekday) DO UPDATE "
+                                "SET start_time = $3, end_time = $4",
+                                master_id, wd, start, end,
+                            )
+                        elif not enabled:
+                            await conn.execute(
+                                "DELETE FROM working_hours WHERE master_id = $1 AND weekday = $2",
+                                master_id, wd,
+                            )
+
+                    # Создаём учётную запись владельца
+                    stored = hash_password(owner_password)
+                    await conn.fetchrow(
+                        "INSERT INTO panel_users (salon_id, login, name, role, password_hash, "
+                        "totp_secret, totp_enabled, is_active) VALUES ($1,$2,$3,$4,$5,NULL,false,true) "
+                        "RETURNING id, login",
+                        salon_id, owner_login, owner_name, owner_role, stored,
+                    )
+                    await conn.execute(
+                        "INSERT INTO audit_log (salon_id, actor, action, details) "
+                        "VALUES ($1, $2, 'onboard_save', $3)",
+                        salon_id, "team:onboard",
+                        json.dumps({
+                            "salon": salon_name,
+                            "city": city,
+                            "master": master_name,
+                            "service": service_name,
+                            "owner": owner_login,
+                        }, ensure_ascii=False),
+                    )
+        except asyncpg.exceptions.UniqueViolationError:
+            # Повторный логин владельца — самая вероятная ошибка занятого ввода.
+            return fail("bad_login", "Такой логин уже занят — укажите другой e-mail")
+
+        return ok(
+            f"Точка «{salon_name}» создана. Мастер: {master_name}, услуга: {service_name}. "
+            f"Владелец: {owner_login} / пароль указан при создании."
+        )
 
     return fail("save_failed", "Неизвестное действие формы")
 

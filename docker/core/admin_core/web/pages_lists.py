@@ -645,7 +645,6 @@ def page_dialogs(
     """Диалоги бота — видно, как бот отвечает клиенту (контроль качества ответов)."""
     from .queries import CHANNEL_RU
 
-    sid = salon["id"] if salon else ""
     client_header = ""
     if client_id:
         client_row = next((d for d in rows if d.get("client_id") == client_id), None)
@@ -662,7 +661,8 @@ def page_dialogs(
             f'реплик: {d["messages"]}</span>'
             f'<span class="meta">Итог: {esc(d["outcome"] or "—")}</span>'
             f'<div class="m-actions">'
-            f'<button class="btn" data-dialog-id="{esc(d["id"])}" data-client-name="{esc(d["client_name"] or d["client_phone"] or "Клиент")}">Открыть</button>'
+            f'<button class="btn" data-dialog-id="{esc(d["id"])}"'
+            f' data-client-name="{esc(d["client_name"] or d["client_phone"] or "Клиент")}">Открыть</button>'
             "</div></div>"
         )
     if cards:
@@ -824,7 +824,9 @@ def page_settings(
         f'<div class="m-grid">{"".join(pay_cards)}</div>'
         if pay_cards else '<div class="empty">Платежей пока не было</div>'
     )
-    billing_card = card("История платежей", pay_block)
+    # История платежей — только для роли «наша команда». Владельцу и админу
+    # точки пока оплаты оформляются вручную, раздел скрыт.
+    billing_card = card("История платежей", pay_block) if role == "team" else ""
 
     people = ""
     if may_users:
@@ -908,8 +910,11 @@ def page_settings(
         "</form>",
     )
     content = (
-        '<div class="page">"
-        '<style>td{overflow-wrap:anywhere !important;word-wrap:anywhere !important;word-break:break-all !important}.two-cols td:first-child{width:26ch !important}.two-cols td:last-child{max-width:calc(100% - 26ch) !important}</style>'
+        '<div class="page">'
+        '<style>td{overflow-wrap:anywhere !important;word-wrap:anywhere !important;'
+        'word-break:break-all !important}'
+        '.two-cols td:first-child{width:26ch !important}'
+        '.two-cols td:last-child{max-width:calc(100% - 26ch) !important}</style>'
         '<div class="page-head-inner">'
         + page_head("Настройки", "Оформление, команда, доступы", salon, salons)
         + "</div>"
@@ -1675,3 +1680,120 @@ STATUS_RU = {
     "issued": "выставлен", "paid": "оплачен",
     "overdue": "просрочен", "void": "аннулирован",
 }
+
+
+# ═══ ОНБОРДИНГ ТОЧКИ ═════════════════════════════════════════════════════════════
+
+def page_onboard(
+    msg: str = "", err: bool = False, ctx: Any | None = None,
+) -> str:
+    """Страница онбординга новой точки: салон, мастер, услуги, учётка владельца.
+
+    Доступна только роли «наша команда» (team). Создаётся через веб-интерфейс,
+    чтобы не лезть в CLI при подключении нового клиента.
+    """
+    from .roles import SELF_ISSUE_ROLES
+
+    csrf = ctx.csrf if ctx else ""
+    role = _role(ctx)
+    can_create = role == "team"
+
+    flash_block = ""
+    if msg:
+        tone = "err" if err else "ok"
+        flash_block = f'<div class="flash {tone}">{esc(msg)}</div>'
+
+    # План тарифа для выбора
+    plans_html = ""
+    if can_create:
+        plans_html = (
+            '<label class="field"><span>Тариф</span>'
+            '<select name="plan">'
+            '<option value="trial">Пробный (14 дней)</option>'
+            '<option value="start">Старт</option>'
+            '<option value="standard">Стандарт</option>'
+            '<option value="pro">Про</option>'
+            '</select></label>'
+        )
+
+    # График работы по умолчанию: ежедневно 10:00–20:00
+    weekdays_html = ""
+    for i, name in enumerate(["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]):
+        weekdays_html += (
+            f'<div class="wh-row">'
+            f'<label class="check"><input type="checkbox" name="wd{i}" value="1" checked>{name}</label>'
+            f'<input type="time" name="ws{i}" value="10:00">'
+            f'<input type="time" name="we{i}" value="20:00">'
+            f'</div>'
+        )
+
+    roles_options = "".join(
+        f'<option value="{r}">{r}</option>' for r in SELF_ISSUE_ROLES
+    )
+
+    form = f"""
+    <form method="post" action="/actions" class="stack">
+    <input type="hidden" name="action" value="onboard_save">
+    {csrf_field(csrf)}
+    <input type="hidden" name="back" value="/onboard">
+
+    <div class="m-grid">
+    <div class="m-card">
+    <div class="m-top"><b>Точка</b></div>
+    <label class="field"><span>Название салона</span>
+    <input type="text" name="salon_name" placeholder="например: «Автосервис на Ленина»" required></label>
+    <label class="field"><span>Город</span>
+    <input type="text" name="city" placeholder="Тюмень" required></label>
+    <label class="field"><span>Таймзона</span>
+    <input type="text" name="timezone" value="Asia/Yekaterinburg" required></label>
+    {plans_html}
+    </div>
+
+    <div class="m-card">
+    <div class="m-top"><b>Мастер</b></div>
+    <label class="field"><span>Имя мастера</span>
+    <input type="text" name="master_name" placeholder="например: Иван Иванов" required></label>
+    <label class="field"><span>Услуга</span>
+    <input type="text" name="service_name" placeholder="например: Замена масла" required></label>
+    <label class="field"><span>Длительность, мин</span>
+    <input type="number" name="service_duration" value="60" min="5" max="600" required></label>
+    <label class="field"><span>Цена, ₽</span>
+    <input type="number" name="service_price" value="1200" min="0" step="50" required></label>
+    </div>
+
+    <div class="m-card">
+    <div class="m-top"><b>График работы</b></div>
+    <div class="wh-grid">{weekdays_html}</div>
+    </div>
+
+    <div class="m-card">
+    <div class="m-top"><b>Учётная запись владельца</b></div>
+    <label class="field"><span>Логин (e-mail)</span>
+    <input type="email" name="owner_login" placeholder="owner@salon.ru" required></label>
+    <label class="field"><span>Имя владельца</span>
+    <input type="text" name="owner_name" placeholder="Иван Петров" required></label>
+    <label class="field"><span>Пароль</span>
+    <input type="password" name="owner_password" minlength="8" required></label>
+    <label class="field"><span>Роль</span>
+    <select name="owner_role">{roles_options}</select></label>
+    </div>
+    </div>
+
+    <div class="modal-foot" style="margin-top:16px">
+    <button type="submit">Создать точку и учётную запись</button>
+    </div>
+    </form>
+    """
+
+    content = (
+        page_head("Онбординг точки", "Создайте новый салон, мастера, услуги и учётку владельца", None, None)
+        + flash_block
+        + (
+            card("Новая точка", form)
+            if can_create
+            # Форму видит только команда: POST всё равно отсечён правами,
+            # но показывать владельцу мёртвую форму — приглашение к путанице.
+            else '<div class="empty">Раздел доступен только нашей команде.</div>'
+        )
+    )
+    return layout("Онбординг", "/onboard", content, salon=None, salons=None, role=role, inner_scroll=True)
