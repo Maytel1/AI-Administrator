@@ -26,17 +26,17 @@
       финальный тест `check_prod_tls.ps1 -Host dejurnii24.duckdns.org`
       делать с внешней сети (телефон в мобильном интернете).
 
-      Продление (раз в ~60 дней, вручную — из каталога `docker`):
+      **Продление автоматизировано** (26.11.2026): задача `Dezhurny24-CertRenew`
+      — понедельник 06:00, лог `docker/logs/renew_cert.log`. acme.sh пропускает
+      прогон, если до конца срока больше 30 дней, поэтому частые прогоны
+      безвредны; после фактического продления сертификат кладётся в
+      `docker/certs` и nginx перезапускается. Скрипт можно дёрнуть и руками:
 
-      ```bash
-      TOKEN=$(grep '^DUCKDNS_TOKEN=' .env | cut -d= -f2 | tr -d '\r')
-      docker run --rm -e DuckDNS_Token="$TOKEN" \
-        -v "C:/Users/1/Desktop/project/docker/certs/acme:/acme.sh" \
-        neilpang/acme.sh --renew -d dejurnii24.duckdns.org --ecc --server letsencrypt
-      cp certs/acme/dejurnii24.duckdns.org_ecc/fullchain.cer certs/fullchain.pem
-      cp certs/acme/dejurnii24.duckdns.org_ecc/dejurnii24.duckdns.org.key certs/privkey.pem
-      docker compose restart nginx
+      ```powershell
+      powershell -NoProfile -ExecutionPolicy Bypass -File docker/scripts/renew_cert.ps1 -Force
       ```
+
+      Убрать задачу: `setup_cert_renew_schedule.ps1 -Remove`.
 - [ ] **A3. Бэкапы живы** — **решение 26.11.2026: только вручную**, планировщик
       не используется (задача `Dezhurny24-Backup` не создаётся; при смене
       решения — `scripts/setup_backup_schedule.ps1`). Ручной цикл из каталога
