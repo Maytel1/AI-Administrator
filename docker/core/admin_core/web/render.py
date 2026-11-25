@@ -485,7 +485,9 @@ def layout(
         '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
         '<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:'
         'wght@500;600;700&display=swap" rel="stylesheet">'
-        '<link rel="stylesheet" href="/static.css?v={_CSS_VERSION}">'
+        # f-строка обязательна: без неё браузер годами держит старый CSS
+        # в кэше под неизменным URL «?v={_CSS_VERSION}».
+        f'<link rel="stylesheet" href="/static.css?v={_CSS_VERSION}">'
         f"{theme_style}"
         '</head><body>'
         '<a href="#main" class="skip-link">Перейти к основному содержимому</a>'
@@ -573,7 +575,7 @@ def login_page(
         '<meta name="color-scheme" content="dark">'
         '<style>.skip-link{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}</style>'
         "<title>Вход — Дежурный24</title>"
-        '<link rel="stylesheet" href="/static.css?v={_CSS_VERSION}"></head><body>'
+        f'<link rel="stylesheet" href="/static.css?v={_CSS_VERSION}"></head><body>'
         '<a href="#main" class="skip-link">Перейти к основному содержимому</a>'
         '<div class="login" id="main"><form method="post" action="/login">'
         '<div class="brand" style="padding:0 0 6px">Дежурный<span>24</span></div>'

@@ -111,8 +111,12 @@ table{width:100%;border-collapse:collapse;font-size:18px}
 th{
   text-align:left; color:var(--subtle); font-weight:500; font-size:18px;
   padding:7px 10px; border-bottom:1px solid var(--border);
+  overflow-wrap:anywhere;
 }
-td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.05);overflow-wrap:anywhere;word-wrap:anywhere;word-break:break-all}
+/* overflow-wrap:anywhere достаточно: переносит длинный токен, когда он
+   не влезает, но не ломает слова посимвольно (в отличие от break-all,
+   который сводил min-content ячейки к ширине одного знака). */
+td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.05);overflow-wrap:anywhere}
 tr:last-child td{border-bottom:none}
 tr:hover td{background:var(--surface-2)}
 .badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:18px;border:1px solid transparent}
@@ -292,13 +296,18 @@ button:focus-visible,.btn:focus-visible{outline:2px solid var(--accent);outline-
 .menu-item button.primary:hover{background:var(--accent-hover)}
 .muted-cell{color:var(--subtle);font-size:18px}
 
-/* Узкая колонка действий не должна раздувать таблицу. */
-td:last-child,th:last-child{width:1%;white-space:nowrap}
+/* Узкая колонка действий (в последней ячейке кнопки/меню) не переносится —
+   иначе три кнопки занимают три строки. Ячейки с текстом под это правило
+   не попадают: значения в таблицах «ключ—значение» переносятся через
+   overflow-wrap, а не уезжают за карточку. */
+td:has(> button), td:has(> details), td:has(> form){width:1%;white-space:nowrap}
 
 /* На ноутбуке панелью пользуются с узкого экрана: таблица записей должна
    прокручиваться по горизонтали, а не ломать сетку. */
 .scroll-x{overflow-x:auto;-webkit-overflow-scrolling:touch}
-.scroll-x table{min-width:860px}
+/* auto: fixed-раскладка делит ширину на равные колонки, и nowrap-кнопки
+   «Действий» вылезают из своей доли; auto даёт колонке ширину по содержимому. */
+.scroll-x table{min-width:860px;table-layout:auto}
 
 /* Панель таблицы: фильтры живут в шапке над колонками и липнут к верху,
    поэтому при длинном списке заголовки не уезжают за экран. */
@@ -690,6 +699,3 @@ table.counterparties .row-end{display:flex;gap:8px;align-items:center}
 .radial-card{display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px}
 .radial-label{font-size:14px;color:var(--subtle);text-align:center}
 .radial svg{width:140px;height:140px}
-.two-cols td:first-child{width:26ch !important}
-.two-cols td:last-child{max-width:calc(100% - 26ch) !important}
-td{overflow-wrap:anywhere !important;word-wrap:anywhere !important;word-break:break-all !important}

@@ -886,10 +886,15 @@ def page_settings(
             )
         people = card(
             "Команда точки",
-            table(
+            # scroll-x: шесть колонок с кнопками не помещаются в карточку —
+            # таблица прокручивается внутри карточки, а не вылезает за неё.
+            '<div class="scroll-x">'
+            + table(
                 ["Логин", "Имя", "Роль", "Второй фактор", "Был(а)", "Действия"],
                 rows, "Пока никого",
-            ) + add_form,
+            )
+            + "</div>"
+            + add_form,
         )
 
     # Смена своего пароля — раньше «по плану фазы 4», теперь форма здесь:
@@ -911,10 +916,6 @@ def page_settings(
     )
     content = (
         '<div class="page">'
-        '<style>td{overflow-wrap:anywhere !important;word-wrap:anywhere !important;'
-        'word-break:break-all !important}'
-        '.two-cols td:first-child{width:26ch !important}'
-        '.two-cols td:last-child{max-width:calc(100% - 26ch) !important}</style>'
         '<div class="page-head-inner">'
         + page_head("Настройки", "Оформление, команда, доступы", salon, salons)
         + "</div>"
