@@ -650,16 +650,18 @@ def page_dialogs(
         client_row = next((d for d in rows if d.get("client_id") == client_id), None)
         cname = esc(client_row["client_name"] or client_row["client_phone"] or "Клиент") if client_row else "Клиент"
         client_header = f'<div class="sub">Диалоги клиента: {cname}</div>'
-    # Лента — плотные строки на всю ширину карточки: имя · канал · время ·
-    # итог · «Открыть» в один ряд. modal.js ловит кнопку по data-dialog-id,
-    # поэтому класс кнопки не важен.
+    # Лента — квадратные плитки в сетке: клиент · канал · время · итог,
+    # «Открыть» прижата к низу плитки. modal.js ловит кнопку по
+    # data-dialog-id, поэтому класс кнопки не важен.
     items = []
     for d in rows:
         items.append(
-            '<div class="dlg-row">'
+            '<div class="dlg-tile">'
+            '<div class="dlg-tile-top">'
             f'<b class="dlg-name">{esc(d["client_name"] or d["client_phone"] or "аноним")}</b>'
             + badge(esc(CHANNEL_RU.get(d["channel"], d["channel"] or "—")), "accent")
-            + f'<span class="dlg-meta">{esc(dt_local(d["started_at"], tz, "%d.%m %H:%M"))} · '
+            + "</div>"
+            f'<span class="dlg-meta">{esc(dt_local(d["started_at"], tz, "%d.%m %H:%M"))} · '
             f'реплик: {d["messages"]}</span>'
             f'<span class="dlg-outcome">Итог: {esc(d["outcome"] or "—")}</span>'
             f'<button class="btn ghost" type="button" data-dialog-id="{esc(d["id"])}"'
@@ -670,7 +672,7 @@ def page_dialogs(
         feed = (
             f'<div class="dlg-count">Диалогов: {len(items)} · нажмите «Открыть», '
             "чтобы прочитать переписку</div>"
-            '<div class="dlg-list">' + "".join(items) + "</div>"
+            '<div class="dlg-grid">' + "".join(items) + "</div>"
         )
     else:
         feed = '<div class="empty">Диалогов пока нет — бот ещё не общался с клиентами.</div>'
