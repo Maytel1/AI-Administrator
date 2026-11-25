@@ -27,6 +27,8 @@ def make_provider(settings: Settings | None = None) -> LLMProvider:
             api_key=s.yc_api_key,
             folder_id=s.yc_folder_id,
             model_uri=s.yandexgpt_model_uri,
+            temperature=s.llm_temperature,
+            max_tokens=s.llm_max_tokens,
         )
     if s.llm_provider in ("openai", "openai_compat"):
         from .openai_compat import OpenAICompatProvider
