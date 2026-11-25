@@ -45,7 +45,12 @@ if (Test-Path $errLog) {
 #    «успешного» восстановления — не успех. Судим по коду выхода restore_check.py
 #    (0 — совпало, 1 — расхождение, 2 — нет доступа к БД): это устойчиво к
 #    кодировке консоли, в отличие от сравнения текста вывода.
-$verify = python "$PSScriptRoot\restore_check.py" --prod aiadmin --restored $CheckDb 2>&1
+#    Проверка идёт внутри контейнера cli: там есть asyncpg и доступ к сети
+#    compose, хост-Python зависимостей не гарантирует. DSN берём из DATABASE_URL
+#    контейнера, подставляя {db} вместо имени базы.
+$cliDsn = (docker compose exec -T cli printenv DATABASE_URL) -replace '/[^/]+$', '/{db}'
+if (-not $cliDsn) { Write-Host 'cli недоступен — не достать DATABASE_URL' -ForegroundColor Red; exit 1 }
+$verify = docker compose exec -T cli python /app/scripts/restore_check.py --prod aiadmin --restored $CheckDb --dsn "$cliDsn" 2>&1
 $verifyExit = $LASTEXITCODE
 Write-Host $verify -ForegroundColor DarkGray
 

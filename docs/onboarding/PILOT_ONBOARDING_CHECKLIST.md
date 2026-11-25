@@ -12,10 +12,21 @@
       секреты в `docker/.env` (`TELEGRAM_BOT_TOKEN`, `WHATSAPP_*`, `BILLING_*`,
       `YOOKASSA_*`). Пошаговый план развёртывания на домашнем ПК —
       `docs/onboarding/PILOT_STAND_DEPLOY_PLAN.md` (этапы 1–4).
-- [ ] **A3. Бэкапы живы**: задача `Dezhurny24-Backup` —
-      `(Get-ScheduledTaskInfo 'Dezhurny24-Backup').LastTaskResult = 0`,
-      свежий дамп в `docker/backups/`, лог `backups/backup.log` заполнен.
-      Разово прогнать `scripts/restore_check.py` на последнем дампе.
+- [ ] **A3. Бэкапы живы** — **решение 26.11.2026: только вручную**, планировщик
+      не используется (задача `Dezhurny24-Backup` не создаётся; при смене
+      решения — `scripts/setup_backup_schedule.ps1`). Ручной цикл из каталога
+      `docker` (политика выполнения требует `ExecutionPolicy Bypass`):
+
+      ```powershell
+      powershell -NoProfile -ExecutionPolicy Bypass -File scripts/backup_db.ps1
+      powershell -NoProfile -ExecutionPolicy Bypass -File scripts/restore_db.ps1 -Dump .\backups\<свежий>.dump
+      ```
+
+      Вторая команда разворачивает копию во временную БД и сверяет счётчики
+      с рабочей — ответ «дамп разворачивается и содержит те же данные»
+      обязателен перед стартом пилота и после значимых изменений
+      (проверено 26.11.2026: salons/clients/bookings/services/masters
+      совпали). Битые и пустые дампы удаляются скриптом автоматически.
 - [x] **A4. Чистка мусора — выполнено 14.10.2026**: удалено 147 тестовых
       салонов (`Chuzhoy salon` ×105, `other-x` ×33, `load-*`, `test-*`,
       `Tretiy salon`, «Другой салон»); остались только 4 живых салона.
@@ -30,7 +41,9 @@
 
 ## B. Салон клиента в БД
 
-- [ ] **B1. Создать салон** — веб-формы нет, только SQL:
+- [ ] **B1. Создать салон** — веб-форма `/onboard` (роль «наша команда»):
+      точка + учётка владельца за один проход (с 25.11.2026; раньше был только
+      SQL). SQL остаётся запасным путём:
 
   ```sql
   INSERT INTO salons (name, phone, timezone, plan)
@@ -102,12 +115,13 @@
 
 ## G. Финальная проверка перед стартом
 
-- [ ] **G1.** `cd docker && pytest` — все тесты зелёные (13.10.2026: 437).
+- [ ] **G1.** `cd docker && pytest` — все тесты зелёные (26.11.2026: 463;
+      по живой базе — с `ALLOW_TESTS_ON_LIVE_DB=1`, см. подводный камень 8).
 - [ ] **G2.** `python scripts/verify.py --fast` — exit 0.
 - [ ] **G3.** `python scripts/smoke_admin.py --base http://<панель> --login <owner>`
-      — «все проверки пройдены» (22 проверки).
-- [ ] **G4.** Бэкап после всех манипуляций: запустить `scripts/backup_db.ps1`,
-      проверить `LastTaskResult = 0` у задачи.
+      — «все проверки пройдены» (22 проверки; 26.11.2026 — пройден).
+- [ ] **G4.** Бэкап после всех манипуляций: `backup_db.ps1` + проверка
+      восстановлением `restore_db.ps1` (см. A3 — ручной режим, без планировщика).
 - [ ] **G5.** `scripts/check_secrets.py` — секретов в git нет.
 
 ## Известные подводные камни (по состоянию на 14.10.2026)
