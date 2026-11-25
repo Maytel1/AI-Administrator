@@ -1,5 +1,6 @@
 """Общие фикстуры pytest. Тесты требуют БД (docker compose up postgres)."""
 
+import os
 import sys
 import uuid
 from datetime import time
@@ -44,6 +45,25 @@ async def pool():
         pool = await get_pool()
     except Exception as exc:  # noqa: BLE001
         pytest.skip(f"БД недоступна ({type(exc).__name__}) — запустите docker compose up")
+    # Предохранитель: тесты создают и удаляют данные, поэтому на живой базе
+    # пилота их запускать нельзя (25.11.2026 такой прогон стёр платёж и
+    # учётки панели — база тогда совпадала с прод-стендом). CI-база пустая,
+    # под гейт не попадает; для осознанного запуска по живой базе есть
+    # ALLOW_TESTS_ON_LIVE_DB=1.
+    if not os.environ.get("ALLOW_TESTS_ON_LIVE_DB"):
+        old_real = await pool.fetchval(
+            "SELECT count(*) FROM salons "
+            "WHERE created_at < now() - interval '7 days' AND name NOT LIKE 'test-%'"
+        )
+        if old_real:
+            await pool.close()
+            pytest.fail(
+                f"В базе {old_real} салон(ов) старше 7 дней с обычными именами — "
+                "похоже, это живая база, а не тестовая. Тесты удаляют и меняют "
+                "данные. Для CI/локальной тестовой базы всё проходит без флагов; "
+                "для запуска по живой базе задайте ALLOW_TESTS_ON_LIVE_DB=1.",
+                pytrace=False,
+            )
     # Миграции накатываем здесь: тесты проверяют код, который зависит от схемы.
     # Без этого «забытая» миграция выглядит как падение в тестах, а не как
     # расхождение кода и БД.

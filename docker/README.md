@@ -118,6 +118,12 @@ docker compose run --rm cli python cli.py            # диалог в терм�
 docker compose run --rm cli python -m pytest -q      # тесты (нужен запущенный postgres)
 ```
 
+> **Осторожно:** тесты создают и удаляют данные. На живой базе (пилотный
+> стенд) прогон блокируется предохранителем conftest — «похоже, это живая
+> база». Обойти его осознанно можно переменной
+> `ALLOW_TESTS_ON_LIVE_DB=1` — тогда сначала сделайте дамп:
+> `powershell -File scripts/backup_db.ps1`.
+
 После создания YC-аккаунта: в `docker/.env` → `LLM_PROVIDER=yandexgpt`, `YC_API_KEY`, `YC_FOLDER_ID`.
 ## Веб-панель (фаза 4)
 
