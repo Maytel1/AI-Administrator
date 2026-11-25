@@ -12,6 +12,29 @@
       секреты в `docker/.env` (`TELEGRAM_BOT_TOKEN`, `WHATSAPP_*`, `BILLING_*`,
       `YOOKASSA_*`). Пошаговый план развёртывания на домашнем ПК —
       `docs/onboarding/PILOT_STAND_DEPLOY_PLAN.md` (этапы 1–4).
+
+      Статус 26.11.2026: домен `dejurnii24.duckdns.org` жив (DDNS обновлён
+      вручную; задача `Dezhurny24-DDNS` не воссоздана — при смене внешнего IP
+      запись устаревает, обновлять `ddns_duckdns.ps1`). Настоящий TLS выпущен:
+      Let's Encrypt, DNS-01 через DuckDNS (acme.sh), действует до **23.02.2027**;
+      `docker/certs/{fullchain.pem,privkey.pem}` заменены, dev-версии —
+      `*.dev.bak`; цепочка проверена curl без `-k` (200, доверие ок).
+      **Осталось**: проброс 443 (и 80) на роутере → 192.168.0.5 — без него
+      клиент снаружи не достучится; изнутри сети hairpin NAT не работает,
+      финальный тест `check_prod_tls.ps1 -Host dejurnii24.duckdns.org`
+      делать с внешней сети (телефон в мобильном интернете).
+
+      Продление (раз в ~60 дней, вручную — из каталога `docker`):
+
+      ```bash
+      TOKEN=$(grep '^DUCKDNS_TOKEN=' .env | cut -d= -f2 | tr -d '\r')
+      docker run --rm -e DuckDNS_Token="$TOKEN" \
+        -v "C:/Users/1/Desktop/project/docker/certs/acme:/acme.sh" \
+        neilpang/acme.sh --renew -d dejurnii24.duckdns.org --ecc --server letsencrypt
+      cp certs/acme/dejurnii24.duckdns.org_ecc/fullchain.cer certs/fullchain.pem
+      cp certs/acme/dejurnii24.duckdns.org_ecc/dejurnii24.duckdns.org.key certs/privkey.pem
+      docker compose restart nginx
+      ```
 - [ ] **A3. Бэкапы живы** — **решение 26.11.2026: только вручную**, планировщик
       не используется (задача `Dezhurny24-Backup` не создаётся; при смене
       решения — `scripts/setup_backup_schedule.ps1`). Ручной цикл из каталога
