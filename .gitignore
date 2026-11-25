@@ -28,6 +28,20 @@ docker/up_err.txt
 # и docker compose, коммитить их незачем — они каждый раз разные.
 *.log
 
+# stderr-логи docker compose — как *.log, меняются при каждом прогоне
+*.err
+
+# отладочные дампы в корне репозитория
+/tmp/
+
+# состояние VS Code
+.vs/
+
+# кэши инструментов (pytest, mypy, ruff)
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
 # prod TLS: certificates and ACME challenge stay out of git
 docker/nginx/acme/
 
